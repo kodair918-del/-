@@ -56,18 +56,20 @@
 > 職場や学校のネットワークなど、厳しいファイアウォール下では接続できないことがあります。
 > その場合はローカルモード（ひとり／同じ端末で2人）で遊べます。
 
-## 自分のGitHubで公開する
+## 公開する（最初に1回だけ必要な設定）
 
-このリポジトリには GitHub Pages への自動デプロイ設定が入っています。
+GitHub Pages の有効化だけは、リポジトリの持ち主が画面から行う必要があります
+（ワークフローの権限では有効化できません）。**1〜2分で終わります。**
 
-1. GitHub のリポジトリページ → **Settings** → **Pages**
+1. リポジトリページ → **Settings**（設定）→ 左メニューの **Pages**
 2. **Build and deployment** の **Source** を **GitHub Actions** に変更
-3. このブランチに push すると自動でデプロイされます
-   （手動で動かしたいときは **Actions** タブ → *Deploy to GitHub Pages* → **Run workflow**）
-4. 数十秒後に `https://<ユーザー名>.github.io/<リポジトリ名>/` で公開されます
+3. **Actions** タブ → 左の *Deploy to GitHub Pages* → **Run workflow** を押す
+   （以降はこのブランチに push するたび自動でデプロイされます）
+4. 1分ほどで `https://<ユーザー名>.github.io/<リポジトリ名>/` が公開されます
 
-> Actions を使わず、Settings → Pages の **Deploy from a branch** でブランチの
-> `/ (root)` を指定してもそのまま動きます（ビルド不要の素のHTMLのため）。
+> **もっと簡単な方法**: 手順2で **Source** を **Deploy from a branch** にして、
+> ブランチと `/ (root)` を選んでも動きます。ビルド不要の素のHTMLなので、
+> Actions を使わずそのまま配信できます。
 
 ## 手元で動かす
 

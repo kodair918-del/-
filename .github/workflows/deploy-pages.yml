@@ -27,11 +27,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 事前に一度だけ Settings → Pages → Source を「GitHub Actions」にしておくこと
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        with:
-          # リポジトリ側でまだ Pages が有効でなければ、ここで有効化する
-          enablement: true
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
