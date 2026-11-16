@@ -102,7 +102,7 @@ body.inbattle #hud,body.inbattle #hint,body.inbattle #toast,body.inbattle #combo
 <div id="toast"></div>
 <div id="hint">どこでもスワイプで回る ／ 指を置くと止まる</div>
 <button id="battleBtn">⚔ バトル</button>
-<div id="btCount"><b id="btCountB">5</b><div id="btCountT"></div></div>
+<div id="btCount"><b id="btCountB">10</b><div id="btCountT"></div></div>
 <button class="dash" id="dash1"><i></i><span>ダッシュ</span></button>
 <button class="dash" id="dash2"><i></i><span>ダッシュ</span></button>
 <button class="dash skill" id="skill1"><i></i><span>必殺技</span></button>
@@ -110,7 +110,7 @@ body.inbattle #hud,body.inbattle #hint,body.inbattle #toast,body.inbattle #combo
 <div id="bt">
   <div class="btcard" id="sMenu">
     <h2>スピン・アリーナ</h2>
-    <p>5秒間回して、最後の回転数でバトル開始。場外に出されるか、回転が止まったら負け。バトル中は画面のボタンでダッシュ！</p>
+    <p>10秒間回して、最後の回転数でバトル開始。場外に出されるか、回転が止まったら負け。バトル中は画面のボタンでダッシュ！</p>
     <div class="mine">
       <canvas id="hbCv" width="224" height="224"></canvas>
       <div style="flex:1;min-width:0">
@@ -143,7 +143,7 @@ body.inbattle #hud,body.inbattle #hint,body.inbattle #toast,body.inbattle #combo
   </div>
   <div class="btcard" id="sP2" hidden>
     <h2>2Pの番です</h2>
-    <p>2Pのスピナーを選んでください。決まったら「決定して回す」を押して、5秒間回します。</p>
+    <p>2Pのスピナーを選んでください。決まったら「決定して回す」を押して、10秒間回します。</p>
     <div class="mine">
       <canvas id="hbCv2" width="224" height="224"></canvas>
       <div style="flex:1;min-width:0"><div id="mineName2" style="font-size:13px;margin-bottom:6px"></div><div class="bars" id="mineBars2"></div></div>
@@ -746,7 +746,7 @@ function enableTilt() {
 function pos(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
 
 canvas.addEventListener('pointerdown', e => {
-  if (MODE === 'battle' || BT.lock) return;                 // バトル中と、5秒が終わった後は回せない
+  if (MODE === 'battle' || BT.lock) return;                 // バトル中と、準備タイムが終わった後は回せない
   initAudio();
   e.preventDefault();
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -2143,11 +2143,12 @@ function btStart(type, diff, keep) {
     if (type === 'cpu') { BT.rpm2 = streak ? stageRpm(BT.stage) : cpuRpm(BT.diff); beginBattle(); } else { refreshP2(); showScreen('sP2'); }
   });
 }
-function startSpin(label, done) {                           // 5秒間回す（ふつうの画面でふつうに回す）
+const SPIN_SEC = 10;                                         // 準備タイム（回す時間）
+function startSpin(label, done) {                           // 準備タイム：SPIN_SEC秒間回す（ふつうの画面でふつうに回す）
   hideOverlay(); document.body.classList.add('btmode');
   MODE = 'spin'; BT.lock = false; BT.spinDone = done; S.omega = 0; S.turns = 0; hintEl.style.opacity = 0;
-  BT.spinEnd = performance.now() + 5000;
-  $b('btCount').style.display = 'block'; $b('btCountT').textContent = `${label}：5秒間、思いきり回そう！`; $b('btCountB').textContent = '5';
+  BT.spinEnd = performance.now() + SPIN_SEC * 1000;
+  $b('btCount').style.display = 'block'; $b('btCountT').textContent = `${label}：${SPIN_SEC}秒間、思いきり回そう！`; $b('btCountB').textContent = String(SPIN_SEC);
 }
 function spinTick(now) {
   if (BT.lock) return;
@@ -2713,7 +2714,7 @@ async function olRandom() {
   peer.on('connection', conn => { if (MM.matched && conn.peer === MM.guestId) { clearTimeout(MM.talk); mmWire(conn, 'host'); } else conn.close(); });
   peer.on('error', () => { if (MM.active && !MM.matched) olStatus('サーバーにつなげません。ネットワークを確認して、もどってやり直してください'); });
 }
-function onNetOpen(keep) {                                      // つながった：お互いのデザインを交換して、同時に5秒間回す
+function onNetOpen(keep) {                                      // つながった：お互いのデザインを交換して、同時に準備タイムで回す
   BT.type = 'online'; BT.p1 = designOf(); BT.saved = designOf(); BT.name1 = 'あなた'; BT.name2 = '相手'; BT.mySpun = BT.peerSpun = false; if (!keep) BT.peer = null; BT.sentHello = true;
   netSend({ t: 'hello', design: BT.p1, nick: myNick() }); olStatus('つながりました！'); maybeStartOnlineSpin();
 }
