@@ -1775,7 +1775,7 @@ bFx.addEventListener('click', () => {
 /* ================= バトル ================= */
 let MODE = 'free';                                         // 'free'(ふつうに回す) | 'spin'(5秒間回す) | 'battle'
 let BS = 0.14, Q = BS / 0.36;                                // R=1 のスピナーの半径（アリーナ半径=1 に対する比）。小さいほどフィールドが広い。Q＝旧サイズ(0.36)との比で、速さ・力を合わせる                                            // R=1 のスピナーの半径（アリーナ半径=1 に対する比）
-const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5 };   // シミュレーションで調整した値
+const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5, DUR: 7.5, SDUR: 1 };   // DUR=バーストの耐久、SDUR=回転の持久（どちらも倍率）   // シミュレーションで調整した値
 const $b = id => document.getElementById(id);
 
 // 材質：dens=重さ hard=硬さ bear=軸の滑らかさ grip=グリップ（相手へ寄っていく強さ）
@@ -1881,7 +1881,7 @@ function stepFighter(f, o, dt) {
   if (f.out) { f.outT += dt; f.x += f.vx * dt * 1.5; f.y += f.vy * dt * 1.5; f.th += f.w * f.dir * dt; f.vz -= PHYS.G * dt; f.z = Math.max(-0.5, f.z + f.vz * dt); return; }
   f.dashCd = Math.max(0, f.dashCd - dt); f.pairCd = Math.max(0, f.pairCd - dt);
   const w = f.w, wn = Math.min(1, w / 250);
-  f.w = Math.max(0, w - (PHYS.C0 + PHYS.C1 * w) * dt / (Math.pow(f.st.sta, 0.7) * f.lk));     // lk=そのバトルの調子（運）
+  f.w = Math.max(0, w - (PHYS.C0 + PHYS.C1 * w) * dt / (Math.pow(f.st.sta, 0.7) * f.lk * PHYS.SDUR));     // lk=そのバトルの調子（運）
   const r0 = Math.hypot(f.x, f.y), gnd = f.z - fh(r0) < 0.004 && f.vz <= 0.05;
   if (gnd) {
     let ax = -PHYS.BOWL * f.x, ay = -PHYS.BOWL * f.y;                                   // すり鉢の斜面（重力の水平成分）
@@ -1942,8 +1942,8 @@ function collide(Bt, A, B) {
   A.vz = Math.min(1.6, A.vz + Jk / mA * PHYS.LIFT * B.st.sharp * up()); B.vz = Math.min(1.6, B.vz + Jk / mB * PHYS.LIFT * A.st.sharp * up());   // ぶつかると浮く（とがった相手ほど高く）
   A.z += 0.002; B.z += 0.002;
   const stress = w => 0.6 + 0.4 * Math.min(4, Math.sqrt(w / 260));                  // 攻める側の回転が速いほど、相手が壊れやすい
-  A.bg += PHYS.BURST * J * rnd() * B.st.atkE * KIND_ATK[best.b.kind] * stress(B.w) / (A.st.bres * KIND_DEF[best.a.kind]);   // バーストゲージ
-  B.bg += PHYS.BURST * J * rnd() * A.st.atkE * KIND_ATK[best.a.kind] * stress(A.w) / (B.st.bres * KIND_DEF[best.b.kind]);
+  A.bg += PHYS.BURST / PHYS.DUR * J * rnd() * B.st.atkE * KIND_ATK[best.b.kind] * stress(B.w) / (A.st.bres * KIND_DEF[best.a.kind]);   // バーストゲージ
+  B.bg += PHYS.BURST / PHYS.DUR * J * rnd() * A.st.atkE * KIND_ATK[best.a.kind] * stress(A.w) / (B.st.bres * KIND_DEF[best.b.kind]);
   A.w = Math.max(0, A.w - dA); B.w = Math.max(0, B.w - dB);
   A.pairCd = B.pairCd = PHYS.PAIR_CD; A.hits++; B.hits++; A.taken += dA; B.taken += dB; A.maxHit = Math.max(A.maxHit, dB); B.maxHit = Math.max(B.maxHit, dA);
   Bt.ev.push({ type: 'hit', x: (best.a.x + best.b.x) / 2, y: (best.a.y + best.b.y) / 2, z: (A.z + B.z) / 2, p: J, da: dA, db: dB });
@@ -1978,7 +1978,7 @@ function aiDash(f, o, diff, dt) {                           // CPUのダッシ�
   f.aiT = [0.55, 0.32, 0.18][diff - 1] * (0.7 + Math.random() * 0.6);
   if (f.dashCd <= 0 && !f.out && Math.hypot(o.x - f.x, o.y - f.y) < 0.85 * Q * 1.4 && Math.random() < [0.2, 0.5, 0.85][diff - 1]) f.dashReq = true;
 }
-const cpuRpm = diff => Math.round([20000, 29000, 38000][diff - 1] * (0.9 + Math.random() * 0.2));
+const cpuRpm = diff => Math.round([10000, 18000, 26000][diff - 1] * (0.85 + Math.random() * 0.3));
 
 /* ---------- 画面の流れ ---------- */
 const btEl = $b('bt'), SCREENS = ['sMenu', 'sP2', 'sOnline', 'sResult'];
