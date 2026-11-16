@@ -149,7 +149,7 @@ const TIMBRE = {
 const S = {
   theta: 0, prevTheta: 0, omega: 0, gripV: 0,
   turns: 0, tickIdx: null, lastRpm: -1,
-  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], tx: 0, ty: 0, tx0: 0, ty0: 0, b0: null, g0: 0, txSlow: 0, tySlow: 0, acc: 0, acc0: 0, shakeE: 0, moveTotal: 0, gx: 0, gy: 0, gz: 0, motionSeen: false, lastRattle: 0, auT: 0, drift: 0, gridPhase: 0, vtx: 0, vty: 0, vph: 0, vsc: 1, tiltReq: false, tiltSeen: false, L: 0, frameDt: 1 / 60, shake: 0, flash: 0, milestone: 0, recordShown: false
+  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], tx: 0, ty: 0, tx0: 0, ty0: 0, b0: null, g0: 0, txSlow: 0, tySlow: 0, acc: 0, acc0: 0, shakeE: 0, moveTotal: 0, gx: 0, gy: 0, gz: 0, motionSeen: false, lastRattle: 0, auT: 0, drift: 0, gridPhase: 0, vtx: 0, vty: 0, vph: 0, vsc: 1, drawDt: 0, skip: false, tiltReq: false, tiltSeen: false, L: 0, frameDt: 1 / 60, shake: 0, flash: 0, milestone: 0, recordShown: false
 };
 let drag = null;             // 指の操作中の情報
 let dirty = false, lastSave = 0;
@@ -173,9 +173,9 @@ const gear = document.getElementById('gear');
 const sheet = document.getElementById('sheet');
 const scrim = document.getElementById('scrim');
 
-let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, R = 100;
+let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, R = 100, quality = 1;   // quality：重い時に自動で下げる描画の細かさ
 function resize() {
-  dpr = Math.min(2, window.devicePixelRatio || 1);
+  dpr = Math.max(0.75, Math.min(2, window.devicePixelRatio || 1) * quality);
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -572,7 +572,7 @@ function drawSpinner(th, full, target, ox, oy) {
   // 厚み：少しずつずらして重ねた側面。傾けるほど側面が見える
   const ext = full && !target;
   if (ext) {
-    const T = R * 0.05, N = c.globalAlpha < 0.99 ? 3 : 8;      // ぶれと重ねている間は層を減らして軽くする
+    const T = R * 0.05, N = 6;
     const ex = S.vtx * T * 1.2, ey = S.vty * T * 1.2 + T * 0.55;                  // 画面上のずれ
     const lx = ex * Math.cos(th) + ey * Math.sin(th), ly = -ex * Math.sin(th) + ey * Math.cos(th);   // 回転後の座標に直す
     const sc = P.side;
@@ -620,19 +620,22 @@ function drawSpinner(th, full, target, ox, oy) {
     if (full && (name === 'metal' || name === 'matte')) {   // 腕の長さ方向のヘアライン
       c.save(); armPath(c); c.clip();
       c.strokeStyle = 'rgba(255,255,255,.05)'; c.lineWidth = 0.7;
-      for (let j = -9; j <= 9; j++) { c.beginPath(); c.moveTo(-R * 0.05, j * R * 0.026); c.lineTo(tipD + tipR, j * R * 0.026); c.stroke(); }
+      c.beginPath();
+      for (let j = -9; j <= 9; j++) { c.moveTo(-R * 0.05, j * R * 0.026); c.lineTo(tipD + tipR, j * R * 0.026); }
+      c.stroke();
       c.restore();
     }
 
     if (name === 'wood') {               // 木目
       c.save(); armPath(c); c.clip();
       c.strokeStyle = 'rgba(70,35,12,.22)'; c.lineWidth = 1.2;
+      c.beginPath();
       for (let j = -3; j <= 3; j++) {
         const y = j * tipR * 0.3;
-        c.beginPath(); c.moveTo(0, y);
+        c.moveTo(0, y);
         c.bezierCurveTo(tipD * 0.3, y + 4, tipD * 0.6, y - 4, tipD + tipR, y);
-        c.stroke();
       }
+      c.stroke();
       c.restore();
     }
 
@@ -685,11 +688,16 @@ function drawSpinner(th, full, target, ox, oy) {
   c.fillStyle = P.hole; c.fill();
 
   if (full) {
-    for (let i = 0; i < 60; i++) {                          // ハブの縁の刻み目（光に向いた側ほど明るい）
-      const a = i * TAU / 60, lit = Math.max(0, Math.cos(a - hla));
-      c.strokeStyle = i % 2 ? `rgba(255,255,255,${0.1 + 0.25 * lit})` : 'rgba(0,0,0,.22)';
+    {                                                       // ハブの縁の刻み目（光に向いた側ほど明るい）。明るさ4段階＋暗い線を、それぞれ1回で描く
       c.lineWidth = Math.max(0.8, R * 0.007);
-      c.beginPath(); c.moveTo(Math.cos(a) * hubR * 0.84, Math.sin(a) * hubR * 0.84); c.lineTo(Math.cos(a) * hubR * 0.97, Math.sin(a) * hubR * 0.97); c.stroke();
+      const paths = [new Path2D(), new Path2D(), new Path2D(), new Path2D(), new Path2D()];
+      for (let i = 0; i < 60; i++) {
+        const a = i * TAU / 60, lit = Math.max(0, Math.cos(a - hla));
+        const pth = i % 2 ? paths[Math.min(3, lit * 4 | 0)] : paths[4];
+        pth.moveTo(Math.cos(a) * hubR * 0.84, Math.sin(a) * hubR * 0.84); pth.lineTo(Math.cos(a) * hubR * 0.97, Math.sin(a) * hubR * 0.97);
+      }
+      for (let b = 0; b < 4; b++) { c.strokeStyle = `rgba(255,255,255,${0.1 + 0.25 * (b + 0.5) / 4})`; c.stroke(paths[b]); }
+      c.strokeStyle = 'rgba(0,0,0,.22)'; c.stroke(paths[4]);
     }
     c.strokeStyle = 'rgba(255,255,255,.09)'; c.lineWidth = 0.8;   // ベアリングカバーの同心円の削り跡
     for (const f of [0.52, 0.62, 0.72]) { c.beginPath(); c.arc(0, 0, hubR * f, 0, TAU); c.stroke(); }
@@ -904,8 +912,8 @@ function drawAurora(cols) {
     g.addColorStop(0, `rgba(${col},0)`); g.addColorStop(0.5, `rgba(${col},${0.06 + 0.07 * glow})`); g.addColorStop(1, `rgba(${col},0)`);
     ctx.fillStyle = g;
     ctx.beginPath();
-    for (let x = -60; x <= W + 60; x += 28) { const y = baseY + wave(x) - th; if (x === -60) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
-    for (let x = W + 60; x >= -60; x -= 28) ctx.lineTo(x, baseY + wave(x) + th);
+    for (let x = -60; x <= W + 60; x += 36) { const y = baseY + wave(x) - th; if (x === -60) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    for (let x = W + 60; x >= -60; x -= 36) ctx.lineTo(x, baseY + wave(x) + th);
     ctx.closePath(); ctx.fill();
   });
   ctx.restore();
@@ -930,7 +938,7 @@ function drawBokeh(rgb, count) {
 function drawGrid() {
   const yH = cy + R * 1.25, hh = H - yH;
   if (hh <= 0) return;
-  S.gridPhase = (S.gridPhase + S.frameDt * (0.1 + 0.12 * S.L)) % 1;
+  S.gridPhase = (S.gridPhase + S.drawDt * (0.1 + 0.12 * S.L)) % 1;
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   const hg = ctx.createLinearGradient(0, yH - 40, 0, yH + 40);
   hg.addColorStop(0, 'rgba(255,60,200,0)'); hg.addColorStop(0.5, 'rgba(255,60,200,0.28)'); hg.addColorStop(1, 'rgba(255,60,200,0)');
@@ -969,8 +977,8 @@ function drawBackground() {
   const B = real ? BGR[settings.theme] : BG[settings.theme];
   const tk = real ? 0.12 : 1;                               // 傾きによる色づきの強さ
   const glow = (1 - Math.exp(-S.L / 3.2)) * (settings.fx > 0 ? 0.7 : 0);
-  S.auT += S.frameDt * (0.25 + 0.12 * S.L);
-  S.drift += S.frameDt * (1 + 0.8 * S.L);
+  S.auT += S.drawDt * (0.25 + 0.12 * S.L);
+  S.drift += S.drawDt * (1 + 0.8 * S.L);
 
   // 土台：光源は傾けた方向に動き、色味も変わる（右＝暖色、左＝寒色）
   const gcx = cx + S.tx * W * (real ? 0.12 : 0.5), gcy = cy + S.ty * H * (real ? 0.05 : 0.2);
@@ -988,7 +996,7 @@ function drawBackground() {
     if (B.aurora) drawAurora(B.aurora);
     if (settings.theme === 'neon') drawGrid();
     if (settings.theme === 'rainbow') drawBlobs();
-    drawBokeh(B.bokeh, settings.theme === 'wood' ? 18 : 36);
+    drawBokeh(B.bokeh, settings.theme === 'wood' ? 12 : 24);
   }
 
   // 傾けた側にたまる光
@@ -1002,24 +1010,32 @@ function drawBackground() {
   }
 }
 
-let grainPat = null;
-function drawLens() {
-  const g = ctx.createRadialGradient(W / 2, H * 0.48, Math.min(W, H) * 0.35, W / 2, H * 0.48, Math.max(W, H) * 0.78);
-  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.5)');       // レンズの周辺減光
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  if (!grainPat) {                                                                 // フィルムのざらつき
-    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
-    const c = cv.getContext('2d'), id = c.createImageData(128, 128);
-    for (let i = 0; i < id.data.length; i += 4) { const v = 128 + (Math.random() - 0.5) * 160; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255; }
-    c.putImageData(id, 0, 0);
-    grainPat = ctx.createPattern(cv, 'repeat');
+let lensCv = [null, null], lensKey = '', lensN = 0;
+function buildLens() {                                    // 周辺減光＋フィルムの粒を焼いた画像を2枚作る（画面サイズが変わった時だけ）
+  const sc = 0.85, w = Math.ceil(W * sc), h = Math.ceil(H * sc);
+  for (let v = 0; v < 2; v++) {
+    const cv = lensCv[v] || (lensCv[v] = document.createElement('canvas'));
+    cv.width = w; cv.height = h;
+    const c = cv.getContext('2d');
+    const g = c.createRadialGradient(w / 2, h * 0.48, Math.min(w, h) * 0.35, w / 2, h * 0.48, Math.max(w, h) * 0.78);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.5)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    const tile = document.createElement('canvas'); tile.width = tile.height = 128;
+    const tc = tile.getContext('2d'), id = tc.createImageData(128, 128);
+    for (let i = 0; i < id.data.length; i += 4) {
+      const v2 = Math.random() < 0.5 ? 0 : 255;
+      id.data[i] = id.data[i + 1] = id.data[i + 2] = v2; id.data[i + 3] = Math.random() * 9;
+    }
+    tc.putImageData(id, 0, 0);
+    c.fillStyle = c.createPattern(tile, 'repeat'); c.fillRect(0, 0, w, h);
   }
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.09;
-  ctx.translate(Math.random() * 128, Math.random() * 128);
-  ctx.fillStyle = grainPat; ctx.fillRect(-128, -128, canvas.width + 256, canvas.height + 256);
-  ctx.restore();
+}
+function drawLens() {
+  const key = W + 'x' + H;
+  if (lensKey !== key) { buildLens(); lensKey = key; }
+  lensN++;
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low';
+  ctx.drawImage(lensCv[(lensN / 3 | 0) % 2], 0, 0, W, H);   // 粒は3コマごとに切り替えて、フィルムのようにちらつかせる
 }
 
 function drawFinger(a) {
@@ -1077,7 +1093,7 @@ function mipChain(src, prev) {
   return out;
 }
 
-// ぶれ用の画像：アーム1枚と、ぶれきった「円盤」を事前に作っておく（毎コマの描画を軽くする）
+// アームの画像を1枚作っておき、残像と影に使い回す（毎コマ描き直さない）
 let sprite = null;
 function getSprite() {
   const dyn = settings.theme === 'neon' || settings.theme === 'rainbow';
@@ -1085,71 +1101,40 @@ function getSprite() {
   if (sprite && sprite.key === key) return sprite;
   const size = Math.ceil(2 * R * dpr);
   const arm = sprite ? sprite.arm : document.createElement('canvas');
-  const disc = sprite ? sprite.disc : document.createElement('canvas');
-  arm.width = arm.height = size; disc.width = disc.height = size;
+  arm.width = arm.height = size;
   const c1 = arm.getContext('2d');
   c1.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawSpinner(0, false, c1, R, R);
-  // 円盤：アームをピッチ1本ぶん細かく回しながら重ねる（回転しても見た目が変わらない）
-  const c2 = disc.getContext('2d');
-  const M = 120, pitch = TAU / settings.arms;
-  c2.globalAlpha = Math.min(1, 2.4 / M);
-  for (let k = 0; k < M; k++) {
-    c2.save();
-    c2.translate(size / 2, size / 2);
-    c2.rotate(-pitch * k / (M - 1));
-    c2.drawImage(arm, -size / 2, -size / 2);
-    c2.restore();
-  }
-  const pa = sprite && sprite.armM, pd = sprite && sprite.discM;
-  sprite = { key, arm, disc, armM: mipChain(arm, pa), discM: mipChain(disc, pd) };
+  sprite = { key, arm, armM: mipChain(arm, sprite && sprite.armM) };
   return sprite;
 }
 
-// 最初のバージョンと同じ、うっすらした残像（アームの後ろに3枚）
+// 最初のバージョンと同じ、うっすらした残像（小さいキャンバスに3枚重ねてから、1回だけ貼る）
+const ghostCv = document.createElement('canvas');
 function drawGhostTrail(a) {
   if (a < 25) return;
   const spr = getSprite(), off = Math.max(-1.2, Math.min(1.2, S.omega * 0.012)), al = [0.2, 0.11, 0.05];
-  ctx.save();
-  ctx.translate(cx, cy);
+  const px = Math.max(16, Math.ceil(R));                                   // ぼけて見えるので、半分の解像度で十分
+  if (ghostCv.width !== px) { ghostCv.width = px; ghostCv.height = px; }
+  const c = ghostCv.getContext('2d');
+  c.clearRect(0, 0, px, px);
+  const src = spr.armM[Math.max(0, Math.min(3, Math.floor(Math.log2(dpr / 0.5))))];
   for (let i = 3; i >= 1; i--) {
-    ctx.save();
-    ctx.rotate(S.theta - off * i);
-    ctx.globalAlpha = al[i - 1];
-    ctx.drawImage(spr.arm, -R, -R, 2 * R, 2 * R);
-    ctx.restore();
+    c.save();
+    c.translate(px / 2, px / 2); c.rotate(S.theta - off * i);
+    c.globalAlpha = al[i - 1];
+    c.drawImage(src, -px / 2, -px / 2, px, px);
+    c.restore();
   }
-  ctx.restore();
-}
-
-// カメラのシャッターが開いている間に回った角度ぶんを重ねて描く（コマ送りで止まって見える現象を防ぐ）
-function drawBlurred(arc, weight) {
-  const spr = getSprite(), pitch = TAU / settings.arms;
-  const d = Math.min(1, Math.max(0, (arc - 0.35 * pitch) / (0.65 * pitch)));
-  const dd = d * d * (3 - 2 * d);                      // ぶれが大きいほど円盤に近づく
-  ctx.save();
-  ctx.translate(cx, cy);
-  if (dd > 0) { ctx.globalAlpha = dd * weight; ctx.drawImage(spr.disc, -R, -R, 2 * R, 2 * R); }
-  if (dd < 1) {
-    const M = Math.min(16, Math.max(3, Math.ceil(arc / 0.04) + 1));       // 滑らかさと軽さの兼ね合いで16枚まで
-    const lv = M > 5 ? 2 : 1;                              // 低解像度の画像で重ねる：軽く、縁もほどよくぼけて輪が目立たない
-    const sgn = Math.sign(S.omega) || 1;
-    ctx.globalAlpha = Math.min(1, 2.4 / M) * (1 - dd) * weight;
-    for (let k = 0; k < M; k++) {
-      ctx.save();
-      ctx.rotate(S.theta - sgn * arc * (k / (M - 1)));
-      ctx.drawImage(spr.armM[lv], -R, -R, 2 * R, 2 * R);
-      ctx.restore();
-    }
-  }
-  ctx.restore();
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low';
+  ctx.drawImage(ghostCv, cx - R, cy - R, 2 * R, 2 * R);
 }
 
 // スピナー自身の形（シルエット）を床に落とす。縮小した画像を拡大して描くので、自然にぼける（軽い）
-const shCv = [document.createElement('canvas'), document.createElement('canvas'), document.createElement('canvas')];
-function castShadow(i, mips, theta, ox, oy, down, alpha, scale, rgb) {
+const shCv = [document.createElement('canvas'), document.createElement('canvas')];
+function castShadow(i, mips, theta, ox, oy, down, alpha, scale, rgb, halfK) {
   if (alpha < 0.01) return;
-  const half = R * 1.3;
+  const half = R * halfK;
   const px = Math.max(8, Math.ceil(2 * half * down));
   const cv = shCv[i];
   if (cv.width !== px) { cv.width = px; cv.height = px; }
@@ -1177,20 +1162,18 @@ function castShadow(i, mips, theta, ox, oy, down, alpha, scale, rgb) {
   ctx.restore();
 }
 
-// 3層の影：接地に近い所は濃くくっきり、離れるほど薄くぼやける（本物の影のように）
-function drawShadows(blend) {
+// 2層の影：接地に近い所は濃くくっきり、離れた所は薄くぼやける
+function drawShadows() {
   const spr = getSprite(), P = THEME[settings.theme];
   const L = lightAng();
   const lx = -Math.cos(L), ly = -Math.sin(L);                         // 影が伸びる向き（光の反対）
-  const layers = [                                                    // [浮いている高さ, 縮小率(小さいほどぼける), 濃さ, 拡大]
-    [R * 0.06, 0.5, 0.52, 1.00],
-    [R * 0.34, 0.2, 0.36, 1.04],
-    [R * 0.65, 0.1, 0.22, 1.10]
+  const layers = [                                                    // [浮いている高さ, 縮小率(小さいほどぼける), 濃さ, 拡大, 範囲]
+    [R * 0.06, 0.5, 0.50, 1.00, 1.15],
+    [R * 0.38, 0.15, 0.44, 1.05, 1.25]
   ];
-  for (let i = 0; i < 3; i++) {
-    const [h, down, al, sc] = layers[i], ox = lx * h, oy = ly * h;
-    if (blend < 1) castShadow(i, spr.armM, S.theta, ox, oy, down, al * (1 - blend), sc, P.shade);
-    if (blend > 0) castShadow(i, spr.discM, 0, ox, oy, down, al * blend, sc, P.shade);
+  for (let i = 0; i < 2; i++) {
+    const [h, down, al, sc, hk] = layers[i];
+    castShadow(i, spr.armM, S.theta, lx * h, ly * h, down, al, sc, P.shade, hk);
   }
 }
 
@@ -1232,11 +1215,7 @@ function draw(a) {
   ctx.translate(-cx, -cy);
 
 
-  // 1コマで回る角度に応じて、くっきり → ぶれ へ滑らかに切り替える
-  const pitch = TAU / settings.arms;
-  const arc = Math.min(a * (settings.fx === 0 ? 0.0033 : S.frameDt * 0.6), pitch);   // リアルは1/300秒の固定シャッター → 本物の動画のようにチラつく
-  const blend = 0;                                          // ぶれた円盤には切り替えない。いつもアームがそのまま回る
-  drawShadows(blend);
+  drawShadows();
   ctx.save();                                               // 傾けた方向に少し縮めて、斜めから見たように
   ctx.translate(cx, cy); ctx.rotate(S.vph); ctx.scale(S.vsc, 1); ctx.rotate(-S.vph); ctx.translate(-cx, -cy);
   drawGhostTrail(a);
@@ -1293,10 +1272,22 @@ function draw(a) {
 }
 
 /* ---------- メインループ ---------- */
-let lastFrame = performance.now();
+let lastFrame = performance.now(), qAcc = 0, qFrames = 0, qWarm = 0;
+// 約1.5秒ごとに平均の速さを見て、遅ければ描画の細かさを段階的に下げる（1 → 0.75 → 0.5）
+function governor(rawDt) {
+  if (window.__noGov || document.hidden || rawDt > 0.25) return;
+  if (qWarm < 90) { qWarm++; return; }                      // 起動直後や切り替え直後は測らない
+  qAcc += rawDt; qFrames++;
+  if (qAcc < 1.5) return;
+  const fps = qFrames / qAcc;
+  qAcc = 0; qFrames = 0;
+  if (fps < 42 && quality > 0.5) { quality = quality > 0.75 ? 0.75 : 0.5; resize(); qWarm = 60; }
+}
 function frame(now) {
   const rawDt = Math.max(0, (now - lastFrame) / 1000);
   lastFrame = now;
+  governor(rawDt);
+  S.drawDt += Math.min(0.05, rawDt);
   const dt = Math.min(1 / 30, rawDt);                       // 演出用
   S.frameDt = Math.min(0.05, Math.max(1 / 240, rawDt));     // 1コマの長さ（ぶれの量に使う）
   // 物理は細かい刻みで、実際に経った時間ぶん進める（コマ落ちしても回転が遅れない）
@@ -1355,7 +1346,9 @@ function frame(now) {
   spawnSparks(a);
   updateParticles(dt);
   updateFx(dt);
-  draw(a);
+  const resting = a < 0.5 && !drag;                         // 止まっている間は1コマおきに描く（電池と発熱を抑える）
+  S.skip = resting ? !S.skip : false;
+  if (!S.skip) { draw(a); S.drawDt = 0; }
   requestAnimationFrame(frame);
 }
 
