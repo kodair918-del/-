@@ -208,13 +208,31 @@ function audioUpdate() {
 }
 
 /* ---------- 振動 ---------- */
+// iPhone(Safari 17.4+)は navigator.vibrate が無いので、スイッチ型チェックボックスの触覚を使う
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let hapticLabel = null;
+if (!canVib && isIOS) {
+  hapticLabel = document.createElement('label');
+  hapticLabel.setAttribute('aria-hidden', 'true');
+  hapticLabel.style.cssText = 'position:fixed;left:-100px;top:0;width:40px;height:40px;opacity:0;pointer-events:none';
+  const sw = document.createElement('input');
+  sw.type = 'checkbox'; sw.setAttribute('switch', '');
+  hapticLabel.appendChild(sw);
+  document.body.appendChild(hapticLabel);
+}
+const canHaptic = canVib || !!hapticLabel;
+
 let lastVib = 0;
 function vib(ms) {
-  if (!settings.vib || !canVib) return;
+  if (!settings.vib || !canHaptic) return;
   const now = performance.now();
-  if (now - lastVib < 38) return;   // 連打しすぎない
+  if (now - lastVib < ms + 20) return;   // 前の振動が終わってから次を出す
   lastVib = now;
-  try { navigator.vibrate(ms); } catch (e) { /* 無視 */ }
+  try {
+    if (canVib) navigator.vibrate(ms);
+    else hapticLabel.click();
+  } catch (e) { /* 無視 */ }
 }
 
 /* ---------- 物理 ---------- */
@@ -235,7 +253,7 @@ function onTick(a) {
   if (a > 8 && a < 320) {
     click(Math.min(1, 0.3 + a / 140) * (1 - a / 360));
   }
-  if (a > 6) vib(Math.round(Math.min(9, Math.max(2, 2 + a / 30))));
+  if (a > 6) vib(Math.round(Math.min(30, Math.max(16, 14 + a / 20))));
 }
 
 /* ---------- 指の操作 ---------- */
@@ -278,11 +296,11 @@ function endDrag(e) {
   const isTap = drag.moved < 10 && now - drag.t0 < 250;
   if (isTap && drag.inside) {
     S.omega = drag.omega0 * 0.2;              // タップでブレーキ
-    vib(6);
+    vib(25);
   } else {
     const quiet = now - drag.lastMove > 90;   // 止まってから離したら速度ゼロ
     S.omega = quiet ? 0 : Math.max(-MAX_W, Math.min(MAX_W, S.gripV));
-    if (Math.abs(S.omega) > 150) vib(12);     // はじいた時の「ビュッ」
+    if (Math.abs(S.omega) > 150) vib(30);     // はじいた時の「ビュッ」
   }
   drag = null; S.dragging = false; S.gripV = 0;
 }
@@ -486,9 +504,9 @@ function refreshUI() {
   bSound.textContent = `音：${settings.sound ? 'ON' : 'OFF'}`;
   bSound.setAttribute('aria-pressed', settings.sound);
   bTimbre.textContent = `音色：${TIMBRE_NAME[settings.timbre]}`;
-  bVib.textContent = canVib ? `振動：${settings.vib ? 'ON' : 'OFF'}` : '振動（非対応）';
-  bVib.disabled = !canVib;
-  bVib.setAttribute('aria-pressed', settings.vib && canVib);
+  bVib.textContent = canHaptic ? `振動：${settings.vib ? 'ON' : 'OFF'}` : '振動（非対応）';
+  bVib.disabled = !canHaptic;
+  bVib.setAttribute('aria-pressed', settings.vib && canHaptic);
   if (ac && master) master.gain.setTargetAtTime(settings.sound ? 0.9 : 0, ac.currentTime, 0.05);
 }
 
