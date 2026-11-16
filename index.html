@@ -224,7 +224,15 @@ const THEME = {
 // 今の形の寸法（R に合わせた実寸）
 function geom() {
   const g = SHAPES[settings.shape] || SHAPES.round;
-  return { type: g.type, tipD: R * g.tipD, tipR: R * g.tipR, w0: R * g.w0, hd: R * g.hd, hr: R * g.hr };
+  const hubR = Math.max(R * 0.2, R * g.w0 * 0.9);
+  // 付け根の幅は、隣の腕とぶつからないよう本数に応じて細くする（ハブの縁で隣と接するまで）
+  const w0 = Math.min(R * g.w0, hubR * Math.sin(Math.PI / settings.arms) * 0.98);
+  // 先端のふくらみも、隣の腕と触れない大きさまでに抑える
+  const sh = Math.sin(Math.PI / settings.arms);
+  let tipR = R * g.tipR;
+  if (g.type === 'round') tipR = Math.min(tipR, R * g.tipD * sh * 0.94);
+  else if (g.type === 'leaf') tipR = Math.min(tipR, R * g.tipD * sh * 0.52);
+  return { type: g.type, tipD: R * g.tipD, tipR, w0, hubR, hd: R * g.hd, hr: R * g.hr };
 }
 
 // 音色（ティック音のパラメータ）
@@ -639,25 +647,27 @@ function armPath(c, G) {
   const { tipD, tipR, w0 } = G;
   c.beginPath();
   if (G.type === 'pointy') {                                // 先がとがった腕
+    const cy1 = w0 * 0.95 + Math.max(0, tipR * 0.7 - w0) * 0.12;     // 付け根が細い時も、ゆるやかに広がる
     c.moveTo(0, -w0);
-    c.quadraticCurveTo(tipD * 0.5, -w0 * 0.95, tipD + tipR, 0);
-    c.quadraticCurveTo(tipD * 0.5, w0 * 0.95, 0, w0);
+    c.quadraticCurveTo(tipD * 0.5, -cy1, tipD + tipR, 0);
+    c.quadraticCurveTo(tipD * 0.5, cy1, 0, w0);
   } else if (G.type === 'leaf') {                           // 真ん中がふくらんだ葉の形
     c.moveTo(0, -w0);
     c.bezierCurveTo(tipD * 0.35, -tipR * 1.25, tipD * 0.75, -tipR * 1.15, tipD + tipR * 0.9, 0);
     c.bezierCurveTo(tipD * 0.75, tipR * 1.15, tipD * 0.35, tipR * 1.25, 0, w0);
   } else {                                                  // 先が丸い腕
+    const cy1 = w0 * 0.9 + Math.max(0, tipR - w0) * 0.3;              // 付け根が細い時は、先に向かって花びらのように広がる
     c.moveTo(0, -w0);
-    c.quadraticCurveTo(tipD * 0.5, -w0 * 0.9, tipD, -tipR);
+    c.quadraticCurveTo(tipD * 0.5, -cy1, tipD, -tipR);
     c.arc(tipD, 0, tipR, -Math.PI / 2, Math.PI / 2, false);
-    c.quadraticCurveTo(tipD * 0.5, w0 * 0.9, 0, w0);
+    c.quadraticCurveTo(tipD * 0.5, cy1, 0, w0);
   }
   c.closePath();
 }
 
 function drawSpinner(th, full, target, ox, oy) {
   const c = target || ctx, name = settings.material, P = THEME[name], n = settings.arms, step = TAU / n;
-  const G = geom(), tipD = G.tipD, tipR = G.tipR, hubR = Math.max(R * 0.2, G.w0 * 0.9);
+  const G = geom(), tipD = G.tipD, tipR = G.tipR, hubR = G.hubR;
   const neonCol = hsl(S.hue, 100, 62);
   const edge = P.edge || neonCol;
   const ring = P.ring || neonCol;
