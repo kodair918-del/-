@@ -370,7 +370,7 @@ canvas.addEventListener('pointermove', e => {
   drag.x = p.x; drag.y = p.y; drag.lastT = now; drag.lastMove = now;
 });
 
-// 指は「加速させる」だけ。今より遅い動きや往復の戻りは無視（摩擦だけ効く）
+// 指は「加速させる」だけ。逆向きや往復の戻りは無視（摩擦だけ効く）
 // 指を止めて置き続けた時だけブレーキになる
 function dragPhysics(dt, now) {
   const sinceMove = now - drag.lastMove;
@@ -381,6 +381,12 @@ function dragPhysics(dt, now) {
   }
   physics(dt);                                            // 通常の摩擦はそのまま
   if (sinceMove < 60) {                                   // 指が動いている時だけ
+    // 同じ向きになぞっている間は、指が遅くても足し算で加速する（ゆっくりなぞっても速くなる）
+    const dir = Math.sign(S.omega) || Math.sign(drag.vf);
+    const along = drag.vf * dir;
+    if (along > 0) {
+      S.omega += dir * 8 * along * (1 - Math.min(1, Math.abs(S.omega) / MAX_W)) * dt;
+    }
     const target = drag.vf * 1.3;                         // 1.3倍＝はじきやすい
     if (Math.abs(target) > Math.abs(S.omega)) {           // 指のほうが速い時だけ引っぱる
       S.omega += (target - S.omega) * (1 - Math.exp(-dt * 20));
