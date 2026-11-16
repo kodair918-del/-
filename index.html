@@ -79,7 +79,11 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <h3>音</h3>
   <div class="rows">
     <button id="bSound" class="row"></button>
-    <button id="bTimbre" class="row"></button>
+  </div>
+  <h3>ティック音（ブレードが通る音）</h3><div class="chips" id="chTick"></div>
+  <h3>回転音</h3><div class="chips" id="chSpin"></div>
+  <h3>音量</h3><div class="chips" id="chVol"></div>
+  <div class="rows" style="margin-top:12px">
     <button id="bBass" class="row"></button>
   </div>
   <h3>体感</h3>
@@ -120,10 +124,15 @@ const HOLE_IDS = Object.keys(HOLES);
 const BG_NAME = { plate: '金属板', wood: '木の机', mat: 'ゴムマット', city: '夜の街', space: '宇宙' };
 const BG_IDS = Object.keys(BG_NAME);
 const COMBOS = MATS.length * SHAPE_IDS.length * ARMS.length * HOLE_IDS.length * BG_IDS.length;   // 6,000通り
-const TIMBRES = ['metal', 'wood', 'plastic'];
-const TIMBRE_NAME = { metal: '金属', wood: '木', plastic: 'プラ' };
+// ティック音（ブレードが通る音）13種類
+const TICK_NAME = { metal: '金属', wood: '木', plastic: 'プラ', glass: 'ガラス', bell: 'ベル', marimba: 'マリンバ', musicbox: 'オルゴール', drum: 'タム', ratchet: 'ラチェット', keyboard: 'キーボード', bubble: '水滴', laser: 'レーザー', chip: 'ピコピコ' };
+const TICK_IDS = Object.keys(TICK_NAME);
+// 回転音（回っている間ずっと鳴る音）8種類
+const SPIN_NAME = { std: '標準', smooth: 'なめらか', jet: 'ジェット', fan: '扇風機', wind: '風', heli: 'ヘリ', motor: 'モーター', none: '無音' };
+const SPIN_IDS = Object.keys(SPIN_NAME);
+const VOL_NAME = ['小', '中', '大'], VOL_GAIN = [0.35, 0.65, 1];
 const KEY = 'fidget-spinner-v1';
-const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0 };
+const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0 };
 
 function loadSettings() {
   let raw = {};
@@ -144,6 +153,10 @@ if (!SHAPES[settings.shape]) settings.shape = DEF.shape;
 if (!ARMS.includes(settings.arms)) settings.arms = DEF.arms;
 if (!HOLES[settings.hole]) settings.hole = DEF.hole;
 if (!BG_NAME[settings.bg]) settings.bg = DEF.bg;
+if (!TICK_NAME[settings.timbre]) settings.timbre = DEF.timbre;
+if (!SPIN_NAME[settings.spin]) settings.spin = DEF.spin;
+if (![0, 1, 2].includes(settings.vol)) settings.vol = DEF.vol;
+const masterLevel = () => settings.sound ? 0.9 * VOL_GAIN[settings.vol] : 0;
 const FXM = [0, 0.45];                                           // 演出の強さ（光のにじみ・尾）
 const FX_NAME = ['リアル', '控えめ'];
 const canVib = 'vibrate' in navigator;
@@ -235,18 +248,23 @@ function geom() {
   return { type: g.type, tipD: R * g.tipD, tipR, w0, hubR, hd: R * g.hd, hr: R * g.hr };
 }
 
-// 音色（ティック音のパラメータ）
-const TIMBRE = {
-  metal:   { osc: 'triangle', f: 2600, dec: 0.035, gain: 0.5,  nf: 4500, nq: 4,   nd: 0.02 },
-  wood:    { osc: 'sine',     f: 900,  dec: 0.06,  gain: 0.6,  nf: 1800, nq: 1.5, nd: 0.03 },
-  plastic: { osc: 'square',   f: 1700, dec: 0.02,  gain: 0.22, nf: 2600, nq: 2,   nd: 0.015 }
+// 回転音の作り：ノイズの量・高さ・鋭さ、うなりの波形・量・高さ、高音の量、脈打ち（羽が回る音）の深さ
+const SPINS = {
+  std:    { noise: 1.0, nf: 1.0, nq: 0.9, hum: 'sawtooth', humK: 1.0, humF: 1.0,  whine: 1.0, am: 0 },
+  smooth: { noise: 0.35, nf: 0.8, nq: 0.8, hum: 'sine',     humK: 1.6, humF: 1.0,  whine: 0.4, am: 0 },
+  jet:    { noise: 1.5, nf: 1.8, nq: 1.4, hum: 'sawtooth', humK: 0.5, humF: 2.0,  whine: 3.0, am: 0 },
+  fan:    { noise: 1.1, nf: 0.45, nq: 0.6, hum: 'sine',    humK: 0.4, humF: 0.5,  whine: 0,   am: 0.85 },
+  wind:   { noise: 1.6, nf: 0.6, nq: 0.5, hum: 'sine',     humK: 0,   humF: 1.0,  whine: 0,   am: 0.25 },
+  heli:   { noise: 0.5, nf: 0.3, nq: 0.8, hum: 'square',   humK: 0.5, humF: 0.35, whine: 0,   am: 1.0 },
+  motor:  { noise: 0.3, nf: 1.2, nq: 1.0, hum: 'sawtooth', humK: 2.0, humF: 1.5,  whine: 1.5, am: 0 },
+  none:   { noise: 0,   nf: 1.0, nq: 1.0, hum: 'sine',     humK: 0,   humF: 1.0,  whine: 0,   am: 0 }
 };
 
 /* ---------- 状態 ---------- */
 const S = {
   theta: 0, prevTheta: 0, omega: 0, gripV: 0,
   turns: 0, tickIdx: null, lastRpm: -1,
-  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], tx: 0, ty: 0, tx0: 0, ty0: 0, b0: null, g0: 0, txSlow: 0, tySlow: 0, acc: 0, acc0: 0, shakeE: 0, moveTotal: 0, gx: 0, gy: 0, gz: 0, motionSeen: false, lastRattle: 0, auT: 0, drift: 0, gridPhase: 0, vtx: 0, vty: 0, vph: 0, vsc: 1, drawDt: 0, skip: false, tiltReq: false, tiltSeen: false, L: 0, frameDt: 1 / 60, shake: 0, flash: 0, milestone: 0, recordShown: false
+  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], tx: 0, ty: 0, tx0: 0, ty0: 0, b0: null, g0: 0, txSlow: 0, tySlow: 0, acc: 0, acc0: 0, shakeE: 0, moveTotal: 0, gx: 0, gy: 0, gz: 0, motionSeen: false, lastRattle: 0, auT: 0, drift: 0, gridPhase: 0, vtx: 0, vty: 0, vph: 0, vsc: 1, drawDt: 0, skip: false, wasMoving: false, tiltReq: false, tiltSeen: false, L: 0, frameDt: 1 / 60, shake: 0, flash: 0, milestone: 0, recordShown: false
 };
 let drag = null;             // 指の操作中の情報
 let dirty = false, lastSave = 0;
@@ -259,7 +277,6 @@ const statsEl = document.getElementById('stats');
 const hintEl = document.getElementById('hint');
 const toastEl = document.getElementById('toast');
 const bSound = document.getElementById('bSound');
-const bTimbre = document.getElementById('bTimbre');
 const bVib = document.getElementById('bVib');
 const bBass = document.getElementById('bBass');
 const bTilt = document.getElementById('bTilt');
@@ -282,7 +299,7 @@ resize();
 
 /* ---------- オーディオ（Web Audio で合成） ---------- */
 let ac = null, master = null, noiseBuf = null;
-let whirrGain, whirrFilter, humOsc, humGain;
+let whirrGain, whirrFilter, humOsc, humGain, whirrAM, amLfo, amDepth;
 let bassMaster, bassAmp, lfo, lfoGain, shaper, lastThump = 0;
 let whine, whineGain, tone, pan, echoSend, echo, echoFb;
 
@@ -292,7 +309,7 @@ function initAudio() {
   if (!AC) return;
   try {
     ac = new AC();
-    master = ac.createGain(); master.gain.value = settings.sound ? 0.9 : 0;
+    master = ac.createGain(); master.gain.value = masterLevel();
     // 傾きで変わる「こもり具合」と左右の定位
     tone = ac.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 12000; tone.Q.value = 0.7;
     pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
@@ -317,13 +334,18 @@ function initAudio() {
     const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
     whirrFilter = ac.createBiquadFilter(); whirrFilter.type = 'bandpass'; whirrFilter.Q.value = 0.9; whirrFilter.frequency.value = 300;
     whirrGain = ac.createGain(); whirrGain.gain.value = 0;
-    src.connect(whirrFilter).connect(whirrGain).connect(master); src.start();
+    // 羽が回るような脈打ち（扇風機・ヘリなど）。ノイズとうなりの両方にかかる
+    whirrAM = ac.createGain(); whirrAM.gain.value = 1;
+    amLfo = ac.createOscillator(); amLfo.type = 'sine'; amLfo.frequency.value = 10;
+    amDepth = ac.createGain(); amDepth.gain.value = 0;
+    amLfo.connect(amDepth).connect(whirrAM.gain); amLfo.start();
+    src.connect(whirrFilter).connect(whirrGain).connect(whirrAM).connect(master); src.start();
 
     // ブレードが通過する「ブーン」という低音
     humOsc = ac.createOscillator(); humOsc.type = 'sawtooth'; humOsc.frequency.value = 40;
     const humLP = ac.createBiquadFilter(); humLP.type = 'lowpass'; humLP.frequency.value = 900;
     humGain = ac.createGain(); humGain.gain.value = 0;
-    humOsc.connect(humLP).connect(humGain).connect(master); humOsc.start();
+    humOsc.connect(humLP).connect(humGain).connect(whirrAM); humOsc.start();
 
     // 速さに応じて上がり続ける「ヒュイーン」（対数で上がるので頭打ちを感じにくい）
     whine = ac.createOscillator(); whine.type = 'sine'; whine.frequency.value = 400;
@@ -350,28 +372,54 @@ function initAudio() {
   } catch (e) { ac = null; }
 }
 
-// 1回のティック音（ブレードが固定点を通過した時）
+// 音の部品：音程が動く音（osc）と、ノイズの一瞬の音（nz）
+function osc(type, f0, f1, dec, gain, t) {
+  const o = ac.createOscillator(); o.type = type;
+  o.frequency.setValueAtTime(f0, t);
+  if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dec);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dec);
+  o.connect(g).connect(master); o.start(t); o.stop(t + dec + 0.02);
+}
+function nz(f, q, dec, gain, t, type) {
+  const n = ac.createBufferSource(); n.buffer = noiseBuf; n.playbackRate.value = 0.9 + Math.random() * 0.2;
+  const fl = ac.createBiquadFilter(); fl.type = type || 'bandpass'; fl.frequency.value = f; fl.Q.value = q;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dec);
+  n.connect(fl).connect(g).connect(master); n.start(t, Math.random() * 0.5); n.stop(t + dec + 0.02);
+}
+const PENTA = [0, 2, 4, 7, 9];                                          // 5音音階（どの音を重ねても濁らない）
+const note = (base, i) => base * Math.pow(2, (PENTA[i % 5] + 12 * Math.floor(i / 5)) / 12);
+const jit = () => 0.95 + Math.random() * 0.1;
+let tickN = 0;
+const nextNote = () => { const m = tickN++ % 8; return m < 5 ? m : 8 - m; };   // 上がって下がる旋律
+// 各ティック音（t=時刻, v=音量, pf=傾きによる音程の倍率）
+const TICKS = {
+  metal:    (t, v, pf) => { osc('triangle', 2600 * pf * jit(), 2600 * pf * 0.6, 0.035, 0.5 * v, t); nz(4500, 4, 0.02, 0.8 * v, t); },
+  wood:     (t, v, pf) => { osc('sine', 900 * pf * jit(), 900 * pf * 0.6, 0.06, 0.6 * v, t); nz(1800, 1.5, 0.03, 0.8 * v, t); },
+  plastic:  (t, v, pf) => { osc('square', 1700 * pf * jit(), 1700 * pf * 0.6, 0.02, 0.22 * v, t); nz(2600, 2, 0.015, 0.8 * v, t); },
+  glass:    (t, v, pf) => { const f = 3300 * pf * jit(); osc('sine', f, f * 0.98, 0.18, 0.28 * v, t); osc('sine', f * 2, null, 0.08, 0.1 * v, t); nz(6500, 3, 0.01, 0.3 * v, t); },
+  bell:     (t, v, pf) => { const f = 1760 * pf * jit(); osc('sine', f, null, 0.38, 0.22 * v, t); osc('sine', f * 1.5, null, 0.26, 0.12 * v, t); osc('sine', f * 2.37, null, 0.16, 0.06 * v, t); },
+  marimba:  (t, v, pf) => { const f = note(392, nextNote()) * pf; osc('sine', f, null, 0.2, 0.5 * v, t); osc('sine', f * 4, null, 0.05, 0.12 * v, t); nz(1500, 2, 0.01, 0.3 * v, t); },
+  musicbox: (t, v, pf) => { const f = note(784, nextNote()) * pf; osc('triangle', f, null, 0.42, 0.3 * v, t); osc('sine', f * 3, null, 0.12, 0.08 * v, t); nz(7000, 4, 0.008, 0.15 * v, t); },
+  drum:     (t, v, pf) => { osc('sine', 200 * pf, 70, 0.17, 0.7 * v, t); nz(1800, 1, 0.04, 0.4 * v, t); },
+  ratchet:  (t, v, pf) => { nz(3800 * pf, 1.2, 0.012, 1.0 * v, t); osc('square', 1100 * pf, null, 0.008, 0.25 * v, t); },
+  keyboard: (t, v, pf) => { nz(3200 * pf, 2.5, 0.012, 0.9 * v, t); osc('sine', 260 * pf, 120, 0.045, 0.5 * v, t + 0.004); },
+  bubble:   (t, v, pf) => { const f = 500 * pf * jit(); osc('sine', f, f * 2.6, 0.09, 0.5 * v, t); },
+  laser:    (t, v, pf) => { osc('sawtooth', 2400 * pf, 300, 0.11, 0.18 * v, t); },
+  chip:     (t, v, pf) => { osc('square', note(523, nextNote()) * pf, null, 0.05, 0.16 * v, t); }
+};
 function click(vol) {
   if (!ac || !settings.sound || vol <= 0.01) return;
-  const T = TIMBRE[settings.timbre] || TIMBRE.metal;
-  const t = ac.currentTime;
   const pf = 1 + S.ty * 0.2 + S.tySlow * 0.1;   // 今の傾きと、しばらくの傾きの平均で音程が変わる
+  (TICKS[settings.timbre] || TICKS.metal)(ac.currentTime, vol, pf);
+}
 
-  const o = ac.createOscillator();
-  o.type = T.osc;
-  o.frequency.setValueAtTime(T.f * pf * (0.95 + Math.random() * 0.1), t);
-  o.frequency.exponentialRampToValueAtTime(T.f * pf * 0.6, t + T.dec);
-  const og = ac.createGain();
-  og.gain.setValueAtTime(T.gain * vol, t);
-  og.gain.exponentialRampToValueAtTime(0.0001, t + T.dec);
-  o.connect(og).connect(master); o.start(t); o.stop(t + T.dec + 0.02);
-
-  const n = ac.createBufferSource(); n.buffer = noiseBuf; n.playbackRate.value = 0.9 + Math.random() * 0.2;
-  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = T.nf; f.Q.value = T.nq;
-  const ng = ac.createGain();
-  ng.gain.setValueAtTime(0.8 * vol, t);
-  ng.gain.exponentialRampToValueAtTime(0.0001, t + T.nd);
-  n.connect(f).connect(ng).connect(master); n.start(t, Math.random() * 0.5); n.stop(t + T.nd + 0.02);
+// 止まった時の「コトン」
+function settle() {
+  if (!ac || !settings.sound) return;
+  const t = ac.currentTime;
+  osc('sine', 190, 95, 0.14, 0.22, t); nz(900, 2, 0.04, 0.18, t);
 }
 
 // スマホを振った時の「カラカラ」（ベアリングの玉が転がる音）
@@ -438,15 +486,19 @@ function audioUpdate() {
   bassAmp.gain.setTargetAtTime(depth * 0.5, t, 0.08);
   lfoGain.gain.setTargetAtTime(depth * 0.5, t, 0.08);
   lfo.frequency.setTargetAtTime(Math.min(45, Math.max(4, a * settings.arms / TAU)), t, 0.05);
-  master.gain.setTargetAtTime(settings.sound ? 0.9 : 0, t, 0.05);
-  whirrGain.gain.setTargetAtTime(0.2 * Math.min(1, a / 120) * (1 + 0.5 * Math.min(1, S.shakeE / 8)), t, 0.08);
+  const SP = SPINS[settings.spin] || SPINS.std;
+  master.gain.setTargetAtTime(masterLevel(), t, 0.05);
+  whirrGain.gain.setTargetAtTime(0.2 * SP.noise * Math.min(1, a / 120) * (1 + 0.5 * Math.min(1, S.shakeE / 8)), t, 0.08);
   const tiltPitch = 1 + S.ty * 0.25;
-  whirrFilter.frequency.setTargetAtTime((280 + 330 * S.L) * tiltPitch, t, 0.06);      // 速さに対して対数で上がる
+  whirrFilter.frequency.setTargetAtTime((280 + 330 * S.L) * tiltPitch * SP.nf, t, 0.06);      // 速さに対して対数で上がる
+  whirrFilter.Q.setTargetAtTime(SP.nq, t, 0.1);
   const pass = Math.max(25, a * settings.arms / TAU);
-  humOsc.frequency.setTargetAtTime(3000 * Math.tanh(pass / 3000), t, 0.03);           // 頭打ちにならず滑らかに上がる
+  if (humOsc.type !== SP.hum) humOsc.type = SP.hum;
+  humOsc.frequency.setTargetAtTime(3000 * Math.tanh(pass / 3000) * SP.humF, t, 0.03);   // 頭打ちにならず滑らかに上がる
   humOsc.detune.setTargetAtTime(S.ty * 180 + S.tySlow * 120, t, 0.1);
   whine.frequency.setTargetAtTime(Math.min(6500, 220 * Math.pow(2, S.L * 0.55)) * (1 + S.ty * 0.12), t, 0.05);
-  whineGain.gain.setTargetAtTime(settings.sound && settings.fx > 0 ? 0.022 * Math.min(1, a / 80) : 0, t, 0.1);
+  const whineOn = settings.sound && (settings.fx > 0 || settings.spin !== 'std');      // リアルの標準だけは高音を鳴らさない
+  whineGain.gain.setTargetAtTime(whineOn ? 0.022 * SP.whine * Math.min(1, a / 80) : 0, t, 0.1);
   if (pan) pan.pan.setTargetAtTime(S.tx * 0.85, t, 0.08);                              // 傾けた側から聞こえる
   tone.frequency.setTargetAtTime(Math.min(20000, 9000 * Math.pow(2, S.ty * 1.2 + S.tySlow * 0.8)), t, 0.1);
   // 開いてからの動きの合計が増えるほど、残響が広がる
@@ -454,7 +506,11 @@ function audioUpdate() {
   echoSend.gain.setTargetAtTime(0.04 + 0.30 * mem, t, 0.3);
   echoFb.gain.setTargetAtTime(0.32 + 0.22 * mem, t, 0.3);
   echo.delayTime.setTargetAtTime(Math.max(0.03, 0.11 + 0.07 * S.txSlow + 0.04 * mem), t, 0.5);
-  humGain.gain.setTargetAtTime(0.035 * Math.min(1, a / 50), t, 0.08);
+  humGain.gain.setTargetAtTime(0.035 * SP.humK * Math.min(1, a / 50), t, 0.08);
+  // 羽が回るような脈打ち（ブレードが通る速さに合わせる）
+  amDepth.gain.setTargetAtTime(SP.am * 0.5, t, 0.1);
+  whirrAM.gain.setTargetAtTime(1 - SP.am * 0.5, t, 0.1);
+  amLfo.frequency.setTargetAtTime(Math.min(40, Math.max(3, a * settings.arms / TAU)), t, 0.05);
 }
 
 /* ---------- 振動 ---------- */
@@ -1436,6 +1492,8 @@ function frame(now) {
   if (idx !== S.tickIdx) { S.tickIdx = idx; onTick(Math.abs(S.omega)); }
 
   const a = Math.abs(S.omega);
+  if (a > 25) S.wasMoving = true;
+  else if (S.wasMoving && a < 0.3) { S.wasMoving = false; settle(); }
   S.L = Math.log2(1 + a / 40);                              // 体感の速さ（対数）
   const rpm = Math.round(a * 60 / TAU);
   if (rpm !== S.lastRpm) { S.lastRpm = rpm; rpmEl.textContent = rpm.toLocaleString('en-US'); }
@@ -1483,12 +1541,11 @@ function refreshUI() {
   comboHead.textContent = `組み合わせ No.${comboNo().toLocaleString('en-US')} / ${COMBOS.toLocaleString('en-US')} 通り`;
   setRow(bFx, '演出', FX_NAME[settings.fx]);
   setRow(bSound, '音', settings.sound ? 'ON' : 'OFF', settings.sound);
-  setRow(bTimbre, '音色', TIMBRE_NAME[settings.timbre]);
   setRow(bBass, '音で振動（低音）', settings.bass ? 'ON' : 'OFF', settings.bass);
   setRow(bVib, '振動', canHaptic ? (settings.vib ? 'ON' : 'OFF') : '非対応', settings.vib && canHaptic);
   bVib.disabled = !canHaptic;
   setRow(bTilt, '傾き・動き', `${settings.tilt ? 'ON' : 'OFF'}${settings.tilt && S.tiltReq && !S.tiltSeen && !S.motionSeen ? '（未検出）' : ''}`, settings.tilt);
-  if (ac && master) master.gain.setTargetAtTime(settings.sound ? 0.9 : 0, ac.currentTime, 0.05);
+  if (ac && master) master.gain.setTargetAtTime(masterLevel(), ac.currentTime, 0.05);
 }
 
 // 設定パネルの開け閉め
@@ -1527,6 +1584,10 @@ addChips('chShape', SHAPE_IDS.map(id => ({ id, label: SHAPES[id].name })), 'shap
 addChips('chArms', ARMS.map(n => ({ id: n, label: `${n}本` })), 'arms', () => { S.tickIdx = null; });
 addChips('chHole', HOLE_IDS.map(id => ({ id, label: HOLES[id].name })), 'hole');
 addChips('chBg', BG_IDS.map(id => ({ id, label: BG_NAME[id] })), 'bg');
+// 音は、選んだらその場で試し聞きできる（ティック音は3回鳴らす／回転音は回して聞かせる）
+addChips('chTick', TICK_IDS.map(id => ({ id, label: TICK_NAME[id] })), 'timbre', () => { initAudio(); for (let i = 0; i < 4; i++) setTimeout(() => click(0.9), i * 140); });
+addChips('chSpin', SPIN_IDS.map(id => ({ id, label: SPIN_NAME[id] })), 'spin', () => { initAudio(); if (Math.abs(S.omega) < 90) S.omega = 90 * (Math.sign(S.omega) || 1); });
+addChips('chVol', VOL_NAME.map((n, i) => ({ id: i, label: n })), 'vol', () => { initAudio(); setTimeout(() => click(0.9), 80); });
 
 // 組み合わせの番号（1〜6,000）
 function comboNo() {
@@ -1535,7 +1596,7 @@ function comboNo() {
 }
 let comboTimer = 0;
 function showCombo(msg) {                                  // 画面の下に、今の組み合わせを数秒だけ表示
-  comboEl.textContent = msg || `No.${comboNo().toLocaleString('en-US')} / ${COMBOS.toLocaleString('en-US')}　${MAT_NAME[settings.material]}・${SHAPES[settings.shape].name}・${settings.arms}本・穴${HOLES[settings.hole].name}・${BG_NAME[settings.bg]}`;
+  comboEl.textContent = msg || `No.${comboNo().toLocaleString('en-US')} / ${COMBOS.toLocaleString('en-US')}　${MAT_NAME[settings.material]}・${SHAPES[settings.shape].name}・${settings.arms}本・穴${HOLES[settings.hole].name}・${BG_NAME[settings.bg]}${settings.sound ? `　♪${TICK_NAME[settings.timbre]}・${SPIN_NAME[settings.spin]}` : ''}`;
   comboEl.classList.add('show');
   clearTimeout(comboTimer); comboTimer = setTimeout(() => comboEl.classList.remove('show'), msg ? 5000 : 3200);
 }
@@ -1546,6 +1607,8 @@ function randomize() {
     settings.material = pick(MATS); settings.shape = pick(SHAPE_IDS); settings.arms = pick(ARMS);
     settings.hole = pick(HOLE_IDS); settings.bg = pick(BG_IDS);
   } while (comboNo() === before);
+  settings.timbre = pick(TICK_IDS); settings.spin = pick(SPIN_IDS.filter(x => x !== 'none'));   // 音もランダム
+  if (Math.abs(S.omega) < 70) S.omega = 70 * (Math.sign(S.omega) || 1);                         // 回転音が聞こえるよう、軽く回す
   S.hue = 200; S.tickIdx = null;
   saveSettings(); refreshUI(); showCombo();
   randBtn.classList.remove('roll'); void randBtn.offsetWidth; randBtn.classList.add('roll');
@@ -1576,7 +1639,6 @@ updateFsIcon();
 function cycle(list, cur) { return list[(list.indexOf(cur) + 1) % list.length]; }
 
 bSound.addEventListener('click', () => { initAudio(); settings.sound = !settings.sound; saveSettings(); refreshUI(); });
-bTimbre.addEventListener('click', () => { settings.timbre = cycle(TIMBRES, settings.timbre); saveSettings(); refreshUI(); });
 bVib.addEventListener('click', () => { settings.vib = !settings.vib; saveSettings(); refreshUI(); vib(10); });
 bBass.addEventListener('click', () => { initAudio(); settings.bass = !settings.bass; saveSettings(); refreshUI(); thump(1); });
 bTilt.addEventListener('click', () => {
