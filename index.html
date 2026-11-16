@@ -38,9 +38,9 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 .chip .dot{margin:0;width:9px;height:9px}
 #comboHead{font-size:13px;opacity:.7;text-align:center;margin:4px 0 0}
 #gear:active,#gear[aria-expanded="true"]{opacity:1}
-#scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s}
+#scrim{z-index:29;position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s}
 #scrim.open{opacity:1;pointer-events:auto}
-#sheet{position:fixed;left:0;right:0;bottom:0;max-height:80%;overflow:auto;background:rgba(16,19,26,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-radius:22px 22px 0 0;border:1px solid rgba(255,255,255,.1);border-bottom:0;padding:10px max(16px,env(safe-area-inset-left,0px)) calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateY(105%);visibility:hidden;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s .3s;touch-action:pan-y;overscroll-behavior:contain}
+#sheet{z-index:30;position:fixed;left:0;right:0;bottom:0;max-height:80%;overflow:auto;background:rgba(16,19,26,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-radius:22px 22px 0 0;border:1px solid rgba(255,255,255,.1);border-bottom:0;padding:10px max(16px,env(safe-area-inset-left,0px)) calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateY(105%);visibility:hidden;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s .3s;touch-action:pan-y;overscroll-behavior:contain}
 #sheet.open{transform:none;visibility:visible;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s}
 .grab{width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.25);margin:2px auto 4px}
 #sheet h3{font-size:12px;font-weight:500;opacity:.55;letter-spacing:.1em;margin:14px 4px 6px}
@@ -52,6 +52,42 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 .row:active{background:rgba(255,255,255,.07)}
 .row:disabled{opacity:.4;cursor:default}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+#battleBtn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);right:max(14px,env(safe-area-inset-right,0px));padding:0 14px;min-height:38px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:var(--panel);color:var(--fg);font:inherit;font-size:14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:.88;cursor:pointer;z-index:8}
+body.btmode #rand,body.btmode #gear,body.btmode #battleBtn{display:none}
+body.inbattle #hud,body.inbattle #hint,body.inbattle #toast,body.inbattle #combo{display:none}
+#bt{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(5,6,10,.74);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:max(16px,env(safe-area-inset-top,0px)) 16px max(16px,env(safe-area-inset-bottom,0px));overflow:auto;touch-action:pan-y}
+#bt.show{display:flex}
+.btcard{width:min(440px,100%);max-height:100%;overflow:auto;background:rgba(18,21,28,.97);border:1px solid rgba(255,255,255,.12);border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:12px;touch-action:pan-y}
+.btcard[hidden]{display:none}
+.col{display:flex;flex-direction:column;gap:8px}
+.col[hidden]{display:none}
+.btgrid[hidden]{display:none}
+.btcard h2{font-size:20px;text-align:center}
+.btcard h3{font-size:12px;opacity:.55;letter-spacing:.1em;margin:4px 2px 0}
+.btcard p{font-size:13px;opacity:.78;line-height:1.5}
+.btn{min-height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:var(--fg);font:inherit;font-size:15px;cursor:pointer;padding:0 14px}
+.btn.main{background:var(--accent);color:#0b0d12;border-color:transparent;font-weight:700}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.4}
+.btgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btgrid .wide{grid-column:1/3}
+.bars{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:12px;flex:1;min-width:0}
+.bar{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.mine{display:flex;gap:14px;align-items:center}
+.mine canvas{position:static;inset:auto;display:block;touch-action:auto;width:112px;height:112px;flex:none;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.09),rgba(255,255,255,0) 70%)}
+.legend{font-size:11px;opacity:.7;display:flex;gap:12px;justify-content:center}
+.legend b{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+#btCount{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 74px);text-align:center;z-index:9;pointer-events:none;display:none}
+#btCount b{font-size:72px;font-weight:800;text-shadow:0 0 24px var(--accent),0 2px 12px rgba(0,0,0,.6)}
+#btCount div{font-size:14px;opacity:.9}
+.dash{position:fixed;left:50%;margin-left:-62px;width:124px;height:56px;border-radius:28px;border:1px solid rgba(255,255,255,.22);background:var(--panel);color:var(--fg);font:inherit;font-size:16px;font-weight:700;overflow:hidden;z-index:9;display:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#dash1{bottom:calc(env(safe-area-inset-bottom,0px) + 22px)}
+#dash2{top:calc(env(safe-area-inset-top,0px) + 22px);transform:rotate(180deg)}
+.dash i{position:absolute;left:0;bottom:0;height:100%;width:0;background:var(--accent);opacity:.4}
+.dash span{position:relative}
+.codebox{width:100%;min-height:84px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--fg);font:11px/1.3 monospace;padding:8px;resize:vertical;user-select:text;-webkit-user-select:text}
+#olStatus{font-size:13px;min-height:1.2em;color:var(--accent)}
 </style>
 </head>
 <body>
@@ -59,6 +95,76 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <div id="hud"><div id="rpm"><span id="rpmv">0</span><small>rpm</small></div><div id="stats"></div></div>
 <div id="toast"></div>
 <div id="hint">どこでもスワイプで回る ／ 指を置くと止まる</div>
+<button id="battleBtn">⚔ バトル</button>
+<div id="btCount"><b id="btCountB">5</b><div id="btCountT"></div></div>
+<button class="dash" id="dash1"><i></i><span>ダッシュ</span></button>
+<button class="dash" id="dash2"><i></i><span>ダッシュ</span></button>
+<div id="bt">
+  <div class="btcard" id="sMenu">
+    <h2>スピナーバトル</h2>
+    <p>5秒間回して、最後の回転数でバトル開始。場外に出されるか、回転が止まったら負け。バトル中は画面のボタンでダッシュ！</p>
+    <div class="mine">
+      <canvas id="hbCv" width="224" height="224"></canvas>
+      <div style="flex:1;min-width:0">
+        <div id="mineName" style="font-size:13px;margin-bottom:6px"></div>
+        <div class="bars" id="mineBars"></div>
+      </div>
+    </div>
+    <div class="legend"><span><b style="background:#ff5d5d"></b>先端（攻撃）</span><span><b style="background:#ffc14d"></b>腕</span><span><b style="background:#5db4ff"></b>中心（守り）</span></div>
+    <div class="btgrid">
+      <button class="btn" id="btPick">スピナーを選ぶ</button>
+      <button class="btn" id="btRand">ランダムで選ぶ</button>
+    </div>
+    <h3>バトルの種類</h3>
+    <div class="btgrid">
+      <button class="btn" data-bt="cpu1">CPU かんたん</button>
+      <button class="btn" data-bt="cpu2">CPU ふつう</button>
+      <button class="btn" data-bt="cpu3">CPU つよい</button>
+      <button class="btn" data-bt="local">2人で対戦（1台）</button>
+      <button class="btn main wide" data-bt="online">オンライン対戦</button>
+    </div>
+    <div id="btRecord" style="font-size:12px;opacity:.7;text-align:center"></div>
+    <button class="btn" id="btClose">とじる</button>
+  </div>
+  <div class="btcard" id="sP2" hidden>
+    <h2>2Pの番です</h2>
+    <p>2Pのスピナーを選んでください。決まったら「決定して回す」を押して、5秒間回します。</p>
+    <div class="mine">
+      <canvas id="hbCv2" width="224" height="224"></canvas>
+      <div style="flex:1;min-width:0"><div id="mineName2" style="font-size:13px;margin-bottom:6px"></div><div class="bars" id="mineBars2"></div></div>
+    </div>
+    <div class="btgrid"><button class="btn" id="p2Pick">スピナーを選ぶ</button><button class="btn" id="p2Rand">ランダムで選ぶ</button></div>
+    <button class="btn main" id="p2Go">決定して回す</button>
+  </div>
+  <div class="btcard" id="sOnline" hidden>
+    <h2>オンライン対戦</h2>
+    <p id="olHelp">サーバーを使わず、友だちとコードを送り合ってつなぎます（LINEなどで送れます）。</p>
+    <div class="btgrid" id="olStep0"><button class="btn" id="olHost">ルームを作る</button><button class="btn" id="olJoin">ルームに入る</button></div>
+    <div id="olHostBox" class="col" hidden>
+      <h3>① このコードを友だちに送る</h3>
+      <textarea class="codebox" id="olHostCode" readonly></textarea>
+      <button class="btn" id="olCopyHost">コピー</button>
+      <h3>② 友だちから返ってきたコードを貼る</h3>
+      <textarea class="codebox" id="olAnsIn"></textarea>
+      <button class="btn main" id="olConnect">つなぐ</button>
+    </div>
+    <div id="olJoinBox" class="col" hidden>
+      <h3>① 友だちのコードを貼る</h3>
+      <textarea class="codebox" id="olHostIn"></textarea>
+      <button class="btn main" id="olMakeAns">返信コードを作る</button>
+      <h3>② このコードを友だちに送り返す</h3>
+      <textarea class="codebox" id="olAnsCode" readonly></textarea>
+      <button class="btn" id="olCopyAns">コピー</button>
+    </div>
+    <div id="olStatus"></div>
+    <button class="btn" id="olBack">もどる</button>
+  </div>
+  <div class="btcard" id="sResult" hidden>
+    <h2 id="resTitle"></h2>
+    <p id="resBody" style="text-align:center"></p>
+    <div class="btgrid"><button class="btn main" id="resAgain">もう一度</button><button class="btn" id="resMenu">メニューへ</button></div>
+  </div>
+</div>
 <button id="rand" aria-label="ランダム"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="12" cy="12" r="1.1" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.1" fill="currentColor"/></svg></button>
 <button id="fs" aria-label="フルスクリーン"><svg id="fsIcon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg></button>
 <div id="combo"></div>
@@ -132,7 +238,7 @@ const SPIN_NAME = { std: '標準', smooth: 'なめらか', jet: 'ジェット', 
 const SPIN_IDS = Object.keys(SPIN_NAME);
 const VOL_NAME = ['小', '中', '大'], VOL_GAIN = [0.35, 0.65, 1];
 const KEY = 'fidget-spinner-v1';
-const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0 };
+const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0 };
 
 function loadSettings() {
   let raw = {};
@@ -157,6 +263,7 @@ if (!TICK_NAME[settings.timbre]) settings.timbre = DEF.timbre;
 if (!SPIN_NAME[settings.spin]) settings.spin = DEF.spin;
 if (![0, 1, 2].includes(settings.vol)) settings.vol = DEF.vol;
 const masterLevel = () => settings.sound ? 0.9 * VOL_GAIN[settings.vol] : 0;
+let DSG = settings;     // いま描くスピナーのデザイン（ふだんは設定そのもの。バトルでは相手のデザインに差し替える）
 const FXM = [0, 0.45];                                           // 演出の強さ（光のにじみ・尾）
 const FX_NAME = ['リアル', '控えめ'];
 const canVib = 'vibrate' in navigator;
@@ -236,12 +343,12 @@ const THEME = {
 };
 // 今の形の寸法（R に合わせた実寸）
 function geom() {
-  const g = SHAPES[settings.shape] || SHAPES.round;
+  const g = SHAPES[DSG.shape] || SHAPES.round;
   const hubR = Math.max(R * 0.2, R * g.w0 * 0.9);
   // 付け根の幅は、隣の腕とぶつからないよう本数に応じて細くする（ハブの縁で隣と接するまで）
-  const w0 = Math.min(R * g.w0, hubR * Math.sin(Math.PI / settings.arms) * 0.98);
+  const w0 = Math.min(R * g.w0, hubR * Math.sin(Math.PI / DSG.arms) * 0.98);
   // 先端のふくらみも、隣の腕と触れない大きさまでに抑える
-  const sh = Math.sin(Math.PI / settings.arms);
+  const sh = Math.sin(Math.PI / DSG.arms);
   let tipR = R * g.tipR;
   if (g.type === 'round') tipR = Math.min(tipR, R * g.tipD * sh * 0.94);
   else if (g.type === 'leaf') tipR = Math.min(tipR, R * g.tipD * sh * 0.52);
@@ -614,6 +721,7 @@ function enableTilt() {
 function pos(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
 
 canvas.addEventListener('pointerdown', e => {
+  if (MODE === 'battle' || BT.lock) return;                 // バトル中と、5秒が終わった後は回せない
   initAudio();
   e.preventDefault();
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -722,7 +830,7 @@ function armPath(c, G) {
 }
 
 function drawSpinner(th, full, target, ox, oy) {
-  const c = target || ctx, name = settings.material, P = THEME[name], n = settings.arms, step = TAU / n;
+  const c = target || ctx, name = DSG.material, P = THEME[name], n = DSG.arms, step = TAU / n;
   const G = geom(), tipD = G.tipD, tipR = G.tipR, hubR = G.hubR;
   const neonCol = hsl(S.hue, 100, 62);
   const edge = P.edge || neonCol;
@@ -814,7 +922,7 @@ function drawSpinner(th, full, target, ox, oy) {
     c.stroke();
 
     // ベアリング穴
-    const HS = HOLES[settings.hole] || HOLES.round, hd = G.hd, hr = G.hr * HS.k;
+    const HS = HOLES[DSG.hole] || HOLES.round, hd = G.hd, hr = G.hr * HS.k;
     c.beginPath(); c.arc(hd, 0, hr, 0, TAU);
     if (HS.weight) {                                           // 重り付き：穴の中に金属の重りが入っている
       const wg = c.createRadialGradient(hd + ldx * hr * 0.35, ldy * hr * 0.35, hr * 0.1, hd, 0, hr);
@@ -1268,20 +1376,23 @@ function mipChain(src, prev) {
   return out;
 }
 
-// アームの画像を1枚作っておき、残像と影に使い回す（毎コマ描き直さない）
-let sprite = null;
+// アームの画像を作っておき、残像・影・バトルの描画に使い回す（デザインごとに最大10枚まで覚える）
+const spCache = new Map();
 function getSprite() {
-  const dyn = DYN.has(settings.material);
-  const key = [settings.material, settings.shape, settings.hole, settings.arms, Math.round(R), dpr, dyn ? Math.round(S.hue / 30) : 0].join('|');
-  if (sprite && sprite.key === key) return sprite;
+  const dyn = DYN.has(DSG.material);
+  const key = [DSG.material, DSG.shape, DSG.hole, DSG.arms, Math.round(R), dpr, dyn ? Math.round(S.hue / 30) : 0].join('|');
+  let sp = spCache.get(key);
+  if (sp) return sp;
   const size = Math.ceil(2 * R * dpr);
-  const arm = sprite ? sprite.arm : document.createElement('canvas');
+  const arm = document.createElement('canvas');
   arm.width = arm.height = size;
   const c1 = arm.getContext('2d');
   c1.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawSpinner(0, false, c1, R, R);
-  sprite = { key, arm, armM: mipChain(arm, sprite && sprite.armM) };
-  return sprite;
+  sp = { key, arm, armM: mipChain(arm) };
+  spCache.set(key, sp);
+  if (spCache.size > 10) spCache.delete(spCache.keys().next().value);
+  return sp;
 }
 
 // 最初のバージョンと同じ、うっすらした残像（小さいキャンバスに3枚重ねてから、1回だけ貼る）
@@ -1339,7 +1450,7 @@ function castShadow(i, mips, theta, ox, oy, down, alpha, scale, rgb, halfK) {
 
 // 2層の影：接地に近い所は濃くくっきり、離れた所は薄くぼやける
 function drawShadows() {
-  const spr = getSprite(), P = THEME[settings.material];
+  const spr = getSprite(), P = THEME[DSG.material];
   const L = lightAng();
   const lx = -Math.cos(L), ly = -Math.sin(L);                         // 影が伸びる向き（光の反対）
   const layers = [                                                    // [浮いている高さ, 縮小率(小さいほどぼける), 濃さ, 拡大, 範囲]
@@ -1462,6 +1573,7 @@ function frame(now) {
   const rawDt = Math.max(0, (now - lastFrame) / 1000);
   lastFrame = now;
   governor(rawDt);
+  if (MODE === 'battle') { battleFrame(now, rawDt); requestAnimationFrame(frame); return; }
   S.drawDt += Math.min(0.05, rawDt);
   const dt = Math.min(1 / 30, rawDt);                       // 演出用
   S.frameDt = Math.min(0.05, Math.max(1 / 240, rawDt));     // 1コマの長さ（ぶれの量に使う）
@@ -1495,6 +1607,7 @@ function frame(now) {
   if (a > 25) S.wasMoving = true;
   else if (S.wasMoving && a < 0.3) { S.wasMoving = false; settle(); }
   S.L = Math.log2(1 + a / 40);                              // 体感の速さ（対数）
+  if (MODE === 'spin') spinTick(now);
   const rpm = Math.round(a * 60 / TAU);
   if (rpm !== S.lastRpm) { S.lastRpm = rpm; rpmEl.textContent = rpm.toLocaleString('en-US'); }
   if (rpm < 150) { S.milestone = 0; S.recordShown = false; }
@@ -1546,6 +1659,7 @@ function refreshUI() {
   bVib.disabled = !canHaptic;
   setRow(bTilt, '傾き・動き', `${settings.tilt ? 'ON' : 'OFF'}${settings.tilt && S.tiltReq && !S.tiltSeen && !S.motionSeen ? '（未検出）' : ''}`, settings.tilt);
   if (ac && master) master.gain.setTargetAtTime(masterLevel(), ac.currentTime, 0.05);
+  if (window.__btRefresh) window.__btRefresh();             // バトルの選択画面が開いていれば、性能の表示も更新
 }
 
 // 設定パネルの開け閉め
@@ -1651,6 +1765,519 @@ bFx.addEventListener('click', () => {
   settings.fx = settings.fx === 1 ? 0 : 1;                           // 控えめ ⇄ 最小
   saveSettings(); refreshUI();
 });
+
+/* ================= バトル ================= */
+let MODE = 'free';                                         // 'free'(ふつうに回す) | 'spin'(5秒間回す) | 'battle'
+const BS = 0.36;                                            // R=1 のスピナーの半径（アリーナ半径=1 に対する比）
+const PHYS = { JMAX: 1.0, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.4, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 1.3, DASH: 1.6, DASH_CD: 1.4, TIME: 75 };   // シミュレーションで調整した値
+const $b = id => document.getElementById(id);
+
+// 材質：dens=重さ hard=硬さ bear=軸の滑らかさ grip=グリップ（相手へ寄っていく強さ）
+const MAT_STAT = {
+  metal: { dens: 1.0, hard: 1.0, bear: 1.0, grip: 1.0 },  gold: { dens: 1.5, hard: 0.8, bear: 0.9, grip: 0.95 },
+  copper: { dens: 1.25, hard: 0.85, bear: 0.95, grip: 1.0 }, titan: { dens: 0.8, hard: 1.25, bear: 0.92, grip: 0.95 },
+  black: { dens: 1.0, hard: 1.2, bear: 1.15, grip: 1.1 },  neon: { dens: 0.9, hard: 1.0, bear: 1.0, grip: 1.0 },
+  rainbow: { dens: 0.85, hard: 0.9, bear: 1.05, grip: 1.05 }, wood: { dens: 0.65, hard: 0.85, bear: 0.98, grip: 1.25 },
+  matte: { dens: 1.05, hard: 1.05, bear: 1.0, grip: 1.3 },  ice: { dens: 0.7, hard: 0.8, bear: 1.3, grip: 0.7 }
+};
+const HOLE_STAT = { round: { m: 1, sta: 1 }, big: { m: 0.9, sta: 0.97 }, small: { m: 1.05, sta: 1.02 }, weight: { m: 1.28, sta: 1.22 } };
+const SHAPE_SHARP = { round: 1.0, slim: 1.1, fat: 0.8, long: 1.05, pointy: 1.3, leaf: 1.15 };
+
+function withDesign(d, r, fn) {                            // 一時的に別のデザイン・大きさで描く／計算する
+  const sD = DSG, sR = R;
+  DSG = d; R = r;
+  try { return fn(); } finally { DSG = sD; R = sR; }
+}
+const designOf = () => ({ material: settings.material, shape: settings.shape, arms: settings.arms, hole: settings.hole, bg: settings.bg });
+function applyDesign(d) { settings.material = d.material; settings.shape = d.shape; settings.arms = d.arms; settings.hole = d.hole; settings.bg = d.bg; S.hue = 200; S.tickIdx = null; refreshUI(); }
+function randomDesign() {
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  return { material: pick(MATS), shape: pick(SHAPE_IDS), arms: pick(ARMS), hole: pick(HOLE_IDS), bg: pick(BG_IDS) };
+}
+const designLabel = d => `${MAT_NAME[d.material]}・${SHAPES[d.shape].name}・${d.arms}本・穴${HOLES[d.hole].name}`;
+
+// デザインから決まる性能。材質・形・アームの数・穴のすべてが効く
+function statsOf(d) {
+  const g = SHAPES[d.shape], m = MAT_STAT[d.material], h = HOLE_STAT[d.hole], n = d.arms;
+  const armArea = (g.w0 * 0.7 + g.tipR * 1.3) * g.tipD;
+  const mass = Math.pow(m.dens * (0.35 + n * armArea * 0.55) * h.m / 0.84, 0.55);   // 重さの差は圧縮（軽いものが一方的にならないように）
+  const reach = g.tipD + g.tipR * (g.type === 'pointy' ? 0.95 : g.type === 'leaf' ? 0.9 : 1);
+  const sharp = SHAPE_SHARP[d.shape];
+  const atk = sharp * (0.6 + reach) * (0.75 + 0.08 * n) * (0.8 + 0.2 * m.hard);
+  const def = m.hard * (0.55 + 2.0 * g.tipR) * (0.85 + 0.05 * n) * (0.8 + 0.2 * mass);
+  const sta = m.bear * h.sta * (0.8 + 0.2 * mass) / (1 + 0.06 * (n - 3));                // アームが多いほど空気抵抗で回転が落ちやすい
+  return { mass, reach, atk, def, sta, grip: m.grip, sharp, atkE: Math.pow(atk, 0.45), defE: Math.pow(def, 0.45) };
+}
+// 当たり判定：腕の形から作る円の集まり（中心・腕の途中・先端）。形が違えば当たり判定も違う
+function hitCircles(d) {
+  const G = withDesign(d, 1, geom);
+  const n = d.arms, step = TAU / n, out = [{ x: 0, y: 0, r: G.hubR, kind: 'hub' }];
+  for (let k = 0; k < n; k++) {
+    const c = Math.cos(k * step), s2 = Math.sin(k * step);
+    const tipDist = G.type === 'round' ? G.tipD : G.type === 'pointy' ? G.tipD + G.tipR * 0.85 : G.hd * 1.15;
+    const tipRad = G.type === 'round' ? G.tipR * 0.95 : G.type === 'pointy' ? 0.055 : G.tipR * 0.85;
+    out.push({ x: c * G.tipD * 0.5, y: s2 * G.tipD * 0.5, r: Math.max(0.05, (G.w0 + G.tipR) * 0.5 * 0.85), kind: 'mid' });
+    out.push({ x: c * tipDist, y: s2 * tipDist, r: tipRad, kind: 'tip' });
+  }
+  return out;
+}
+let statRange = null;
+function ranges() {                                         // 全1,200通りの性能の最小・最大（棒グラフの目盛り）
+  if (statRange) return statRange;
+  const r = { atk: [9, 0], def: [9, 0], sta: [9, 0], mass: [9, 0], reach: [9, 0] };
+  for (const material of MATS) for (const shape of SHAPE_IDS) for (const arms of ARMS) for (const hole of HOLE_IDS) {
+    const st = statsOf({ material, shape, arms, hole });
+    for (const k of Object.keys(r)) { r[k][0] = Math.min(r[k][0], st[k]); r[k][1] = Math.max(r[k][1], st[k]); }
+  }
+  return (statRange = r);
+}
+function fillBars(el, st) {
+  const r = ranges(), nrm = (k, v) => 0.08 + 0.92 * (v - r[k][0]) / ((r[k][1] - r[k][0]) || 1);
+  el.innerHTML = [['攻撃', 'atk'], ['防御', 'def'], ['持久', 'sta'], ['重さ', 'mass'], ['リーチ', 'reach']]
+    .map(([l, k]) => `<span>${l}</span><div class="bar"><i style="width:${(nrm(k, st[k]) * 100) | 0}%"></i></div>`).join('');
+}
+function drawHitPreview(cv, d) {                            // スピナーに当たり判定の円を重ねて見せる
+  const c = cv.getContext('2d'), size = cv.width, rp = size * 0.43;
+  c.clearRect(0, 0, size, size);
+  const spr = withDesign(d, rp, getSprite);
+  c.save(); c.translate(size / 2, size / 2);
+  c.drawImage(spr.arm, -rp, -rp, 2 * rp, 2 * rp);
+  const colors = { tip: '255,93,93', mid: '255,193,77', hub: '93,180,255' };
+  for (const k of hitCircles(d)) {
+    c.fillStyle = `rgba(${colors[k.kind]},.22)`; c.strokeStyle = `rgba(${colors[k.kind]},.95)`; c.lineWidth = 1.6;
+    c.beginPath(); c.arc(k.x * rp, k.y * rp, k.r * rp, 0, TAU); c.fill(); c.stroke();
+  }
+  c.restore();
+}
+
+/* ---------- ファイターとバトルの計算 ---------- */
+function makeFighter(d, rpm, name, side) {
+  const r = Math.max(120, Math.min(rpm, 9000)), w = r * TAU / 60;
+  return { d, name, side, st: statsOf(d), circles: hitCircles(d), x: 0, y: 0, vx: 0, vy: 0, th: Math.random() * TAU, dir: Math.random() < 0.5 ? 1 : -1,
+    w, w0: w, lk: 0.85 + Math.random() * 0.3, dashCd: 0, dashReq: false, pairCd: 0, out: false, fin: false, outT: 0, hits: 0, taken: 0, maxHit: 0, dashed: 0, aiT: 0, rpm: Math.round(r) };
+}
+function makeBattle(a, b) {
+  a.x = 0; a.y = 0.55; a.vy = -0.2; b.x = 0; b.y = -0.55; b.vy = 0.2;
+  return { A: a, B: b, t: 0, over: false, winner: null, reason: '', ev: [] };
+}
+function worldCircles(f) {
+  const c = Math.cos(f.th), s2 = Math.sin(f.th), out = [];
+  for (const k of f.circles) out.push({ x: f.x + (k.x * c - k.y * s2) * BS, y: f.y + (k.x * s2 + k.y * c) * BS, r: k.r * BS, kind: k.kind });
+  return out;
+}
+function stepFighter(f, o, dt) {
+  if (f.out) { f.outT += dt; f.x += f.vx * dt * 1.5; f.y += f.vy * dt * 1.5; f.th += f.w * f.dir * dt; return; }
+  f.dashCd = Math.max(0, f.dashCd - dt); f.pairCd = Math.max(0, f.pairCd - dt);
+  const w = f.w, wn = Math.min(1, w / 250);
+  f.w = Math.max(0, w - (PHYS.C0 + PHYS.C1 * w) * dt / (Math.pow(f.st.sta, 0.7) * f.lk));     // lk=そのバトルの調子（運）
+  let ax = -PHYS.BOWL * f.x, ay = -PHYS.BOWL * f.y;                                   // すり鉢の中心へ
+  const dx = o.x - f.x, dy = o.y - f.y, dist = Math.hypot(dx, dy) || 1e-6;
+  const att = PHYS.ATT * wn * f.st.grip / Math.sqrt(f.st.mass);                         // 回転が速いほど相手へ寄っていく
+  ax += dx / dist * att; ay += dy / dist * att;
+  const rr = Math.hypot(f.x, f.y) || 1e-6;
+  ax += -f.y / rr * PHYS.ORBIT * wn * f.dir; ay += f.x / rr * PHYS.ORBIT * wn * f.dir; // 回転の向きに沿って周回
+  if (f.w < 70) { const j = (1 - f.w / 70) * 6; ax += (Math.random() - 0.5) * j; ay += (Math.random() - 0.5) * j; }   // 回転が落ちるとふらつく
+  f.vx += ax * dt; f.vy += ay * dt;
+  const dr = Math.exp(-PHYS.DRAG * dt); f.vx *= dr; f.vy *= dr;
+  f.x += f.vx * dt; f.y += f.vy * dt;
+  f.th += f.w * f.dir * dt;
+}
+function applyDash(f, o) {
+  if (!f.dashReq) return;
+  f.dashReq = false;
+  if (f.dashCd > 0 || f.out || f.fin) return;
+  const dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy) || 1e-6, k = PHYS.DASH / Math.sqrt(f.st.mass);
+  f.vx += dx / d * k; f.vy += dy / d * k; f.w *= 0.94; f.dashCd = PHYS.DASH_CD; f.dashed++;
+}
+const KIND_ATK = { tip: 1, mid: 0.55, hub: 0.4 }, KIND_DEF = { tip: 0.8, mid: 1, hub: 1.1 };
+function collide(Bt, A, B) {
+  const cA = worldCircles(A), cB = worldCircles(B);
+  let best = null;
+  for (const a of cA) for (const b of cB) {
+    const dx = b.x - a.x, dy = b.y - a.y, rr = a.r + b.r, d2 = dx * dx + dy * dy;
+    if (d2 < rr * rr) { const d = Math.sqrt(d2) || 1e-6, pen = rr - d; if (!best || pen > best.pen) best = { a, b, dx, dy, d, pen }; }
+  }
+  if (!best) return;
+  const nx = best.dx / best.d, ny = best.dy / best.d, mA = A.st.mass, mB = B.st.mass, tot = mA + mB;
+  A.x -= nx * best.pen * mB / tot; A.y -= ny * best.pen * mB / tot; B.x += nx * best.pen * mA / tot; B.y += ny * best.pen * mA / tot;   // めり込みを戻す
+  const rax = best.a.x - A.x, ray = best.a.y - A.y, rbx = best.b.x - B.x, rby = best.b.y - B.y;
+  const wa = Math.sqrt(A.w * 150), wb = Math.sqrt(B.w * 150);                       // 回転数の効き方は緩やかに（2倍回しても2倍強くはならない）
+  const vax = A.vx - PHYS.SPIN * wa * A.dir * ray, vay = A.vy + PHYS.SPIN * wa * A.dir * rax;     // 接触点の速度（回転ぶんも含む）
+  const vbx = B.vx - PHYS.SPIN * wb * B.dir * rby, vby = B.vy + PHYS.SPIN * wb * B.dir * rbx;
+  const vn = (vbx - vax) * nx + (vby - vay) * ny;
+  if (A.pairCd > 0 || vn > -PHYS.MINV) return;             // かすっただけの接触はヒットにしない
+  const J = -(1 + PHYS.E) * vn / (1 / mA + 1 / mB);
+  const Jk = Math.min(J, PHYS.JMAX);                        // はじき飛ばす力には上限（ダメージは大きくなっても、1発で場外にならないように）
+  A.vx -= Jk / mA * nx * PHYS.KNOCK; A.vy -= Jk / mA * ny * PHYS.KNOCK; B.vx += Jk / mB * nx * PHYS.KNOCK; B.vy += Jk / mB * ny * PHYS.KNOCK;
+  const rnd = () => 0.75 + Math.random() * 0.5;                               // ダメージには毎回少しばらつき
+  const dB = PHYS.DMG * J * rnd() * A.lk * A.st.atkE * KIND_ATK[best.a.kind] / (B.st.defE * KIND_DEF[best.b.kind]);   // 相手が受ける回転ダメージ
+  const dA = PHYS.DMG * J * rnd() * B.lk * B.st.atkE * KIND_ATK[best.b.kind] / (A.st.defE * KIND_DEF[best.a.kind]);
+  A.w = Math.max(0, A.w - dA); B.w = Math.max(0, B.w - dB);
+  A.pairCd = B.pairCd = PHYS.PAIR_CD; A.hits++; B.hits++; A.taken += dA; B.taken += dB; A.maxHit = Math.max(A.maxHit, dB); B.maxHit = Math.max(B.maxHit, dA);
+  Bt.ev.push({ type: 'hit', x: (best.a.x + best.b.x) / 2, y: (best.a.y + best.b.y) / 2, p: J, da: dA, db: dB });
+}
+const higherW = (A, B) => Math.abs(A.w - B.w) < 1e-6 ? (Math.random() < 0.5 ? 'A' : 'B') : (A.w > B.w ? 'A' : 'B');   // 同点はランダム（どちらかが有利にならないように）
+function stepBattle(Bt, dt) {
+  if (Bt.over) return;
+  const A = Bt.A, B = Bt.B;
+  Bt.t += dt;
+  applyDash(A, B); applyDash(B, A);
+  const sA = { x: A.x, y: A.y }, sB = { x: B.x, y: B.y };      // 2人を同時に動かす（先に動く側が有利にならないように）
+  stepFighter(A, sB, dt); stepFighter(B, sA, dt);
+  if (!A.out && !B.out) collide(Bt, A, B);
+  for (const f of [A, B]) {
+    if (!f.out && Math.hypot(f.x, f.y) > 1.02) { f.out = true; f.outT = 0; Bt.ev.push({ type: 'out', who: f.side }); }
+    if (!f.out && !f.fin && f.w < 6) { f.fin = true; Bt.ev.push({ type: 'fin', who: f.side }); }
+  }
+  const aDown = A.out || A.fin, bDown = B.out || B.fin;
+  if (aDown || bDown) {
+    Bt.over = true;
+    Bt.winner = aDown && bDown ? higherW(A, B) : aDown ? 'B' : 'A';
+    Bt.reason = (Bt.winner === 'A' ? B : A).out ? 'ringout' : 'stop';
+  } else if (Bt.t > PHYS.TIME) { Bt.over = true; Bt.winner = higherW(A, B); Bt.reason = 'time'; }
+}
+function aiDash(f, o, diff, dt) {                           // CPUのダッシュ：近づいた時に、つよいほど頻繁に使う
+  f.aiT -= dt;
+  if (f.aiT > 0) return;
+  f.aiT = [0.55, 0.32, 0.18][diff - 1] * (0.7 + Math.random() * 0.6);
+  if (f.dashCd <= 0 && !f.out && Math.hypot(o.x - f.x, o.y - f.y) < 0.85 && Math.random() < [0.2, 0.5, 0.85][diff - 1]) f.dashReq = true;
+}
+const cpuRpm = diff => Math.round([900, 2200, 4200][diff - 1] * (0.8 + Math.random() * 0.4));
+
+/* ---------- 画面の流れ ---------- */
+const btEl = $b('bt'), SCREENS = ['sMenu', 'sP2', 'sOnline', 'sResult'];
+const BT = { type: null, diff: 1, phase: 'idle', lock: false, role: 'local', flip: false, saved: null, p1: null, p2: null, name1: '', name2: '',
+  rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
+function showScreen(id) { for (const s of SCREENS) $b(s).hidden = s !== id; btEl.classList.add('show'); document.body.classList.add('btmode'); }
+function hideOverlay() { btEl.classList.remove('show'); }
+function refreshMenu() {
+  const d = designOf(), st = statsOf(d);
+  $b('mineName').textContent = designLabel(d); fillBars($b('mineBars'), st); drawHitPreview($b('hbCv'), d);
+  $b('btRecord').textContent = `戦績 ${settings.wins}勝 ${settings.losses}敗`;
+}
+function refreshP2() { const d = designOf(); $b('mineName2').textContent = designLabel(d); fillBars($b('mineBars2'), statsOf(d)); drawHitPreview($b('hbCv2'), d); }
+window.__btRefresh = () => { if (btEl.classList.contains('show')) { if (!$b('sMenu').hidden) refreshMenu(); if (!$b('sP2').hidden) refreshP2(); } };
+function openMenu() { if (MODE !== 'free') return; initAudio(); refreshMenu(); showScreen('sMenu'); }
+function closeMenu() { hideOverlay(); document.body.classList.remove('btmode'); }
+
+function btStart(type, diff) {
+  BT.type = type; BT.diff = diff || 1; BT.saved = designOf(); BT.p1 = designOf(); BT.recorded = false;
+  BT.role = type === 'online' ? 'host' : 'local'; BT.flip = false; BT.mySpun = BT.peerSpun = false;
+  initAudio();
+  if (type === 'online') { showScreen('sOnline'); olReset(); return; }
+  BT.name1 = type === 'cpu' ? 'あなた' : '1P'; BT.name2 = type === 'cpu' ? 'CPU' : '2P';
+  if (type === 'cpu') BT.p2 = randomDesign();
+  startSpin(type === 'cpu' ? 'あなた' : '1P', rpm => {
+    BT.rpm1 = rpm;
+    if (type === 'cpu') { BT.rpm2 = cpuRpm(BT.diff); beginBattle(); } else { refreshP2(); showScreen('sP2'); }
+  });
+}
+function startSpin(label, done) {                           // 5秒間回す（ふつうの画面でふつうに回す）
+  hideOverlay(); document.body.classList.add('btmode');
+  MODE = 'spin'; BT.lock = false; BT.spinDone = done; S.omega = 0; S.turns = 0; hintEl.style.opacity = 0;
+  BT.spinEnd = performance.now() + 5000;
+  $b('btCount').style.display = 'block'; $b('btCountT').textContent = `${label}：5秒間、思いきり回そう！`; $b('btCountB').textContent = '5';
+}
+function spinTick(now) {
+  if (BT.lock) return;
+  const left = (BT.spinEnd - now) / 1000;
+  if (left > 0) { $b('btCountB').textContent = Math.ceil(left); return; }
+  const rpm = Math.round(Math.abs(S.omega) * 60 / TAU);     // この時点の回転数が、バトルの最初の回転数になる
+  BT.lock = true;
+  $b('btCountB').textContent = rpm.toLocaleString('en-US'); $b('btCountT').textContent = 'rpm 確定！';
+  setTimeout(() => { $b('btCount').style.display = 'none'; const d = BT.spinDone; BT.spinDone = null; MODE = 'free'; if (d) d(rpm); }, 1500);
+}
+function beginBattle() {
+  const a = makeFighter(BT.flip ? BT.p2 : BT.p1, BT.flip ? BT.rpm2 : BT.rpm1, BT.flip ? BT.name2 : BT.name1, 'A');
+  const b = makeFighter(BT.flip ? BT.p1 : BT.p2, BT.flip ? BT.rpm1 : BT.rpm2, BT.flip ? BT.name1 : BT.name2, 'B');
+  if (BT.type === 'local' && BT.saved) applyDesign(BT.saved);
+  BT.battle = makeBattle(a, b); enterBattleView();
+}
+function enterBattleView() {
+  MODE = 'battle'; BT.phase = 'count'; BT.count = 3.2; BT.sparks = []; BT.snapT = 0; BT.endT = 0;
+  document.body.classList.add('btmode', 'inbattle');
+  hideOverlay();
+  $b('dash1').style.display = 'block'; $b('dash2').style.display = BT.type === 'local' ? 'block' : 'none';
+}
+function endBattle(toMenu) {
+  MODE = 'free'; BT.phase = 'idle'; BT.lock = false; BT.battle = null;
+  $b('dash1').style.display = $b('dash2').style.display = 'none'; $b('btCount').style.display = 'none';
+  document.body.classList.remove('inbattle');
+  if (BT.saved) { applyDesign(BT.saved); saveSettings(); BT.saved = null; }
+  netClose(); S.omega = 0;
+  if (toMenu) openMenu(); else { hideOverlay(); document.body.classList.remove('btmode'); }
+}
+function showResult() {
+  const Bt = BT.battle, meSide = BT.flip ? 'B' : 'A', win = Bt.winner === meSide;
+  const why = { ringout: '場外に押し出した！', stop: '回転を止めた！', time: 'タイムアップ（残りの回転数で判定）' }[Bt.reason];
+  let title;
+  if (BT.type === 'local') title = (Bt.winner === 'A' ? '1P' : '2P') + ' の勝ち！';
+  else {
+    title = win ? 'WIN!' : 'LOSE...';
+    if (!BT.recorded) { BT.recorded = true; if (win) settings.wins++; else settings.losses++; saveSettings(); }
+  }
+  const me = BT.flip ? Bt.B : Bt.A, op = BT.flip ? Bt.A : Bt.B;
+  $b('resTitle').textContent = title;
+  $b('resBody').innerHTML = `${win || BT.type === 'local' ? why : (Bt.reason === 'ringout' ? '場外に出された…' : Bt.reason === 'stop' ? '回転が止まった…' : why)}<br>
+    ${Bt.t.toFixed(1)}秒 ／ ヒット ${me.hits}回 ／ 最大ダメージ ${Math.round(me.maxHit)} ／ ダッシュ ${me.dashed}回<br>
+    あなた ${me.rpm.toLocaleString('en-US')}rpm（${designLabel(me.d)}）<br>相手 ${op.rpm.toLocaleString('en-US')}rpm（${designLabel(op.d)}）`;
+  $b('resAgain').disabled = BT.type === 'online';
+  showScreen('sResult');
+}
+
+/* ---------- バトル中の更新と描画 ---------- */
+function btEvents(Bt) {
+  for (const e of Bt.ev.splice(0)) {
+    if (e.type === 'hit') {
+      for (let i = 0; i < 9; i++) { const a = Math.random() * TAU, v = 0.4 + Math.random() * 1.1; BT.sparks.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.35 + Math.random() * 0.25 }); }
+      click(Math.min(1, 0.35 + e.p * 0.35)); if (e.p > 0.8) thump(Math.min(1, e.p * 0.35)); vib(Math.min(40, 12 + e.p * 14));
+    } else if (e.type === 'out') { whoosh(0.8); vib(40); } else if (e.type === 'fin') settle();
+  }
+}
+function battleFrame(now, rawDt) {
+  const Bt = BT.battle, dt = Math.min(0.05, rawDt), isGuest = BT.role === 'guest';
+  if (!Bt) return;
+  const me = BT.flip ? Bt.B : Bt.A;
+  if (BT.phase === 'count') {
+    BT.count -= dt;
+    for (const f of [Bt.A, Bt.B]) f.th += f.w * f.dir * dt * 0.2;
+    if (BT.count <= 0) BT.phase = 'fight';
+  } else if (BT.phase === 'fight' && !isGuest) {
+    if (BT.type === 'cpu') aiDash(Bt.B, Bt.A, BT.diff, dt);
+    const n = Math.max(1, Math.ceil(dt / (1 / 120)));
+    for (let i = 0; i < n; i++) stepBattle(Bt, dt / n);
+    if (BT.role === 'host') {
+      BT.snapT += dt;
+      if (BT.snapT >= 1 / 30) { BT.snapT = 0; netSend(snapOf(Bt)); }
+    }
+    btEvents(Bt);
+    if (Bt.over) { BT.phase = 'end'; BT.endT = 0; if (BT.role === 'host') netSend(snapOf(Bt)); }
+  } else if (isGuest && BT.phase === 'fight') {
+    for (const f of [Bt.A, Bt.B]) {                          // ホストから届いた位置へなめらかに寄せる
+      if (f.tx !== undefined) { f.x += (f.tx - f.x) * 0.4; f.y += (f.ty - f.y) * 0.4; f.w += (f.tw - f.w) * 0.4; }
+      f.th += f.w * f.dir * dt; f.dashCd = Math.max(0, f.dashCd - dt); if (f.out) f.outT += dt;
+    }
+    btEvents(Bt);
+    if (Bt.over) { BT.phase = 'end'; BT.endT = 0; }
+  } else if (BT.phase === 'end') {
+    BT.endT += dt;
+    for (const f of [Bt.A, Bt.B]) { if (f.out) stepFighter(f, f, dt); else { f.th += f.w * f.dir * dt; f.w *= Math.exp(-dt * 2); } }
+    if (BT.endT > 1.6 && btEl.classList.contains('show') === false) showResult();
+  }
+  S.omega = me.out ? 0 : me.w; audioUpdate();               // 自分のスピナーの回転音を鳴らす
+  drawBattle(dt, Bt);
+}
+function battleLayout() { return { AR: Math.max(110, Math.min(W * 0.46, (H - 250) / 2)), ax: W / 2, ay: H * 0.5 }; }
+function drawBattle(dt, Bt) {
+  const L = battleLayout(), sgn = BT.flip ? -1 : 1, P = THEME[settings.material];
+  S.drawDt += dt; S.L = Math.log2(1 + Math.abs(S.omega) / 40);
+  drawBackground(); S.drawDt = 0;
+  // すり鉢のアリーナ
+  ctx.save();
+  let g = ctx.createRadialGradient(L.ax, L.ay, L.AR * 0.1, L.ax, L.ay, L.AR * 1.1);
+  g.addColorStop(0, 'rgba(46,52,66,.95)'); g.addColorStop(0.75, 'rgba(18,21,28,.97)'); g.addColorStop(1, 'rgba(6,7,10,.98)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(L.ax, L.ay, L.AR * 1.07, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
+  for (const r of [0.25, 0.5, 0.75]) { ctx.beginPath(); ctx.arc(L.ax, L.ay, L.AR * r, 0, TAU); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(L.ax - L.AR, L.ay); ctx.lineTo(L.ax + L.AR, L.ay); ctx.moveTo(L.ax, L.ay - L.AR); ctx.lineTo(L.ax, L.ay + L.AR); ctx.stroke();
+  g = ctx.createLinearGradient(L.ax - L.AR, L.ay - L.AR, L.ax + L.AR, L.ay + L.AR);
+  g.addColorStop(0, '#b4bdcc'); g.addColorStop(0.5, '#4a5160'); g.addColorStop(1, '#d3dbe8');
+  ctx.strokeStyle = g; ctx.lineWidth = L.AR * 0.07; ctx.beginPath(); ctx.arc(L.ax, L.ay, L.AR * 1.04, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = P.accent; ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(L.ax, L.ay, L.AR * 1.0, 0, TAU); ctx.stroke();
+  ctx.restore();
+  for (const f of [Bt.A, Bt.B]) drawFighter(f, L, sgn);
+  // 火花
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let i = BT.sparks.length - 1; i >= 0; i--) {
+    const p = BT.sparks[i]; p.life -= dt; if (p.life <= 0) { BT.sparks.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    ctx.fillStyle = `rgba(${P.spark},${Math.min(1, p.life * 2.5)})`;
+    ctx.beginPath(); ctx.arc(L.ax + sgn * p.x * L.AR, L.ay + sgn * p.y * L.AR, 2.2, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  drawBattleHud(Bt);
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.shadowColor = P.accent; ctx.shadowBlur = 24;
+  if (BT.phase === 'count') {
+    const n = Math.ceil(BT.count - 0.2);
+    ctx.font = '800 84px system-ui, sans-serif'; ctx.fillText(n > 0 ? String(n) : 'FIGHT!', W / 2, H * 0.5);
+  } else if (BT.phase === 'end') {
+    ctx.font = '800 44px system-ui, sans-serif';
+    const me = BT.flip ? 'B' : 'A';
+    ctx.fillText(BT.type === 'local' ? 'FINISH!' : (Bt.winner === me ? 'WIN!' : 'LOSE...'), W / 2, H * 0.5);
+  }
+  ctx.restore();
+  // ダッシュのボタンの充電表示
+  const mine = BT.flip ? Bt.B : Bt.A;
+  $b('dash1').firstChild.style.width = ((1 - mine.dashCd / PHYS.DASH_CD) * 100) + '%';
+  if (BT.type === 'local') $b('dash2').firstChild.style.width = ((1 - Bt.B.dashCd / PHYS.DASH_CD) * 100) + '%';
+}
+function drawFighter(f, L, sgn) {
+  const RB = BS * L.AR, fade = f.out ? Math.max(0, 1 - f.outT * 0.9) : 1;
+  if (fade <= 0) return;
+  const sp = withDesign(f.d, RB, getSprite);
+  const sx = L.ax + sgn * f.x * L.AR, sy = L.ay + sgn * f.y * L.AR, rot = f.th + (BT.flip ? Math.PI : 0);
+  ctx.save(); ctx.translate(sx, sy); ctx.globalAlpha = fade;
+  const sc = f.out ? 0.6 + 0.4 * fade : 1; ctx.scale(sc, sc);
+  const sg = ctx.createRadialGradient(0, 0, RB * 0.3, 0, 0, RB * 1.15);
+  sg.addColorStop(0, 'rgba(0,0,0,.5)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(RB * 0.12, RB * 0.16, RB * 1.15, 0, TAU); ctx.fill();
+  if (f.w > 25) { const off = Math.max(-1.2, Math.min(1.2, f.w * f.dir * 0.012)); for (let i = 2; i >= 1; i--) { ctx.save(); ctx.rotate(rot - off * i); ctx.globalAlpha = fade * (i === 1 ? 0.18 : 0.08); ctx.drawImage(sp.arm, -RB, -RB, 2 * RB, 2 * RB); ctx.restore(); } }
+  ctx.rotate(rot); ctx.drawImage(sp.arm, -RB, -RB, 2 * RB, 2 * RB);
+  ctx.restore();
+  if (!f.out) {                                             // 回転数のリング（満タン＝最初の回転数）
+    ctx.save(); ctx.lineWidth = 3; ctx.strokeStyle = THEME[f.d.material].accent; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.arc(sx, sy, RB * 1.12, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, f.w / f.w0)); ctx.stroke(); ctx.restore();
+  }
+}
+function drawBattleHud(Bt) {
+  const me = BT.flip ? Bt.B : Bt.A, op = BT.flip ? Bt.A : Bt.B;
+  hudRow(op, BT.type === 'local' ? 104 : 60, BT.type === 'local');
+  hudRow(me, H - 100, false);
+}
+function hudRow(f, y, upside) {
+  const bw = Math.min(W * 0.8, 360), x0 = (W - bw) / 2;
+  ctx.save();
+  if (upside) { ctx.translate(W / 2, y); ctx.rotate(Math.PI); ctx.translate(-W / 2, -y); }
+  ctx.font = '600 13px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.textAlign = 'left'; ctx.fillText(f.name + '　' + SHAPES[f.d.shape].name + '・' + f.d.arms + '本', x0, y - 9);
+  ctx.textAlign = 'right'; ctx.fillText(Math.round(f.w * 60 / TAU).toLocaleString('en-US') + ' rpm', x0 + bw, y - 9);
+  ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.roundRect(x0, y, bw, 8, 4); ctx.fill();
+  ctx.fillStyle = THEME[f.d.material].accent; ctx.beginPath(); ctx.roundRect(x0, y, Math.max(8, bw * Math.min(1, f.w / f.w0)), 8, 4); ctx.fill();
+  ctx.restore();
+}
+
+/* ---------- オンライン（サーバーなし：コードを送り合って直接つなぐ） ---------- */
+const Net = { pc: null, dc: null, open: false };
+const RTC_CFG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+const enc = d => btoa(JSON.stringify({ type: d.type, sdp: d.sdp })), dec = c => JSON.parse(atob(c.trim()));
+function iceDone(pc) {
+  return new Promise(res => {
+    if (pc.iceGatheringState === 'complete') return res();
+    const f = () => { if (pc.iceGatheringState === 'complete') { pc.removeEventListener('icegatheringstatechange', f); res(); } };
+    pc.addEventListener('icegatheringstatechange', f); setTimeout(res, 4000);
+  });
+}
+function olStatus(t) { $b('olStatus').textContent = t; }
+function olReset() {
+  netClose(); $b('olStep0').hidden = false; $b('olHostBox').hidden = $b('olJoinBox').hidden = true;
+  for (const id of ['olHostCode', 'olAnsIn', 'olHostIn', 'olAnsCode']) $b(id).value = '';
+  olStatus(typeof RTCPeerConnection === 'undefined' ? 'この環境ではオンライン対戦が使えません（GitHub Pagesなど、普通のWebページとして開いてください）' : '');
+}
+function netClose() {                                       // 自分から閉じる時は「切れた」と誤検出しないよう、先に監視をはずす
+  try { if (Net.dc) { Net.dc.onclose = null; Net.dc.close(); } if (Net.pc) { Net.pc.onconnectionstatechange = null; Net.pc.close(); } } catch (e) { /* 無視 */ }
+  Net.pc = Net.dc = null; Net.open = false;
+}
+function newPC() {
+  const pc = new RTCPeerConnection(RTC_CFG);
+  pc.onconnectionstatechange = () => { if (['failed', 'disconnected', 'closed'].includes(pc.connectionState) && MODE !== 'free') netLost(); };
+  return (Net.pc = pc);
+}
+function setupDC(dc) {
+  Net.dc = dc;
+  dc.onopen = () => { Net.open = true; onNetOpen(); };
+  dc.onmessage = e => { try { handleNet(JSON.parse(e.data)); } catch (err) { /* 無視 */ } };
+  dc.onclose = () => { Net.open = false; if (MODE !== 'free' || BT.phase !== 'idle') netLost(); };
+}
+function netSend(o) { if (Net.dc && Net.dc.readyState === 'open') Net.dc.send(JSON.stringify(o)); }
+function netLost() {
+  if (BT.type !== 'online' || BT.phase === 'end') return;
+  if (MODE === 'free' && btEl.classList.contains('show')) { olStatus('接続が切れました'); return; }
+  MODE = 'free'; BT.phase = 'idle'; BT.lock = false; $b('dash1').style.display = 'none'; $b('btCount').style.display = 'none';
+  document.body.classList.remove('inbattle');
+  showScreen('sOnline'); $b('olStep0').hidden = true; olStatus('接続が切れました。「もどる」からやり直してください');
+}
+async function olHost() {
+  try {
+    const pc = newPC(); setupDC(pc.createDataChannel('spin'));
+    olStatus('コードを作っています…'); $b('olStep0').hidden = true; $b('olHostBox').hidden = false;
+    await pc.setLocalDescription(await pc.createOffer()); await iceDone(pc);
+    $b('olHostCode').value = enc(pc.localDescription); BT.role = 'host'; olStatus('友だちにコードを送って、返信コードを待ちましょう');
+  } catch (e) { olStatus('作れませんでした：' + e.message); }
+}
+async function olConnect() {
+  try { olStatus('つないでいます…'); await Net.pc.setRemoteDescription(dec($b('olAnsIn').value)); } catch (e) { olStatus('コードが正しくありません'); }
+}
+async function olMakeAns() {
+  try {
+    const pc = newPC(); pc.ondatachannel = e => setupDC(e.channel); BT.role = 'guest'; BT.flip = true;
+    olStatus('返信コードを作っています…');
+    await pc.setRemoteDescription(dec($b('olHostIn').value));
+    await pc.setLocalDescription(await pc.createAnswer()); await iceDone(pc);
+    $b('olAnsCode').value = enc(pc.localDescription); olStatus('このコードを友だちに送り返してください。つながるまで待ちます');
+  } catch (e) { olStatus('コードが正しくありません'); }
+}
+function onNetOpen() {                                      // つながった：お互いのデザインを交換して、同時に5秒間回す
+  BT.type = 'online'; BT.p1 = designOf(); BT.saved = designOf(); BT.name1 = 'あなた'; BT.name2 = '相手'; BT.mySpun = BT.peerSpun = false; BT.peer = null; BT.sentHello = true;
+  netSend({ t: 'hello', design: BT.p1 }); olStatus('つながりました！'); maybeStartOnlineSpin();
+}
+function maybeStartOnlineSpin() {
+  if (!BT.sentHello || !BT.peer || MODE !== 'free' || BT.phase !== 'idle') return;
+  BT.phase = 'wait'; BT.p2 = BT.peer.design;
+  startSpin('あなた', rpm => { BT.rpm1 = rpm; BT.mySpun = true; netSend({ t: 'spun', rpm }); maybeBeginOnline(); });
+}
+function maybeBeginOnline() {
+  if (BT.role !== 'host' || !BT.mySpun || !BT.peerSpun) return;
+  const a = makeFighter(BT.p1, BT.rpm1, 'あなた', 'A'), b = makeFighter(BT.p2, BT.rpm2, '相手', 'B');
+  BT.battle = makeBattle(a, b);
+  netSend({ t: 'start', A: { d: a.d, rpm: a.rpm, dir: a.dir }, B: { d: b.d, rpm: b.rpm, dir: b.dir } });
+  enterBattleView();
+}
+const snapOf = Bt => ({ t: 'snap', tm: Bt.t, a: [Bt.A.x, Bt.A.y, Bt.A.w, +Bt.A.out, +Bt.A.fin, Bt.A.dashCd], b: [Bt.B.x, Bt.B.y, Bt.B.w, +Bt.B.out, +Bt.B.fin, Bt.B.dashCd],
+  ev: Bt.ev.map(e => ({ ...e })), over: Bt.over, win: Bt.winner, why: Bt.reason, ha: [Bt.A.hits, Bt.A.maxHit, Bt.A.dashed], hb: [Bt.B.hits, Bt.B.maxHit, Bt.B.dashed] });
+function handleNet(m) {
+  if (m.t === 'hello') { BT.peer = m; maybeStartOnlineSpin(); }
+  else if (m.t === 'spun') { BT.rpm2 = m.rpm; BT.peerSpun = true; maybeBeginOnline(); }
+  else if (m.t === 'start' && BT.role === 'guest') {
+    const fa = makeFighter(m.A.d, m.A.rpm, '相手', 'A'), fb = makeFighter(m.B.d, m.B.rpm, 'あなた', 'B');   // A=ホスト、B=ゲスト（自分）
+    fa.dir = m.A.dir; fb.dir = m.B.dir;
+    BT.battle = makeBattle(fa, fb);
+    enterBattleView();
+  } else if (m.t === 'snap' && BT.role === 'guest' && BT.battle) {
+    const Bt = BT.battle;
+    for (const [f, s2, h] of [[Bt.A, m.a, m.ha], [Bt.B, m.b, m.hb]]) {
+      f.tx = s2[0]; f.ty = s2[1]; f.tw = s2[2]; f.out = !!s2[3]; f.fin = !!s2[4]; f.dashCd = s2[5];
+      if (f.x === 0 && f.y === 0 || f.out) { f.x = s2[0]; f.y = s2[1]; }
+      f.hits = h[0]; f.maxHit = h[1]; f.dashed = h[2];
+    }
+    for (const e of m.ev) Bt.ev.push(e);
+    Bt.t = m.tm;
+    if (m.over && !Bt.over) { Bt.over = true; Bt.winner = m.win; Bt.reason = m.why; }
+  } else if (m.t === 'dash' && BT.role === 'host' && BT.battle) BT.battle.B.dashReq = true;
+}
+
+/* ---------- ボタンの接続 ---------- */
+$b('battleBtn').addEventListener('click', openMenu);
+$b('btClose').addEventListener('click', closeMenu);
+$b('btPick').addEventListener('click', () => setSheet(true));
+$b('btRand').addEventListener('click', () => { applyDesign(randomDesign()); saveSettings(); click(0.9); refreshMenu(); });
+for (const b of btEl.querySelectorAll('[data-bt]')) b.addEventListener('click', () => {
+  const v = b.dataset.bt;
+  if (v.startsWith('cpu')) btStart('cpu', +v.slice(3)); else btStart(v);
+});
+$b('p2Pick').addEventListener('click', () => setSheet(true));
+$b('p2Rand').addEventListener('click', () => { applyDesign(randomDesign()); click(0.9); refreshP2(); });
+$b('p2Go').addEventListener('click', () => {
+  BT.p2 = designOf();
+  startSpin('2P', rpm => { BT.rpm2 = rpm; beginBattle(); });
+});
+$b('resAgain').addEventListener('click', () => { const t = BT.type, d = BT.diff; endBattle(false); btStart(t, d); });
+$b('resMenu').addEventListener('click', () => endBattle(true));
+$b('olBack').addEventListener('click', () => { netClose(); BT.phase = 'idle'; endBattle(true); });
+$b('olHost').addEventListener('click', olHost);
+$b('olJoin').addEventListener('click', () => { $b('olStep0').hidden = true; $b('olJoinBox').hidden = false; });
+$b('olConnect').addEventListener('click', olConnect);
+$b('olMakeAns').addEventListener('click', olMakeAns);
+const copyTo = (id, label) => async () => { const el = $b(id); el.select(); try { await navigator.clipboard.writeText(el.value); olStatus(label + 'をコピーしました'); } catch (e) { document.execCommand && document.execCommand('copy'); olStatus('選択しました。コピーしてください'); } };
+$b('olCopyHost').addEventListener('click', copyTo('olHostCode', 'コード'));
+$b('olCopyAns').addEventListener('click', copyTo('olAnsCode', '返信コード'));
+const dashPress = who => e => {
+  e.preventDefault();
+  if (MODE !== 'battle' || BT.phase !== 'fight' || !BT.battle) return;
+  if (BT.role === 'guest') { netSend({ t: 'dash' }); return; }
+  (who === 1 ? BT.battle.A : BT.battle.B).dashReq = true;
+};
+$b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventListener('pointerdown', dashPress(2));
+window.__bt = { statsOf, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign };
 
 // 別タブに行った時は音を止める
 document.addEventListener('visibilitychange', () => {
