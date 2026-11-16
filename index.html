@@ -47,7 +47,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 
 /* ---------- 定数・設定 ---------- */
 const TAU = Math.PI * 2;
-const MAX_W = 420;                       // rad/s（約4000rpm）上限
+const MAX_W = 600;                       // rad/s（約5700rpm）上限
 const ARMS = [3, 2, 4, 5];
 const THEMES = ['metal', 'neon', 'rainbow', 'wood', 'matte'];
 const THEME_NAME = { metal: 'メタル', neon: 'ネオン', rainbow: 'レインボー', wood: 'ウッド', matte: 'マット' };
@@ -118,7 +118,7 @@ const TIMBRE = {
 const S = {
   theta: 0, prevTheta: 0, omega: 0, gripV: 0,
   turns: 0, tickIdx: null, lastRpm: -1,
-  hue: 200, dragging: false, particles: [], rings: [], shake: 0, flash: 0, milestone: 0, recordShown: false
+  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], shake: 0, flash: 0, milestone: 0, recordShown: false
 };
 let drag = null;             // 指の操作中の情報
 let dirty = false, lastSave = 0;
@@ -241,7 +241,7 @@ function whoosh(vol) {
 function chime(i) {
   if (!ac || !settings.sound) return;
   const t = ac.currentTime;
-  const base = [523.25, 587.33, 659.25, 783.99, 880][Math.min(i, 4)];
+  const base = [523.25, 587.33, 659.25, 783.99, 880, 987.77][Math.min(i, 5)];
   [1, 1.5, 2].forEach((m, j) => {
     const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = base * m;
     const g = ac.createGain(), st = t + j * 0.07;
@@ -349,7 +349,10 @@ canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
   const p = pos(e), now = performance.now();
-  drag = { id: e.pointerId, x: p.x, y: p.y, t0: now, lastT: now, lastMove: now, moved: 0, vf: 0 };
+  drag = { id: e.pointerId, x: p.x, y: p.y, t0: now, lastT: now, lastMove: now, moved: 0, vf: 0, dx: 0, dy: 0 };
+  S.trail.length = 0;
+  S.trail.push({ x: p.x, y: p.y, t: now });
+  S.ripples.push({ x: p.x, y: p.y, life: 0.55, max: 0.55, s: 1 });   // 触れた瞬間の波紋
   S.dragging = true;
   hintEl.style.opacity = 0;
 });
@@ -367,7 +370,9 @@ canvas.addEventListener('pointermove', e => {
   const v = Math.max(-MAX_W * 1.5, Math.min(MAX_W * 1.5, tang / rRef / dt));
   drag.vf = drag.vf * 0.5 + v * 0.5;
   drag.moved += Math.hypot(dx, dy);
-  drag.x = p.x; drag.y = p.y; drag.lastT = now; drag.lastMove = now;
+  drag.x = p.x; drag.y = p.y; drag.lastT = now; drag.lastMove = now; drag.dx = dx; drag.dy = dy;
+  S.trail.push({ x: p.x, y: p.y, t: now });
+  if (S.trail.length > 40) S.trail.shift();
 });
 
 // 指は「加速させる」だけ。逆向きや往復の戻りは無視（摩擦だけ効く）
@@ -385,7 +390,9 @@ function dragPhysics(dt, now) {
     const dir = Math.sign(S.omega) || Math.sign(drag.vf);
     const along = drag.vf * dir;
     if (along > 0) {
-      S.omega += dir * 8 * along * (1 - Math.min(1, Math.abs(S.omega) / MAX_W)) * dt;
+      const room = 1 - Math.pow(Math.min(1, Math.abs(S.omega) / MAX_W), 3);   // 上限の直前までほぼ弱まらない
+      S.omega += dir * 22 * along * room * dt;
+      spawnFingerSparks();
     }
     const target = drag.vf * 1.3;                         // 1.3倍＝はじきやすい
     if (Math.abs(target) > Math.abs(S.omega)) {           // 指のほうが速い時だけ引っぱる
@@ -404,6 +411,7 @@ function endDrag(e) {
   } else if (now - drag.lastMove < 100 && Math.abs(S.omega) > 120) {
     flickFx(Math.abs(S.omega));                                            // はじいた瞬間
   }
+  S.ripples.push({ x: drag.x, y: drag.y, life: 0.4, max: 0.4, s: 0.6 });   // 離した時の小さな波紋
   drag = null; S.dragging = false;
 }
 for (const type of ['pointerdown', 'pointermove', 'pointerup']) {
@@ -539,7 +547,7 @@ function updateParticles(dt) {
   }
 }
 
-const MILES = [500, 1000, 2000, 3000, 4000];
+const MILES = [500, 1000, 2000, 3000, 4000, 5000];
 const DUST = Array.from({ length: 44 }, () => ({
   a: Math.random() * TAU, k: 0.5 + Math.random() * 1.6, s: 0.8 + Math.random() * 1.8, al: 0.12 + Math.random() * 0.3
 }));
@@ -559,7 +567,22 @@ function flickFx(a) {
   S.shake = Math.max(S.shake, k); addRing(k);
   vib(30); thump(1); whoosh(k);
 }
+// 加速している間、指先から火花が飛ぶ
+function spawnFingerSparks() {
+  if (!drag || S.particles.length > 100 || Math.random() > 0.7) return;
+  const mv = Math.hypot(drag.dx, drag.dy);
+  if (mv < 1) return;
+  const ang = Math.atan2(drag.dy, drag.dx) + (Math.random() - 0.5) * 1.2;
+  const sp = 180 + Math.random() * 260;
+  const life = 0.22 + Math.random() * 0.25;
+  S.particles.push({ x: drag.x, y: drag.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life, max: life });
+}
+
 function updateFx(dt) {
+  for (let i = S.ripples.length - 1; i >= 0; i--) {
+    S.ripples[i].life -= dt;
+    if (S.ripples[i].life <= 0) S.ripples.splice(i, 1);
+  }
   S.shake *= Math.exp(-7 * dt);
   S.flash *= Math.exp(-5 * dt);
   for (let i = S.rings.length - 1; i >= 0; i--) {
@@ -567,6 +590,42 @@ function updateFx(dt) {
     if (r.life <= 0) S.rings.splice(i, 1);
   }
   for (const d of DUST) d.a += (S.omega * 0.05 / (0.6 + d.k) + 0.03 * d.s) * dt;   // 回転に引っぱられるちり
+}
+
+function drawFinger(a) {
+  const now = performance.now();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  // 指の軌跡（新しいほど太く明るい）
+  const tr = S.trail;
+  while (tr.length && now - tr[0].t > 320) tr.shift();
+  for (let i = 1; i < tr.length; i++) {
+    const age = (now - tr[i].t) / 320;
+    ctx.strokeStyle = glowColor(0.55 * (1 - age));
+    ctx.lineWidth = 3 + 11 * (1 - age);
+    ctx.beginPath(); ctx.moveTo(tr[i - 1].x, tr[i - 1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
+  }
+
+  // 触れている場所の光の玉（回転が速いほど大きく脈打つ）
+  if (drag) {
+    const pulse = 1 + 0.12 * Math.sin(now / 90);
+    const r = (34 + Math.min(34, a / 12)) * pulse;
+    const g = ctx.createRadialGradient(drag.x, drag.y, 0, drag.x, drag.y, r);
+    g.addColorStop(0, glowColor(0.55)); g.addColorStop(0.4, glowColor(0.22)); g.addColorStop(1, glowColor(0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(drag.x, drag.y, r, 0, TAU); ctx.fill();
+  }
+
+  // 波紋
+  for (const r of S.ripples) {
+    const t = r.life / r.max;
+    ctx.strokeStyle = glowColor(0.7 * t * r.s);
+    ctx.lineWidth = 1.5 + 4 * t;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 10 + 80 * (1 - t) * r.s, 0, TAU); ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function draw(a) {
@@ -657,6 +716,8 @@ function draw(a) {
     ctx.beginPath(); ctx.arc(cx, cy, r.r, 0, TAU); ctx.stroke();
   }
   ctx.restore();
+
+  drawFinger(a);
 
   // 節目の閃光
   if (S.flash > 0.02) {
