@@ -73,8 +73,11 @@ const FX_NAME = ['最小', '控えめ'];
 const canVib = 'vibrate' in navigator;
 
 const hsl = (h, s, l) => `hsl(${((h % 360) + 360) % 360},${s}%,${l}%)`;
-const grad = (c, w, stops) => {
-  const g = c.createLinearGradient(0, -w, 0, w);
+const grad = (c, w, stops, ang = Math.PI / 2) => {
+  // 光の向き(ang)に沿ってグラデーションをかける。腕が光に対してどう向いているかで長さを変える
+  const sp = w + (R * 0.42 - w) * Math.abs(Math.cos(ang));
+  const dx = Math.cos(ang), dy = Math.sin(ang), mx = R * 0.33;
+  const g = c.createLinearGradient(mx + dx * sp, dy * sp, mx - dx * sp, -dy * sp);
   for (const [o, col] of stops) g.addColorStop(o, col);
   return g;
 };
@@ -82,34 +85,34 @@ const grad = (c, w, stops) => {
 // テーマごとの見た目
 const THEME = {
   metal: {
-    arm: (c, w) => grad(c, w, [[0, '#4a525e'], [0.42, '#e9eef4'], [0.6, '#9aa5b2'], [1, '#3a414c']]),
+    arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#4a525e'], [0.42, '#e9eef4'], [0.6, '#9aa5b2'], [1, '#3a414c']], ang),
     hub: [[0, '#ffffff'], [0.5, '#b9c2cd'], [1, '#4b5360']],
     hole: '#14181e', ring: '#e6ecf3', edge: 'rgba(255,255,255,.4)', shadow: 'rgba(0,0,0,.55)',
-    spark: '255,226,180', accent: '#cfd8e3'
+    spark: '255,226,180', accent: '#cfd8e3', side: [89, 97, 109]
   },
   neon: {
-    arm: (c, w) => grad(c, w, [[0, '#1d2333'], [1, '#080a10']]),
+    arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#1d2333'], [1, '#080a10']], ang),
     hub: [[0, '#d8fbff'], [0.45, '#1a2536'], [1, '#05070b']],
     hole: '#020304', ring: null, edge: null, shadow: null,   // null = 色相で変化
-    spark: '120,240,255', accent: '#3ee8ff'
+    spark: '120,240,255', accent: '#3ee8ff', side: [8, 10, 18]
   },
   rainbow: {
-    arm: (c, w, k, n, hue) => { const h = hue + k * 360 / n; return grad(c, w, [[0, hsl(h, 95, 72)], [1, hsl(h, 90, 38)]]); },
+    arm: (c, w, k, n, hue, ang) => { const h = hue + k * 360 / n; return grad(c, w, [[0, hsl(h, 95, 72)], [1, hsl(h, 90, 38)]], ang); },
     hub: [[0, '#ffffff'], [0.6, '#cccccc'], [1, '#555555']],
     hole: '#101014', ring: '#ffffff', edge: 'rgba(255,255,255,.5)', shadow: 'rgba(0,0,0,.45)',
-    spark: '255,255,255', accent: '#ff8fd1'
+    spark: '255,255,255', accent: '#ff8fd1', side: [58, 52, 92]
   },
   wood: {
-    arm: (c, w) => grad(c, w, [[0, '#e7bd86'], [0.5, '#b07540'], [1, '#6a3e1c']]),
+    arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#e7bd86'], [0.5, '#b07540'], [1, '#6a3e1c']], ang),
     hub: [[0, '#f6dcae'], [1, '#6a3e1c']],
     hole: '#2b180a', ring: '#f0cf9a', edge: 'rgba(40,20,8,.5)', shadow: 'rgba(0,0,0,.5)',
-    spark: '255,190,110', accent: '#e0a96d'
+    spark: '255,190,110', accent: '#e0a96d', side: [92, 54, 26]
   },
   matte: {
-    arm: (c, w) => grad(c, w, [[0, '#4b505d'], [1, '#20232b']]),
+    arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#4b505d'], [1, '#20232b']], ang),
     hub: [[0, '#7a8090'], [1, '#17191f']],
     hole: '#0b0c0f', ring: '#ff5d8f', edge: 'rgba(255,255,255,.12)', shadow: 'rgba(0,0,0,.6)',
-    spark: '255,93,143', accent: '#ff5d8f'
+    spark: '255,93,143', accent: '#ff5d8f', side: [28, 30, 38]
   }
 };
 
@@ -124,7 +127,7 @@ const TIMBRE = {
 const S = {
   theta: 0, prevTheta: 0, omega: 0, gripV: 0,
   turns: 0, tickIdx: null, lastRpm: -1,
-  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], tx: 0, ty: 0, tx0: 0, ty0: 0, b0: null, g0: 0, txSlow: 0, tySlow: 0, acc: 0, acc0: 0, shakeE: 0, moveTotal: 0, gx: 0, gy: 0, gz: 0, motionSeen: false, lastRattle: 0, auT: 0, drift: 0, gridPhase: 0, tiltReq: false, tiltSeen: false, L: 0, frameDt: 1 / 60, shake: 0, flash: 0, milestone: 0, recordShown: false
+  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], tx: 0, ty: 0, tx0: 0, ty0: 0, b0: null, g0: 0, txSlow: 0, tySlow: 0, acc: 0, acc0: 0, shakeE: 0, moveTotal: 0, gx: 0, gy: 0, gz: 0, motionSeen: false, lastRattle: 0, auT: 0, drift: 0, gridPhase: 0, vtx: 0, vty: 0, vph: 0, vsc: 1, tiltReq: false, tiltSeen: false, L: 0, frameDt: 1 / 60, shake: 0, flash: 0, milestone: 0, recordShown: false
 };
 let drag = null;             // 指の操作中の情報
 let dirty = false, lastSave = 0;
@@ -542,17 +545,44 @@ function drawSpinner(th, full, target, ox, oy) {
   c.translate(ox === undefined ? cx : ox, oy === undefined ? cy : oy);
   c.rotate(th);
 
+  // 厚み：少しずつずらして重ねた側面。傾けるほど側面が見える
+  const ext = full && !target;
+  if (ext) {
+    const T = R * 0.05, N = 8;
+    const ex = S.vtx * T * 1.2, ey = S.vty * T * 1.2 + T * 0.55;                  // 画面上のずれ
+    const lx = ex * Math.cos(th) + ey * Math.sin(th), ly = -ex * Math.sin(th) + ey * Math.cos(th);   // 回転後の座標に直す
+    const sc = P.side;
+    for (let j = N; j >= 1; j--) {
+      const f = j / N, br = 0.6 + 0.4 * (1 - f);
+      c.save();
+      c.translate(lx * f, ly * f);
+      if (j === N) {                                                               // 一番下の層に影を付ける
+        c.shadowColor = shadow;
+        c.shadowBlur = (name === 'neon' ? R * 0.22 : R * 0.12) * dpr;
+        c.shadowOffsetX = -S.vtx * R * 0.08 * dpr;
+        c.shadowOffsetY = (name === 'neon' ? 0 : R * 0.05 + S.vty * R * 0.03) * dpr;
+      }
+      c.fillStyle = `rgb(${sc[0] * br | 0},${sc[1] * br | 0},${sc[2] * br | 0})`;
+      for (let k = 0; k < n; k++) { c.save(); c.rotate(k * step); armPath(c); c.fill(); c.restore(); }
+      c.beginPath(); c.arc(0, 0, hubR, 0, TAU); c.fill();
+      c.restore();
+    }
+    c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetX = 0; c.shadowOffsetY = 0;
+  }
+
   for (let k = 0; k < n; k++) {
     c.save();
     c.rotate(k * step);
-    if (full) {
+    const ang = lightAng() - (th + k * step);                // この腕から見た「光の向き」
+    const ldx = Math.cos(ang), ldy = Math.sin(ang);
+    if (full && !ext) {
       c.shadowColor = shadow;
       c.shadowBlur = (name === 'neon' ? R * 0.22 : R * 0.1) * dpr;
       c.shadowOffsetX = -S.tx * R * 0.08 * dpr;                       // 傾けると影がずれる
       c.shadowOffsetY = (name === 'neon' ? 0 : R * 0.04 + S.ty * R * 0.03) * dpr;
     }
     armPath(c);
-    c.fillStyle = P.arm(c, R * 0.24, k, n, S.hue);
+    c.fillStyle = P.arm(c, R * 0.24, k, n, S.hue, ang);
     c.fill();
     c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetX = 0; c.shadowOffsetY = 0;
 
@@ -582,17 +612,31 @@ function drawSpinner(th, full, target, ox, oy) {
     }
 
     armPath(c);
-    c.strokeStyle = edge; c.lineWidth = Math.max(1, R * 0.012); c.stroke();
+    if (name === 'neon') { c.strokeStyle = edge; c.lineWidth = Math.max(1, R * 0.012); }
+    else {
+      const sp = R * 0.3, mx = R * 0.33;
+      const bl = c.createLinearGradient(mx + ldx * sp, ldy * sp, mx - ldx * sp, -ldy * sp);
+      bl.addColorStop(0, 'rgba(255,255,255,.8)'); bl.addColorStop(0.5, 'rgba(255,255,255,.1)'); bl.addColorStop(1, 'rgba(0,0,0,.5)');
+      c.strokeStyle = bl; c.lineWidth = Math.max(1.5, R * 0.022);
+    }
+    c.stroke();
 
     // ベアリング穴（先端）
     c.beginPath(); c.arc(tipD, 0, tipR * 0.5, 0, TAU);
     c.fillStyle = P.hole; c.fill();
+    {                                                          // 穴の内側：光源側の壁は影、反対側の壁は明るい
+      const hr = tipR * 0.5;
+      const hgr = c.createLinearGradient(tipD + ldx * hr, ldy * hr, tipD - ldx * hr, -ldy * hr);
+      hgr.addColorStop(0, 'rgba(0,0,0,.55)'); hgr.addColorStop(0.5, 'rgba(0,0,0,0)'); hgr.addColorStop(1, 'rgba(255,255,255,.28)');
+      c.fillStyle = hgr; c.fill();
+    }
     c.strokeStyle = ring; c.lineWidth = R * 0.012; c.stroke();
     c.restore();
   }
 
   // ハブ
-  const hg = c.createRadialGradient(-hubR * 0.3, -hubR * 0.3, hubR * 0.05, 0, 0, hubR);
+  const hla = lightAng() - th;                              // ハブの光沢も光源に向けて固定
+  const hg = c.createRadialGradient(Math.cos(hla) * hubR * 0.35, Math.sin(hla) * hubR * 0.35, hubR * 0.05, 0, 0, hubR);
   for (const [o, col] of P.hub) hg.addColorStop(o, col);
   c.beginPath(); c.arc(0, 0, hubR, 0, TAU);
   c.fillStyle = hg; c.fill();
@@ -900,6 +944,9 @@ function drawFinger(a) {
   ctx.restore();
 }
 
+// 光源の向き（画面に固定。傾けると少し動く）
+const lightAng = () => -2.36 + S.vtx * 0.9 - S.vty * 0.5;
+
 // ぶれ用の画像：アーム1枚と、ぶれきった「円盤」を事前に作っておく（毎コマの描画を軽くする）
 let sprite = null;
 function getSprite() {
@@ -952,6 +999,15 @@ function drawBlurred(arc, weight) {
 
 function draw(a) {
   const P = THEME[settings.theme];
+  // 仮想の傾き：スマホの傾きに、ゆっくりした揺れを足す（センサーがなくても立体感が出る）
+  {
+    const t3 = performance.now() / 1000, sway = S.tiltSeen ? 0.3 : 1;
+    S.vtx = S.tx + sway * 0.18 * Math.sin(t3 * 0.6);
+    S.vty = S.ty + sway * 0.12 * Math.cos(t3 * 0.45);
+    const vm = Math.min(1, Math.hypot(S.vtx, S.vty));
+    S.vph = Math.atan2(S.vty, S.vtx);
+    S.vsc = Math.cos(vm * 0.45);                            // 最大で約26度の傾き
+  }
   drawBackground();
 
   // 空気のちり（回転に引っぱられて流れる）
@@ -980,14 +1036,17 @@ function draw(a) {
 
   // 床の影
   ctx.fillStyle = 'rgba(0,0,0,.35)';
-  ctx.beginPath(); ctx.ellipse(cx - S.tx * R * 0.3, cy + R * 1.08 + S.ty * R * 0.08, R * 0.95, R * 0.14, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx - S.vtx * R * 0.3, cy + R * 1.08 + S.vty * R * 0.08, R * 0.95, R * 0.14, 0, 0, TAU); ctx.fill();
 
   // 1コマで回る角度に応じて、くっきり → ぶれ へ滑らかに切り替える
   const pitch = TAU / settings.arms;
   const arc = Math.min(a * S.frameDt * 0.6, pitch);         // シャッター開放中に回る角度（アーム1本ぶんが上限）
   const blend = Math.min(1, Math.max(0, (arc - 0.12) / 0.3));
+  ctx.save();                                               // 傾けた方向に少し縮めて、斜めから見たように
+  ctx.translate(cx, cy); ctx.rotate(S.vph); ctx.scale(S.vsc, 1); ctx.rotate(-S.vph); ctx.translate(-cx, -cy);
   if (blend < 1) { ctx.globalAlpha = 1 - blend; drawSpinner(S.theta, true); ctx.globalAlpha = 1; }
   if (blend > 0) drawBlurred(Math.max(arc, 0.12), blend);
+  ctx.restore();
 
   // 先端の光の尾（彗星のように伸びる）
   if (a > 40 && settings.fx > 0) {
