@@ -35,6 +35,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <button id="bTimbre"></button>
   <button id="bVib"></button>
   <button id="bStop">止める</button>
+  <button id="bTest">振動テスト</button>
 </div>
 <script>
 (() => {
@@ -223,7 +224,15 @@ if (!canVib && isIOS) {
 }
 const canHaptic = canVib || !!hapticLabel;
 
-let lastVib = 0;
+let lastVib = 0, pendingHaptic = false;
+// iOSの触覚は「指で触れた瞬間の処理」の中でしか鳴らないので、
+// 回転中に溜まった分は、次の指イベントでまとめて鳴らす
+function flushHaptic() {
+  if (pendingHaptic && hapticLabel) {
+    pendingHaptic = false;
+    try { hapticLabel.click(); } catch (e) { /* 無視 */ }
+  }
+}
 function vib(ms) {
   if (!settings.vib || !canHaptic) return;
   const now = performance.now();
@@ -231,7 +240,7 @@ function vib(ms) {
   lastVib = now;
   try {
     if (canVib) navigator.vibrate(ms);
-    else hapticLabel.click();
+    else pendingHaptic = true;
   } catch (e) { /* 無視 */ }
 }
 
@@ -303,6 +312,9 @@ function endDrag(e) {
     if (Math.abs(S.omega) > 150) vib(30);     // はじいた時の「ビュッ」
   }
   drag = null; S.dragging = false; S.gripV = 0;
+}
+for (const type of ['pointerdown', 'pointermove', 'pointerup']) {
+  canvas.addEventListener(type, flushHaptic);
 }
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
@@ -518,6 +530,15 @@ bSound.addEventListener('click', () => { initAudio(); settings.sound = !settings
 bTimbre.addEventListener('click', () => { settings.timbre = cycle(TIMBRES, settings.timbre); saveSettings(); refreshUI(); });
 bVib.addEventListener('click', () => { settings.vib = !settings.vib; saveSettings(); refreshUI(); vib(10); });
 bStop.addEventListener('click', () => { initAudio(); S.omega = 0; });
+// 振動の仕組みそのものが動くかを確かめるボタン
+document.getElementById('bTest').addEventListener('click', e => {
+  let how = '非対応';
+  try {
+    if (canVib) { how = navigator.vibrate(40) ? 'vibrate送信' : 'vibrate拒否'; }
+    else if (hapticLabel) { hapticLabel.click(); how = 'iOS触覚送信'; }
+  } catch (err) { how = 'エラー'; }
+  e.currentTarget.textContent = `テスト：${how}`;
+});
 
 // 別タブに行った時は音を止める
 document.addEventListener('visibilitychange', () => {
