@@ -17,6 +17,9 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 #rpm small{font-size:14px;font-weight:500;opacity:.7;margin-left:6px}
 #stats{font-size:13px;opacity:.7;font-variant-numeric:tabular-nums;margin-top:2px}
 #hint{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 112px);text-align:center;font-size:13px;opacity:.6;transition:opacity .8s;pointer-events:none}
+#toast{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 118px);text-align:center;font-size:30px;font-weight:800;letter-spacing:.05em;pointer-events:none;opacity:0;text-shadow:0 0 18px var(--accent),0 2px 10px rgba(0,0,0,.6)}
+#toast.show{animation:pop 1.4s ease-out}
+@keyframes pop{0%{opacity:0;transform:scale(.6)}14%{opacity:1;transform:scale(1.18)}28%{transform:scale(1)}78%{opacity:1}100%{opacity:0;transform:translateY(-16px)}}
 #bar{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:0 12px}
 #bar button{font:inherit;font-size:14px;color:var(--fg);background:var(--panel);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:0 14px;min-height:44px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;transition:transform .08s}
 #bar button[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
@@ -27,7 +30,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <body>
 <canvas id="c"></canvas>
 <div id="hud"><div id="rpm"><span id="rpmv">0</span><small>rpm</small></div><div id="stats"></div></div>
-<div id="hint">指で回す・はじく ／ タップでブレーキ</div>
+<div id="toast"></div>
+<div id="hint">どこでもスワイプで回る ／ 指を置くと止まる</div>
 <div id="bar">
   <button id="bTheme"></button>
   <button id="bArms"></button>
@@ -36,7 +40,6 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <button id="bVib"></button>
   <button id="bBass"></button>
   <button id="bStop">止める</button>
-  <button id="bTest">振動テスト</button>
 </div>
 <script>
 (() => {
@@ -115,7 +118,7 @@ const TIMBRE = {
 const S = {
   theta: 0, prevTheta: 0, omega: 0, gripV: 0,
   turns: 0, tickIdx: null, lastRpm: -1,
-  hue: 200, dragging: false, particles: []
+  hue: 200, dragging: false, particles: [], rings: [], shake: 0, flash: 0, milestone: 0, recordShown: false
 };
 let drag = null;             // 指の操作中の情報
 let dirty = false, lastSave = 0;
@@ -126,6 +129,7 @@ const ctx = canvas.getContext('2d');
 const rpmEl = document.getElementById('rpmv');
 const statsEl = document.getElementById('stats');
 const hintEl = document.getElementById('hint');
+const toastEl = document.getElementById('toast');
 const bTheme = document.getElementById('bTheme');
 const bArms = document.getElementById('bArms');
 const bSound = document.getElementById('bSound');
@@ -217,6 +221,35 @@ function click(vol) {
   ng.gain.setValueAtTime(0.8 * vol, t);
   ng.gain.exponentialRampToValueAtTime(0.0001, t + T.nd);
   n.connect(f).connect(ng).connect(master); n.start(t, Math.random() * 0.5); n.stop(t + T.nd + 0.02);
+}
+
+// はじいた瞬間の「ヒュッ」（ノイズの帯域が上に抜けていく）
+function whoosh(vol) {
+  if (!ac || !settings.sound) return;
+  const t = ac.currentTime;
+  const n = ac.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
+  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+  f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(3500, t + 0.35);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.35 * vol, t + 0.08);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+  n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.55);
+}
+
+// 節目の「キラーン」。i が大きいほど高い音
+function chime(i) {
+  if (!ac || !settings.sound) return;
+  const t = ac.currentTime;
+  const base = [523.25, 587.33, 659.25, 783.99, 880][Math.min(i, 4)];
+  [1, 1.5, 2].forEach((m, j) => {
+    const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = base * m;
+    const g = ac.createGain(), st = t + j * 0.07;
+    g.gain.setValueAtTime(0.0001, st);
+    g.gain.exponentialRampToValueAtTime(0.18, st + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, st + 0.5);
+    o.connect(g).connect(master); o.start(st); o.stop(st + 0.55);
+  });
 }
 
 // 低い「ドン」（キックドラム風）。vol は 0〜1
@@ -313,49 +346,50 @@ function pos(e) { const r = canvas.getBoundingClientRect(); return { x: e.client
 
 canvas.addEventListener('pointerdown', e => {
   initAudio();
-  const p = pos(e);
-  const d = Math.hypot(p.x - cx, p.y - cy);
-  if (d > R * 1.3) return;
   e.preventDefault();
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-  const now = performance.now();
-  drag = {
-    id: e.pointerId, sx: p.x, sy: p.y, t0: now, moved: 0,
-    lastPhi: Math.atan2(p.y - cy, p.x - cx), lastT: now, lastMove: now,
-    inside: d < R * 1.05, omega0: S.omega
-  };
-  S.gripV = 0; S.dragging = true;
+  const p = pos(e), now = performance.now();
+  drag = { id: e.pointerId, x: p.x, y: p.y, t0: now, lastT: now, lastMove: now, moved: 0, vf: 0 };
+  S.dragging = true;
   hintEl.style.opacity = 0;
 });
 
 canvas.addEventListener('pointermove', e => {
   if (!drag || e.pointerId !== drag.id) return;
   const p = pos(e), now = performance.now();
-  const phi = Math.atan2(p.y - cy, p.x - cx);
-  const dphi = wrap(phi - drag.lastPhi);
   const dt = Math.max(0.004, (now - drag.lastT) / 1000);
-  // 指に吸い付くように回す
-  S.theta += dphi;
-  const v = Math.max(-MAX_W, Math.min(MAX_W, dphi / dt));
-  S.gripV = S.gripV * 0.5 + v * 0.5;
-  drag.moved += Math.hypot(e.movementX || 0, e.movementY || 0);
-  drag.lastPhi = phi; drag.lastT = now; drag.lastMove = now;
+  const rx = drag.x - cx, ry = drag.y - cy;
+  const rl = Math.hypot(rx, ry) || 1;
+  const dx = p.x - drag.x, dy = p.y - drag.y;
+  // 指の動きのうち「円周方向」の成分だけを回転速度にする（画面のどこをなぞっても回る）
+  const tang = (rx * dy - ry * dx) / rl;
+  const rRef = Math.min(R, Math.max(R * 0.45, rl));      // 中心近くでも暴れないように
+  const v = Math.max(-MAX_W * 1.5, Math.min(MAX_W * 1.5, tang / rRef / dt));
+  drag.vf = drag.vf * 0.5 + v * 0.5;
+  drag.moved += Math.hypot(dx, dy);
+  drag.x = p.x; drag.y = p.y; drag.lastT = now; drag.lastMove = now;
 });
+
+// 指が動いている間は速度に追従、止めて置くと少しずつ止まる
+function dragPhysics(dt, now) {
+  const idle = now - drag.lastMove > 100;
+  const target = idle ? 0 : drag.vf * 1.3;               // 1.3倍＝はじきやすい
+  const rate = idle ? 5 : 20;
+  S.omega += (target - S.omega) * (1 - Math.exp(-dt * rate));
+  S.omega = Math.max(-MAX_W, Math.min(MAX_W, S.omega));
+  S.theta += S.omega * dt;
+}
 
 function endDrag(e) {
   if (!drag || e.pointerId !== drag.id) return;
   const now = performance.now();
   const isTap = drag.moved < 10 && now - drag.t0 < 250;
-  if (isTap && drag.inside) {
-    S.omega = drag.omega0 * 0.2;              // タップでブレーキ
-    vib(25);
-    thump(0.9);
-  } else {
-    const quiet = now - drag.lastMove > 90;   // 止まってから離したら速度ゼロ
-    S.omega = quiet ? 0 : Math.max(-MAX_W, Math.min(MAX_W, S.gripV));
-    if (Math.abs(S.omega) > 150) { vib(30); thump(1); }   // はじいた時の「ビュッ」
+  if (isTap) {
+    if (Math.abs(S.omega) > 5) { S.omega *= 0.25; vib(25); thump(0.9); }   // タップでブレーキ
+  } else if (now - drag.lastMove < 100 && Math.abs(S.omega) > 120) {
+    flickFx(Math.abs(S.omega));                                            // はじいた瞬間
   }
-  drag = null; S.dragging = false; S.gripV = 0;
+  drag = null; S.dragging = false;
 }
 for (const type of ['pointerdown', 'pointermove', 'pointerup']) {
   canvas.addEventListener(type, flushHaptic);
@@ -407,6 +441,19 @@ function drawSpinner(th, full) {
     c.fillStyle = P.arm(c, R * 0.24, k, n, S.hue);
     c.fill();
     c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetY = 0;
+
+    if (full) {                           // 光の向きに来た瞬間に走るハイライト
+      const gl = Math.pow(Math.max(0, Math.cos(th + k * step + 0.8)), 10);
+      if (gl > 0.02) {
+        c.save(); armPath(c); c.clip();
+        const gg = c.createLinearGradient(0, -tipR, 0, tipR);
+        gg.addColorStop(0, 'rgba(255,255,255,0)');
+        gg.addColorStop(0.5, `rgba(255,255,255,${0.75 * gl})`);
+        gg.addColorStop(1, 'rgba(255,255,255,0)');
+        c.fillStyle = gg; c.fillRect(0, -tipR, tipD + tipR, tipR * 2);
+        c.restore();
+      }
+    }
 
     if (name === 'wood') {               // 木目
       c.save(); armPath(c); c.clip();
@@ -477,6 +524,36 @@ function updateParticles(dt) {
   }
 }
 
+const MILES = [500, 1000, 2000, 3000, 4000];
+const DUST = Array.from({ length: 44 }, () => ({
+  a: Math.random() * TAU, k: 0.5 + Math.random() * 1.6, s: 0.8 + Math.random() * 1.8, al: 0.12 + Math.random() * 0.3
+}));
+
+function glowColor(alpha) {
+  const n = settings.theme;
+  if (n === 'neon' || n === 'rainbow') return `hsla(${S.hue},100%,60%,${alpha})`;
+  return `rgba(${THEME[n].spark},${alpha})`;
+}
+function addRing(strength) { S.rings.push({ r: R * 0.3, life: 0.7, max: 0.7, s: Math.max(0.35, strength) }); }
+function showToast(text) {
+  toastEl.textContent = text;
+  toastEl.classList.remove('show'); void toastEl.offsetWidth; toastEl.classList.add('show');
+}
+function flickFx(a) {
+  const k = Math.min(1, a / 300);
+  S.shake = Math.max(S.shake, k); addRing(k);
+  vib(30); thump(1); whoosh(k);
+}
+function updateFx(dt) {
+  S.shake *= Math.exp(-7 * dt);
+  S.flash *= Math.exp(-5 * dt);
+  for (let i = S.rings.length - 1; i >= 0; i--) {
+    const r = S.rings[i]; r.life -= dt; r.r += R * 2.4 * dt;
+    if (r.life <= 0) S.rings.splice(i, 1);
+  }
+  for (const d of DUST) d.a += (S.omega * 0.05 / (0.6 + d.k) + 0.03 * d.s) * dt;   // 回転に引っぱられるちり
+}
+
 function draw(a) {
   const P = THEME[settings.theme];
   // 背景（回すほど少し明るくなる）
@@ -486,6 +563,30 @@ function draw(a) {
   g.addColorStop(1, '#050608');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
+
+  // 空気のちり（回転に引っぱられて流れる）
+  for (const d of DUST) {
+    ctx.fillStyle = glowColor(d.al * (0.5 + Math.min(1, a / 200)));
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(d.a) * d.k * R * 0.95, cy + Math.sin(d.a) * d.k * R * 1.05, d.s, 0, TAU);
+    ctx.fill();
+  }
+  // 速いほど強くなる光のにじみ
+  if (a > 30) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const gr = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 1.6);
+    gr.addColorStop(0, glowColor(Math.min(0.4, a / 650))); gr.addColorStop(1, glowColor(0));
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  // 画面の揺れとズーム（はじいた瞬間・高速時）
+  ctx.save();
+  const zoom = 1 + Math.min(0.035, a / 9000);
+  ctx.translate(cx + (Math.random() - 0.5) * 16 * S.shake, cy + (Math.random() - 0.5) * 16 * S.shake);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-cx, -cy);
 
   // 床の影
   ctx.fillStyle = 'rgba(0,0,0,.35)';
@@ -503,6 +604,25 @@ function draw(a) {
 
   drawSpinner(S.theta, true);
 
+  // 先端の光の尾（彗星のように伸びる）
+  if (a > 40) {
+    const n = settings.arms, step = TAU / n, sgn = Math.sign(S.omega) || 1;
+    const len = Math.min(1.4, a * 0.006), al = Math.min(1, a / 200);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'butt'; ctx.lineWidth = R * 0.06;
+    for (let k = 0; k < n; k++) {
+      const ang = S.theta + k * step;
+      for (let j = 0; j < 6; j++) {
+        const a0 = sgn > 0 ? ang - len * (j + 1) / 6 : ang + len * j / 6;
+        const a1 = sgn > 0 ? ang - len * j / 6 : ang + len * (j + 1) / 6;
+        ctx.strokeStyle = glowColor(0.5 * al * (1 - j / 6));
+        ctx.beginPath(); ctx.arc(cx, cy, R * 0.84, a0, a1); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   // 火花
   for (const p of S.particles) {
     const t = Math.max(0, p.life / p.max);
@@ -513,6 +633,21 @@ function draw(a) {
     ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
     ctx.stroke();
   }
+
+  // 衝撃波のリング
+  for (const r of S.rings) {
+    const t = r.life / r.max;
+    ctx.strokeStyle = glowColor(0.6 * t * r.s);
+    ctx.lineWidth = 2 + 6 * t * r.s;
+    ctx.beginPath(); ctx.arc(cx, cy, r.r, 0, TAU); ctx.stroke();
+  }
+  ctx.restore();
+
+  // 節目の閃光
+  if (S.flash > 0.02) {
+    ctx.fillStyle = `rgba(255,255,255,${S.flash * 0.16})`;
+    ctx.fillRect(0, 0, W, H);
+  }
 }
 
 /* ---------- メインループ ---------- */
@@ -521,7 +656,7 @@ function frame(now) {
   const dt = Math.min(1 / 30, Math.max(0, (now - lastFrame) / 1000));
   lastFrame = now;
 
-  if (drag) S.omega = S.gripV; else physics(dt);
+  if (drag) dragPhysics(dt, now); else physics(dt);
   S.hue = (S.hue + dt * 25) % 360;
 
   S.turns += Math.abs(S.theta - S.prevTheta) / TAU;
@@ -536,7 +671,19 @@ function frame(now) {
   const a = Math.abs(S.omega);
   const rpm = Math.round(a * 60 / TAU);
   if (rpm !== S.lastRpm) { S.lastRpm = rpm; rpmEl.textContent = rpm; }
-  if (rpm > settings.best) { settings.best = rpm; dirty = true; }
+  if (rpm < 150) { S.milestone = 0; S.recordShown = false; }
+  for (let i = 0; i < MILES.length; i++) {
+    if (rpm >= MILES[i] && S.milestone < MILES[i]) {
+      S.milestone = MILES[i];
+      showToast(`${MILES[i]} RPM!`); addRing(1); thump(1); chime(i); S.flash = 1;
+    }
+  }
+  if (rpm > settings.best) {
+    if (settings.best >= 300 && !S.recordShown) {
+      S.recordShown = true; showToast('NEW RECORD!'); chime(4); S.flash = 0.6; addRing(1);
+    }
+    settings.best = rpm; dirty = true;
+  }
   if (dirty && now - lastSave > 1500) { saveSettings(); dirty = false; lastSave = now; }
 
   if (Math.floor(now / 250) !== frame.lastStat) {
@@ -547,6 +694,7 @@ function frame(now) {
   audioUpdate();
   spawnSparks(a);
   updateParticles(dt);
+  updateFx(dt);
   draw(a);
   requestAnimationFrame(frame);
 }
@@ -577,15 +725,6 @@ bTimbre.addEventListener('click', () => { settings.timbre = cycle(TIMBRES, setti
 bVib.addEventListener('click', () => { settings.vib = !settings.vib; saveSettings(); refreshUI(); vib(10); });
 bBass.addEventListener('click', () => { initAudio(); settings.bass = !settings.bass; saveSettings(); refreshUI(); thump(1); });
 bStop.addEventListener('click', () => { initAudio(); S.omega = 0; });
-// 振動の仕組みそのものが動くかを確かめるボタン
-document.getElementById('bTest').addEventListener('click', e => {
-  let how = '非対応';
-  try {
-    if (canVib) { how = navigator.vibrate(40) ? 'vibrate送信' : 'vibrate拒否'; }
-    else if (hapticLabel) { hapticLabel.click(); how = 'iOS触覚送信'; }
-  } catch (err) { how = 'エラー'; }
-  e.currentTarget.textContent = `テスト：${how}`;
-});
 
 // 別タブに行った時は音を止める
 document.addEventListener('visibilitychange', () => {
