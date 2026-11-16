@@ -67,9 +67,9 @@ function saveSettings() {
   try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch (e) { /* 保存できなくても動く */ }
 }
 const settings = loadSettings();
-if (![0, 1, 2].includes(settings.fx)) settings.fx = 1;          // 演出：0=最小 1=控えめ 2=フル
-const FXM = [0, 0.45, 1];                                        // 演出の強さ（光のにじみ・尾）
-const FX_NAME = ['最小', '控えめ', 'フル'];
+if (![0, 1].includes(settings.fx)) settings.fx = 1;             // 演出：0=最小 1=控えめ
+const FXM = [0, 0.45];                                           // 演出の強さ（光のにじみ・尾）
+const FX_NAME = ['最小', '控えめ'];
 const canVib = 'vibrate' in navigator;
 
 const hsl = (h, s, l) => `hsl(${((h % 360) + 360) % 360},${s}%,${l}%)`;
@@ -124,7 +124,7 @@ const TIMBRE = {
 const S = {
   theta: 0, prevTheta: 0, omega: 0, gripV: 0,
   turns: 0, tickIdx: null, lastRpm: -1,
-  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], tx: 0, ty: 0, tx0: 0, ty0: 0, b0: null, g0: 0, txSlow: 0, tySlow: 0, acc: 0, acc0: 0, shakeE: 0, moveTotal: 0, gx: 0, gy: 0, gz: 0, motionSeen: false, lastRattle: 0, tiltReq: false, tiltSeen: false, L: 0, frameDt: 1 / 60, shake: 0, flash: 0, milestone: 0, recordShown: false
+  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], tx: 0, ty: 0, tx0: 0, ty0: 0, b0: null, g0: 0, txSlow: 0, tySlow: 0, acc: 0, acc0: 0, shakeE: 0, moveTotal: 0, gx: 0, gy: 0, gz: 0, motionSeen: false, lastRattle: 0, auT: 0, drift: 0, gridPhase: 0, tiltReq: false, tiltSeen: false, L: 0, frameDt: 1 / 60, shake: 0, flash: 0, milestone: 0, recordShown: false
 };
 let drag = null;             // 指の操作中の情報
 let dirty = false, lastSave = 0;
@@ -685,6 +685,185 @@ function updateFx(dt) {
   for (const d of DUST) d.a += (S.omega * 0.05 / (0.6 + d.k) + 0.03 * d.s) * dt;   // 回転に引っぱられるちり
 }
 
+/* ---------- 背景（テーマごとの世界） ---------- */
+const BG = {
+  metal:   { c0: [34, 40, 56], c1: [6, 7, 10],  aurora: ['130,175,255', '205,220,240'], bokeh: '210,225,255' },
+  neon:    { c0: [38, 18, 84], c1: [4, 3, 14],  aurora: ['255,60,200', '60,220,255'],   bokeh: '255,120,230' },
+  rainbow: { c0: [44, 30, 78], c1: [5, 4, 12],  aurora: null,                            bokeh: '255,255,255' },
+  wood:    { c0: [64, 41, 25], c1: [11, 7, 5],  aurora: null,                            bokeh: '255,200,140' },
+  matte:   { c0: [36, 31, 42], c1: [6, 6, 9],   aurora: ['255,93,143', '130,110,210'],  bokeh: '255,140,180' }
+};
+const BOKEH = Array.from({ length: 64 }, () => ({
+  x: Math.random(), y: Math.random(), z: 0.25 + Math.random() * 0.75,
+  r: 3 + Math.random() * 7, ph: Math.random() * 6.28, sp: 0.3 + Math.random() * 0.8
+}));
+const c255 = v => Math.max(0, Math.min(255, v)) | 0;
+function rng(seed) { let x = seed >>> 0; return () => (x = (x * 1664525 + 1013904223) >>> 0) / 4294967296; }
+
+// 動かない質感（テーマごとに1回だけ描いて使い回す）
+function paintTexture(c, theme, w, h, pad) {
+  const rnd = rng(7);
+  if (theme === 'metal') {                         // ヘアライン加工の金属板
+    for (let i = 0; i < 1400; i++) {
+      const x = rnd() * w, y = rnd() * h, len = 60 + rnd() * 320;
+      c.strokeStyle = `rgba(255,255,255,${0.012 + rnd() * 0.035})`; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + len, y + (rnd() - 0.5) * 2); c.stroke();
+    }
+    const g = c.createLinearGradient(0, 0, w, h);   // 斜めの反射帯
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.42, 'rgba(255,255,255,0.05)');
+    g.addColorStop(0.52, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,0.03)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+  } else if (theme === 'wood') {                   // 板張りの机
+    const planks = 4, pw = w / planks;
+    for (let k = 0; k < planks; k++) {
+      const sh = 0.85 + rnd() * 0.3;
+      c.fillStyle = `rgba(${(130 * sh) | 0},${(84 * sh) | 0},${(48 * sh) | 0},0.17)`; c.fillRect(k * pw, 0, pw, h);
+      for (let i = 0; i < 70; i++) {               // 木目
+        const x0 = k * pw + rnd() * pw, amp = 2 + rnd() * 5, ph = rnd() * 6.28;
+        c.strokeStyle = `rgba(40,20,8,${0.05 + rnd() * 0.1})`; c.lineWidth = 0.6 + rnd() * 1.2;
+        c.beginPath();
+        for (let y = 0; y <= h; y += 24) { const x = x0 + Math.sin(y / 90 + ph) * amp; if (y === 0) c.moveTo(x, y); else c.lineTo(x, y); }
+        c.stroke();
+      }
+      c.fillStyle = 'rgba(0,0,0,0.38)'; c.fillRect(k * pw - 1, 0, 2, h);   // 板の継ぎ目
+    }
+  } else if (theme === 'matte') {                  // レコード盤のような同心円の溝
+    c.strokeStyle = 'rgba(255,255,255,0.04)'; c.lineWidth = 1;
+    for (let r = 40; r < Math.hypot(w, h); r += 14) { c.beginPath(); c.arc(cx + pad, cy + pad, r, 0, TAU); c.stroke(); }
+  } else if (theme === 'neon') {                   // 地平線に向かう格子の縦線
+    const yH = cy + R * 1.25 + pad;
+    c.strokeStyle = 'rgba(120,220,255,0.16)'; c.lineWidth = 1;
+    for (let i = -14; i <= 14; i++) { c.beginPath(); c.moveTo(w / 2 + i * w * 0.012, yH); c.lineTo(w / 2 + i * w * 0.17, h); c.stroke(); }
+  }
+}
+
+let bgCache = null, dotSprite = null;
+function getBgStatic() {
+  const key = [settings.theme, W, H, dpr, Math.round(cx), Math.round(cy), Math.round(R)].join('|');
+  if (bgCache && bgCache.key === key) return bgCache;
+  const pad = Math.round(Math.max(W, H) * 0.08);
+  const cv = bgCache ? bgCache.canvas : document.createElement('canvas');
+  cv.width = Math.ceil((W + pad * 2) * dpr); cv.height = Math.ceil((H + pad * 2) * dpr);
+  const c = cv.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  paintTexture(c, settings.theme, W + pad * 2, H + pad * 2, pad);
+  bgCache = { key, canvas: cv, pad };
+  return bgCache;
+}
+function getDot(rgb) {
+  if (dotSprite && dotSprite.rgb === rgb) return dotSprite.canvas;
+  const cv = dotSprite ? dotSprite.canvas : document.createElement('canvas');
+  cv.width = cv.height = 64;
+  const c = cv.getContext('2d');
+  const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, `rgba(${rgb},0.9)`); g.addColorStop(0.35, `rgba(${rgb},0.35)`); g.addColorStop(1, `rgba(${rgb},0)`);
+  c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+  dotSprite = { rgb, canvas: cv };
+  return cv;
+}
+
+// 流れるオーロラ（回転が速いほど速く大きくうねる。傾けると上下・左右にずれる）
+function drawAurora(cols) {
+  const glow = 1 - Math.exp(-S.L / 3.2);
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  cols.forEach((col, k) => {
+    const baseY = H * (0.16 + 0.17 * k) + S.ty * H * 0.07 * (k + 1);
+    const th = H * (0.07 + 0.015 * k), amp = H * (0.025 + 0.012 * glow);
+    const ph = S.auT * (1 + 0.5 * k) + k * 2.1 + S.tx * 1.5;
+    const wave = x => Math.sin(x / W * 5 + ph) * amp + Math.sin(x / W * 11 - ph * 0.7 + k) * amp * 0.35;
+    const g = ctx.createLinearGradient(0, baseY - th, 0, baseY + th);
+    g.addColorStop(0, `rgba(${col},0)`); g.addColorStop(0.5, `rgba(${col},${0.06 + 0.07 * glow})`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    for (let x = -60; x <= W + 60; x += 28) { const y = baseY + wave(x) - th; if (x === -60) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    for (let x = W + 60; x >= -60; x -= 28) ctx.lineTo(x, baseY + wave(x) + th);
+    ctx.closePath(); ctx.fill();
+  });
+  ctx.restore();
+}
+
+// 奥行きのある光の粒（手前ほど傾きで大きくずれる）
+function drawBokeh(rgb, count) {
+  const dot = getDot(rgb), glow = 1 - Math.exp(-S.L / 3.2), t = performance.now() / 1000;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < count; i++) {
+    const b = BOKEH[i];
+    let x = (b.x * W + S.tx * b.z * 80) % W; if (x < 0) x += W;
+    let y = (b.y * H - S.drift * b.z * 6 + S.ty * b.z * 50) % H; if (y < 0) y += H;
+    const sz = b.r * (0.6 + b.z * 1.2);
+    ctx.globalAlpha = (0.10 + 0.22 * b.z) * (0.65 + 0.35 * Math.sin(t * b.sp + b.ph)) * (0.8 + 0.4 * glow);
+    ctx.drawImage(dot, x - sz, y - sz, sz * 2, sz * 2);
+  }
+  ctx.restore();
+}
+
+// ネオン：地平線へ流れる格子（回転が速いほど速く流れる）
+function drawGrid() {
+  const yH = cy + R * 1.25, hh = H - yH;
+  if (hh <= 0) return;
+  S.gridPhase = (S.gridPhase + S.frameDt * (0.1 + 0.12 * S.L)) % 1;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const hg = ctx.createLinearGradient(0, yH - 40, 0, yH + 40);
+  hg.addColorStop(0, 'rgba(255,60,200,0)'); hg.addColorStop(0.5, 'rgba(255,60,200,0.28)'); hg.addColorStop(1, 'rgba(255,60,200,0)');
+  ctx.fillStyle = hg; ctx.fillRect(0, yH - 40, W, 80);
+  for (let k = 0; k < 12; k++) {
+    const t = (k + S.gridPhase) / 12, y = yH + hh * t * t;
+    ctx.strokeStyle = `rgba(120,220,255,${0.05 + 0.3 * t})`; ctx.lineWidth = 1 + t * 1.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// レインボー：色が溶け合ってゆっくり流れる
+function drawBlobs() {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 3; k++) {
+    const x = W * (0.5 + 0.35 * Math.sin(S.auT * 0.5 + k * 2.1) + S.tx * 0.2);
+    const y = H * (0.38 + 0.2 * Math.cos(S.auT * 0.4 + k * 1.7) + S.ty * 0.08);
+    const rr = Math.max(W, H) * 0.45;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rr);
+    g.addColorStop(0, `hsla(${(S.hue + k * 120) % 360},90%,60%,0.14)`); g.addColorStop(1, `hsla(${(S.hue + k * 120) % 360},90%,60%,0)`);
+    ctx.fillStyle = g; ctx.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+  }
+  ctx.restore();
+}
+
+function drawBackground() {
+  const B = BG[settings.theme];
+  const glow = (1 - Math.exp(-S.L / 3.2)) * (settings.fx > 0 ? 0.7 : 0);
+  S.auT += S.frameDt * (0.25 + 0.12 * S.L);
+  S.drift += S.frameDt * (1 + 0.8 * S.L);
+
+  // 土台：光源は傾けた方向に動き、色味も変わる（右＝暖色、左＝寒色）
+  const gcx = cx + S.tx * W * 0.5, gcy = cy + S.ty * H * 0.2;
+  const g = ctx.createRadialGradient(gcx, gcy, R * 0.1, gcx, gcy, Math.max(W, H) * 0.75);
+  g.addColorStop(0, `rgb(${c255(B.c0[0] + glow * 40 + Math.max(0, S.tx) * 70)},${c255(B.c0[1] + glow * 30 + S.ty * 8)},${c255(B.c0[2] + glow * 50 + Math.max(0, -S.tx) * 80)})`);
+  g.addColorStop(1, `rgb(${B.c1.join(',')})`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  // 質感（傾けると奥行きでずれる）
+  const st = getBgStatic();
+  ctx.drawImage(st.canvas, -st.pad + S.tx * st.pad * 0.6, -st.pad + S.ty * st.pad * 0.4, W + st.pad * 2, H + st.pad * 2);
+
+  // 動く層（演出「控えめ」のときだけ）
+  if (settings.fx > 0) {
+    if (B.aurora) drawAurora(B.aurora);
+    if (settings.theme === 'neon') drawGrid();
+    if (settings.theme === 'rainbow') drawBlobs();
+    drawBokeh(B.bokeh, settings.theme === 'wood' ? 18 : 36);
+  }
+
+  // 傾けた側にたまる光
+  const tm = Math.min(1, Math.hypot(S.tx, S.ty * 0.6));
+  if (tm > 0.03) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const ax = cx + S.tx * W * 0.7, ay = cy - S.ty * H * 0.18 + H * 0.1;
+    const ag = ctx.createRadialGradient(ax, ay, 0, ax, ay, Math.max(W, H) * 0.6);
+    ag.addColorStop(0, glowColor(0.22 * tm)); ag.addColorStop(1, glowColor(0));
+    ctx.fillStyle = ag; ctx.fillRect(0, 0, W, H); ctx.restore();
+  }
+}
+
 function drawFinger(a) {
   const now = performance.now();
   ctx.save();
@@ -773,24 +952,7 @@ function drawBlurred(arc, weight) {
 
 function draw(a) {
   const P = THEME[settings.theme];
-  // 背景（回すほど少し明るくなる）
-  const glow = (1 - Math.exp(-S.L / 3.2)) * FXM[settings.fx];
-  // 背景の光源は傾けた方向に動き、色味も変わる（右＝暖色、左＝寒色）
-  const gcx = cx + S.tx * W * 0.5, gcy = cy + S.ty * H * 0.2;
-  const g = ctx.createRadialGradient(gcx, gcy, R * 0.1, gcx, gcy, Math.max(W, H) * 0.75);
-  g.addColorStop(0, `rgb(${30 + glow * 50 + Math.max(0, S.tx) * 70 | 0},${36 + glow * 40 + S.ty * 8 | 0},${52 + glow * 60 + Math.max(0, -S.tx) * 80 | 0})`);
-  g.addColorStop(1, '#050608');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-  // 傾けた側にたまる光（スマホの中で光が流れるように動く）
-  const tm = Math.min(1, Math.hypot(S.tx, S.ty * 0.6));
-  if (tm > 0.03) {
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    const ax = cx + S.tx * W * 0.7, ay = cy - S.ty * H * 0.18 + H * 0.1;
-    const ag = ctx.createRadialGradient(ax, ay, 0, ax, ay, Math.max(W, H) * 0.6);
-    ag.addColorStop(0, glowColor(0.22 * tm)); ag.addColorStop(1, glowColor(0));
-    ctx.fillStyle = ag; ctx.fillRect(0, 0, W, H); ctx.restore();
-  }
+  drawBackground();
 
   // 空気のちり（回転に引っぱられて流れる）
   if (settings.fx >= 2) for (const d of DUST) {
@@ -977,7 +1139,7 @@ bTilt.addEventListener('click', () => {
   refreshUI();
 });
 bFx.addEventListener('click', () => {
-  settings.fx = settings.fx === 1 ? 2 : settings.fx === 2 ? 0 : 1;   // 控えめ → フル → 最小 → 控えめ
+  settings.fx = settings.fx === 1 ? 0 : 1;                           // 控えめ ⇄ 最小
   saveSettings(); refreshUI();
 });
 bStop.addEventListener('click', () => { initAudio(); S.omega = 0; });
