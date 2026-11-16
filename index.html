@@ -19,6 +19,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 #hint{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 112px);text-align:center;font-size:13px;opacity:.6;transition:opacity .8s;pointer-events:none}
 #toast{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 118px);text-align:center;font-size:30px;font-weight:800;letter-spacing:.05em;pointer-events:none;opacity:0;text-shadow:0 0 18px var(--accent),0 2px 10px rgba(0,0,0,.6)}
 #toast.show{animation:pop 1.4s ease-out}
+#toast.lite{font-size:18px;font-weight:600;letter-spacing:.08em;text-shadow:0 1px 8px rgba(0,0,0,.6);opacity:.75}
 @keyframes pop{0%{opacity:0;transform:scale(.6)}14%{opacity:1;transform:scale(1.18)}28%{transform:scale(1)}78%{opacity:1}100%{opacity:0;transform:translateY(-16px)}}
 #bar{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:0 12px}
 #bar button{font:inherit;font-size:14px;color:var(--fg);background:var(--panel);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:0 14px;min-height:44px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;transition:transform .08s}
@@ -40,6 +41,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <button id="bVib"></button>
   <button id="bBass"></button>
   <button id="bTilt"></button>
+  <button id="bFx"></button>
   <button id="bStop">止める</button>
 </div>
 <script>
@@ -55,7 +57,7 @@ const THEME_NAME = { metal: 'メタル', neon: 'ネオン', rainbow: 'レイン�
 const TIMBRES = ['metal', 'wood', 'plastic'];
 const TIMBRE_NAME = { metal: '金属', wood: '木', plastic: 'プラ' };
 const KEY = 'fidget-spinner-v1';
-const DEF = { theme: 'metal', timbre: 'metal', arms: 3, sound: true, vib: true, bass: true, tilt: true, best: 0 };
+const DEF = { theme: 'metal', timbre: 'metal', arms: 3, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0 };
 
 function loadSettings() {
   try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); }
@@ -65,6 +67,9 @@ function saveSettings() {
   try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch (e) { /* 保存できなくても動く */ }
 }
 const settings = loadSettings();
+if (![0, 1, 2].includes(settings.fx)) settings.fx = 1;          // 演出：0=最小 1=控えめ 2=フル
+const FXM = [0, 0.45, 1];                                        // 演出の強さ（光のにじみ・尾）
+const FX_NAME = ['最小', '控えめ', 'フル'];
 const canVib = 'vibrate' in navigator;
 
 const hsl = (h, s, l) => `hsl(${((h % 360) + 360) % 360},${s}%,${l}%)`;
@@ -119,7 +124,7 @@ const TIMBRE = {
 const S = {
   theta: 0, prevTheta: 0, omega: 0, gripV: 0,
   turns: 0, tickIdx: null, lastRpm: -1,
-  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], tx: 0, ty: 0, tx0: 0, ty0: 0, tiltReq: false, tiltSeen: false, L: 0, frameDt: 1 / 60, shake: 0, flash: 0, milestone: 0, recordShown: false
+  hue: 200, dragging: false, particles: [], rings: [], trail: [], ripples: [], tx: 0, ty: 0, tx0: 0, ty0: 0, b0: null, g0: 0, txSlow: 0, tySlow: 0, acc: 0, acc0: 0, shakeE: 0, moveTotal: 0, gx: 0, gy: 0, gz: 0, motionSeen: false, lastRattle: 0, tiltReq: false, tiltSeen: false, L: 0, frameDt: 1 / 60, shake: 0, flash: 0, milestone: 0, recordShown: false
 };
 let drag = null;             // 指の操作中の情報
 let dirty = false, lastSave = 0;
@@ -138,6 +143,7 @@ const bTimbre = document.getElementById('bTimbre');
 const bVib = document.getElementById('bVib');
 const bBass = document.getElementById('bBass');
 const bTilt = document.getElementById('bTilt');
+const bFx = document.getElementById('bFx');
 const bStop = document.getElementById('bStop');
 
 let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, R = 100;
@@ -156,7 +162,7 @@ resize();
 let ac = null, master = null, noiseBuf = null;
 let whirrGain, whirrFilter, humOsc, humGain;
 let bassMaster, bassAmp, lfo, lfoGain, shaper, lastThump = 0;
-let whine, whineGain, tone, pan;
+let whine, whineGain, tone, pan, echoSend, echo, echoFb;
 
 function initAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
@@ -168,8 +174,17 @@ function initAudio() {
     // 傾きで変わる「こもり具合」と左右の定位
     tone = ac.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 12000; tone.Q.value = 0.7;
     pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
+    const out = pan || ac.destination;
     master.connect(tone);
-    if (pan) { tone.connect(pan); pan.connect(ac.destination); } else tone.connect(ac.destination);
+    tone.connect(out);
+    if (pan) pan.connect(ac.destination);
+    // 動かした量に応じて広がる残響（エコー）。最初は小さく、動かすほど空間が広がる
+    echoSend = ac.createGain(); echoSend.gain.value = 0.04;
+    echo = ac.createDelay(1.0); echo.delayTime.value = 0.12;
+    echoFb = ac.createGain(); echoFb.gain.value = 0.32;
+    const echoLP = ac.createBiquadFilter(); echoLP.type = 'lowpass'; echoLP.frequency.value = 2800;
+    tone.connect(echoSend); echoSend.connect(echo); echo.connect(echoLP);
+    echoLP.connect(echoFb); echoFb.connect(echo); echoLP.connect(out);
 
     // ノイズ素材（1秒のホワイトノイズ）
     noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
@@ -218,7 +233,7 @@ function click(vol) {
   if (!ac || !settings.sound || vol <= 0.01) return;
   const T = TIMBRE[settings.timbre] || TIMBRE.metal;
   const t = ac.currentTime;
-  const pf = 1 + S.ty * 0.2;                 // 手前に傾けると高く、奥に傾けると低く
+  const pf = 1 + S.ty * 0.2 + S.tySlow * 0.1;   // 今の傾きと、しばらくの傾きの平均で音程が変わる
 
   const o = ac.createOscillator();
   o.type = T.osc;
@@ -235,6 +250,17 @@ function click(vol) {
   ng.gain.setValueAtTime(0.8 * vol, t);
   ng.gain.exponentialRampToValueAtTime(0.0001, t + T.nd);
   n.connect(f).connect(ng).connect(master); n.start(t, Math.random() * 0.5); n.stop(t + T.nd + 0.02);
+}
+
+// スマホを振った時の「カラカラ」（ベアリングの玉が転がる音）
+function rattle(vol) {
+  if (!ac || !settings.sound) return;
+  const t = ac.currentTime;
+  const n = ac.createBufferSource(); n.buffer = noiseBuf;
+  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2200 + Math.random() * 2600; f.Q.value = 5;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.5 * vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+  n.connect(f).connect(g).connect(master); n.start(t, Math.random() * 0.5); n.stop(t + 0.04);
 }
 
 // はじいた瞬間の「ヒュッ」（ノイズの帯域が上に抜けていく）
@@ -291,16 +317,21 @@ function audioUpdate() {
   lfoGain.gain.setTargetAtTime(depth * 0.5, t, 0.08);
   lfo.frequency.setTargetAtTime(Math.min(45, Math.max(4, a * settings.arms / TAU)), t, 0.05);
   master.gain.setTargetAtTime(settings.sound ? 0.9 : 0, t, 0.05);
-  whirrGain.gain.setTargetAtTime(0.2 * Math.min(1, a / 120), t, 0.08);
+  whirrGain.gain.setTargetAtTime(0.2 * Math.min(1, a / 120) * (1 + 0.5 * Math.min(1, S.shakeE / 8)), t, 0.08);
   const tiltPitch = 1 + S.ty * 0.25;
   whirrFilter.frequency.setTargetAtTime((280 + 330 * S.L) * tiltPitch, t, 0.06);      // 速さに対して対数で上がる
   const pass = Math.max(25, a * settings.arms / TAU);
   humOsc.frequency.setTargetAtTime(3000 * Math.tanh(pass / 3000), t, 0.03);           // 頭打ちにならず滑らかに上がる
-  humOsc.detune.setTargetAtTime(S.ty * 180, t, 0.1);
+  humOsc.detune.setTargetAtTime(S.ty * 180 + S.tySlow * 120, t, 0.1);
   whine.frequency.setTargetAtTime(Math.min(6500, 220 * Math.pow(2, S.L * 0.55)) * (1 + S.ty * 0.12), t, 0.05);
   whineGain.gain.setTargetAtTime(settings.sound ? 0.022 * Math.min(1, a / 80) : 0, t, 0.1);
   if (pan) pan.pan.setTargetAtTime(S.tx * 0.85, t, 0.08);                              // 傾けた側から聞こえる
-  tone.frequency.setTargetAtTime(Math.min(20000, 9000 * Math.pow(2, S.ty * 1.2)), t, 0.1);
+  tone.frequency.setTargetAtTime(Math.min(20000, 9000 * Math.pow(2, S.ty * 1.2 + S.tySlow * 0.8)), t, 0.1);
+  // 開いてからの動きの合計が増えるほど、残響が広がる
+  const mem = 1 - Math.exp(-S.moveTotal / 25);
+  echoSend.gain.setTargetAtTime(0.04 + 0.30 * mem, t, 0.3);
+  echoFb.gain.setTargetAtTime(0.32 + 0.22 * mem, t, 0.3);
+  echo.delayTime.setTargetAtTime(Math.max(0.03, 0.11 + 0.07 * S.txSlow + 0.04 * mem), t, 0.5);
   humGain.gain.setTargetAtTime(0.035 * Math.min(1, a / 50), t, 0.08);
 }
 
@@ -366,21 +397,39 @@ function onTilt(e) {
   if (e.beta == null || e.gamma == null) return;
   S.tiltSeen = true;
   if (!settings.tilt) return;
-  S.tx0 = Math.max(-1, Math.min(1, e.gamma / 45));          // 左右
-  S.ty0 = Math.max(-1, Math.min(1, (e.beta - 50) / 45));    // 手前・奥（持つ角度50°を中立）
+  if (S.b0 === null) { S.b0 = e.beta; S.g0 = e.gamma; }      // 開いた時の持ち方を基準（ゼロ）にする
+  S.tx0 = Math.max(-1, Math.min(1, (e.gamma - S.g0) / 35));   // 左右
+  S.ty0 = Math.max(-1, Math.min(1, (e.beta - S.b0) / 35));    // 手前・奥
+}
+// 加速度（揺れ）。重力を除いた値が取れない端末は、ゆっくり変わる成分を重力とみなして引く
+function onMotion(e) {
+  let ax, ay, az;
+  const a = e.acceleration;
+  if (a && a.x != null) { ax = a.x; ay = a.y; az = a.z; }
+  else {
+    const g = e.accelerationIncludingGravity;
+    if (!g || g.x == null) return;
+    S.gx = S.gx * 0.9 + g.x * 0.1; S.gy = S.gy * 0.9 + g.y * 0.1; S.gz = S.gz * 0.9 + g.z * 0.1;
+    ax = g.x - S.gx; ay = g.y - S.gy; az = g.z - S.gz;
+  }
+  S.motionSeen = true;
+  if (settings.tilt) S.acc0 = Math.hypot(ax, ay, az);
 }
 function enableTilt() {
   if (S.tiltReq || !settings.tilt) return;
   S.tiltReq = true;
-  const start = () => { window.addEventListener('deviceorientation', onTilt, true); setTimeout(refreshUI, 2500); };
-  try {
-    // iPhoneはユーザー操作の中で許可を求める必要がある
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission()
-        .then(r => { if (r === 'granted') start(); else S.tiltReq = false; })
-        .catch(() => { S.tiltReq = false; });
-    } else start();
-  } catch (e) { S.tiltReq = false; }
+  // iPhoneはユーザー操作の中で許可を求める必要がある（傾きと加速度の両方）
+  const ask = (Ctor, onEvent, name) => {
+    try {
+      if (!Ctor) return;
+      if (typeof Ctor.requestPermission === 'function') {
+        Ctor.requestPermission().then(r => { if (r === 'granted') window.addEventListener(name, onEvent, true); }).catch(() => {});
+      } else window.addEventListener(name, onEvent, true);
+    } catch (e) { /* 使えない端末 */ }
+  };
+  ask(window.DeviceOrientationEvent, onTilt, 'deviceorientation');
+  ask(window.DeviceMotionEvent, onMotion, 'devicemotion');
+  setTimeout(refreshUI, 2500);
 }
 
 /* ---------- 指の操作 ---------- */
@@ -560,7 +609,7 @@ function drawSpinner(th, full, target, ox, oy) {
 }
 
 function spawnSparks(a) {
-  if (a < 140 || S.particles.length > 80 || Math.random() > 0.6) return;
+  if (settings.fx < 2 || a < 140 || S.particles.length > 80 || Math.random() > 0.6) return;
   const n = settings.arms;
   const k = Math.floor(Math.random() * n);
   const ang = S.theta + k * (TAU / n);
@@ -601,17 +650,19 @@ function glowColor(alpha) {
 }
 function addRing(strength) { S.rings.push({ r: R * 0.3, life: 0.7, max: 0.7, s: Math.max(0.35, strength) }); }
 function showToast(text) {
+  if (settings.fx < 1) return;
   toastEl.textContent = text;
+  toastEl.classList.toggle('lite', settings.fx < 2);   // 控えめの時は小さく静かに
   toastEl.classList.remove('show'); void toastEl.offsetWidth; toastEl.classList.add('show');
 }
 function flickFx(a) {
   const k = Math.min(1, Math.log2(1 + a / 40) / 6);
-  S.shake = Math.max(S.shake, k); addRing(k);
+  if (settings.fx >= 2) { S.shake = Math.max(S.shake, k); addRing(k); }
   vib(30); thump(1); whoosh(k);
 }
 // 加速している間、指先から火花が飛ぶ
 function spawnFingerSparks() {
-  if (!drag || S.particles.length > 100 || Math.random() > 0.7) return;
+  if (settings.fx < 2 || !drag || S.particles.length > 100 || Math.random() > 0.7) return;
   const mv = Math.hypot(drag.dx, drag.dy);
   if (mv < 1) return;
   const ang = Math.atan2(drag.dy, drag.dx) + (Math.random() - 0.5) * 1.2;
@@ -643,7 +694,7 @@ function drawFinger(a) {
   // 指の軌跡（新しいほど太く明るい）
   const tr = S.trail;
   while (tr.length && now - tr[0].t > 320) tr.shift();
-  for (let i = 1; i < tr.length; i++) {
+  if (settings.fx >= 2) for (let i = 1; i < tr.length; i++) {
     const age = (now - tr[i].t) / 320;
     ctx.strokeStyle = glowColor(0.55 * (1 - age));
     ctx.lineWidth = 3 + 11 * (1 - age);
@@ -651,7 +702,7 @@ function drawFinger(a) {
   }
 
   // 触れている場所の光の玉（回転が速いほど大きく脈打つ）
-  if (drag) {
+  if (drag && settings.fx >= 2) {
     const pulse = 1 + 0.12 * Math.sin(now / 90);
     const r = (34 + Math.min(34, a / 12)) * pulse;
     const g = ctx.createRadialGradient(drag.x, drag.y, 0, drag.x, drag.y, r);
@@ -661,7 +712,7 @@ function drawFinger(a) {
   }
 
   // 波紋
-  for (const r of S.ripples) {
+  if (settings.fx >= 1) for (const r of S.ripples) {
     const t = r.life / r.max;
     ctx.strokeStyle = glowColor(0.7 * t * r.s);
     ctx.lineWidth = 1.5 + 4 * t;
@@ -723,7 +774,7 @@ function drawBlurred(arc, weight) {
 function draw(a) {
   const P = THEME[settings.theme];
   // 背景（回すほど少し明るくなる）
-  const glow = 1 - Math.exp(-S.L / 3.2);
+  const glow = (1 - Math.exp(-S.L / 3.2)) * FXM[settings.fx];
   // 背景の光源は傾けた方向に動き、色味も変わる（右＝暖色、左＝寒色）
   const gcx = cx + S.tx * W * 0.5, gcy = cy + S.ty * H * 0.2;
   const g = ctx.createRadialGradient(gcx, gcy, R * 0.1, gcx, gcy, Math.max(W, H) * 0.75);
@@ -742,25 +793,25 @@ function draw(a) {
   }
 
   // 空気のちり（回転に引っぱられて流れる）
-  for (const d of DUST) {
+  if (settings.fx >= 2) for (const d of DUST) {
     ctx.fillStyle = glowColor(d.al * (0.5 + Math.min(1, a / 200)));
     ctx.beginPath();
     ctx.arc(cx + Math.cos(d.a) * d.k * R * 0.95 + S.tx * d.k * R * 0.18, cy + Math.sin(d.a) * d.k * R * 1.05 + S.ty * d.k * R * 0.12, d.s, 0, TAU);
     ctx.fill();
   }
   // 速いほど強くなる光のにじみ
-  if (a > 30) {
+  if (a > 30 && settings.fx > 0) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const gr = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 1.6);
-    gr.addColorStop(0, glowColor(0.08 + 0.34 * (1 - Math.exp(-S.L / 3.5)))); gr.addColorStop(1, glowColor(0));
+    gr.addColorStop(0, glowColor((0.08 + 0.34 * (1 - Math.exp(-S.L / 3.5))) * FXM[settings.fx])); gr.addColorStop(1, glowColor(0));
     ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
     ctx.restore();
   }
 
   // 画面の揺れとズーム（はじいた瞬間・高速時）
   ctx.save();
-  const zoom = 1 + 0.045 * (1 - Math.exp(-S.L / 4));
+  const zoom = 1 + (settings.fx >= 2 ? 0.045 * (1 - Math.exp(-S.L / 4)) : 0);
   ctx.translate(cx + (Math.random() - 0.5) * 16 * S.shake, cy + (Math.random() - 0.5) * 16 * S.shake);
   ctx.scale(zoom, zoom);
   ctx.translate(-cx, -cy);
@@ -777,7 +828,7 @@ function draw(a) {
   if (blend > 0) drawBlurred(Math.max(arc, 0.12), blend);
 
   // 先端の光の尾（彗星のように伸びる）
-  if (a > 40) {
+  if (a > 40 && settings.fx > 0) {
     const n = settings.arms, step = TAU / n, sgn = Math.sign(S.omega) || 1;
     const len = 0.2 + 1.2 * (1 - Math.exp(-S.L / 3)), al = Math.min(1, a / 120);
     ctx.save();
@@ -788,7 +839,7 @@ function draw(a) {
       for (let j = 0; j < 6; j++) {
         const a0 = sgn > 0 ? ang - len * (j + 1) / 6 : ang + len * j / 6;
         const a1 = sgn > 0 ? ang - len * j / 6 : ang + len * (j + 1) / 6;
-        ctx.strokeStyle = glowColor(0.5 * al * (1 - j / 6));
+        ctx.strokeStyle = glowColor(0.5 * al * FXM[settings.fx] * (1 - j / 6));
         ctx.beginPath(); ctx.arc(cx, cy, R * 0.84, a0, a1); ctx.stroke();
       }
     }
@@ -834,8 +885,18 @@ function frame(now) {
   // 物理は細かい刻みで、実際に経った時間ぶん進める（コマ落ちしても回転が遅れない）
   const simDt = Math.min(0.1, rawDt), steps = Math.max(1, Math.ceil(simDt / 0.008));
   for (let i = 0; i < steps; i++) { if (drag) dragPhysics(simDt / steps, now); else physics(simDt / steps); }
+  const otx = S.tx, oty = S.ty;
   S.tx += (S.tx0 - S.tx) * (1 - Math.exp(-dt * 8));
   S.ty += (S.ty0 - S.ty) * (1 - Math.exp(-dt * 8));
+  // スマホの動きの「今」「しばらくの傾向」「開いてからの合計」
+  const tiltSpeed = (Math.abs(S.tx - otx) + Math.abs(S.ty - oty)) / Math.max(dt, 0.001);
+  S.acc += (S.acc0 - S.acc) * (1 - Math.exp(-dt * 10));
+  S.acc0 *= Math.exp(-dt * 2);
+  S.shakeE = Math.max(S.acc, S.shakeE * Math.exp(-dt * 3));
+  S.moveTotal += S.acc * dt * 0.4 + tiltSpeed * dt * 3;
+  S.txSlow += (S.tx - S.txSlow) * (1 - Math.exp(-dt / 10));
+  S.tySlow += (S.ty - S.tySlow) * (1 - Math.exp(-dt / 10));
+  if (S.shakeE > 2.5 && now - S.lastRattle > 55) { S.lastRattle = now; rattle(Math.min(1, S.shakeE / 12)); }
   S.hue = (S.hue + dt * 25) % 360;
 
   S.turns += Math.abs(S.theta - S.prevTheta) / TAU;
@@ -855,12 +916,14 @@ function frame(now) {
   for (let i = 0; i < MILES.length; i++) {
     if (rpm >= MILES[i] && S.milestone < MILES[i]) {
       S.milestone = MILES[i];
-      showToast(`${MILES[i].toLocaleString('en-US')} RPM!`); addRing(1); thump(1); chime(i); S.flash = 1;
+      showToast(`${MILES[i].toLocaleString('en-US')} RPM!`); thump(1); chime(i);
+      if (settings.fx >= 2) { addRing(1); S.flash = 1; }
     }
   }
   if (rpm > settings.best) {
     if (settings.best >= 300 && !S.recordShown) {
-      S.recordShown = true; showToast('NEW RECORD!'); chime(4); S.flash = 0.6; addRing(1);
+      S.recordShown = true; showToast('NEW RECORD!'); chime(4);
+      if (settings.fx >= 2) { S.flash = 0.6; addRing(1); }
     }
     settings.best = rpm; dirty = true;
   }
@@ -893,7 +956,8 @@ function refreshUI() {
   bVib.setAttribute('aria-pressed', settings.vib && canHaptic);
   bBass.textContent = `音で振動：${settings.bass ? 'ON' : 'OFF'}`;
   bBass.setAttribute('aria-pressed', settings.bass);
-  bTilt.textContent = `傾き：${settings.tilt ? 'ON' : 'OFF'}${settings.tilt && S.tiltReq && !S.tiltSeen ? '（未検出）' : ''}`;
+  bTilt.textContent = `傾き・動き：${settings.tilt ? 'ON' : 'OFF'}${settings.tilt && S.tiltReq && !S.tiltSeen && !S.motionSeen ? '（未検出）' : ''}`;
+  bFx.textContent = `演出：${FX_NAME[settings.fx]}`;
   bTilt.setAttribute('aria-pressed', settings.tilt);
   if (ac && master) master.gain.setTargetAtTime(settings.sound ? 0.9 : 0, ac.currentTime, 0.05);
 }
@@ -909,8 +973,12 @@ bBass.addEventListener('click', () => { initAudio(); settings.bass = !settings.b
 bTilt.addEventListener('click', () => {
   initAudio();
   settings.tilt = !settings.tilt; saveSettings();
-  if (settings.tilt) { S.tiltReq = false; enableTilt(); } else { S.tx0 = 0; S.ty0 = 0; }
+  if (settings.tilt) { S.tiltReq = false; S.b0 = null; enableTilt(); } else { S.tx0 = 0; S.ty0 = 0; }
   refreshUI();
+});
+bFx.addEventListener('click', () => {
+  settings.fx = settings.fx === 1 ? 2 : settings.fx === 2 ? 0 : 1;   // 控えめ → フル → 最小 → 控えめ
+  saveSettings(); refreshUI();
 });
 bStop.addEventListener('click', () => { initAudio(); S.omega = 0; });
 
