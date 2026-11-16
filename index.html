@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#07080b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="指で回せる疑似ハンドスピナー。音・振動・見た目までこだわりました。">
+<title>Fidget Spinner</title>
+<style>
+:root{--accent:#cfd8e3;--panel:rgba(18,21,28,.72);--fg:#eef2f7}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#07080b;color:var(--fg);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hud{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 14px);text-align:center;pointer-events:none}
+#rpm{font-size:46px;font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 2px 14px rgba(0,0,0,.6)}
+#rpm small{font-size:14px;font-weight:500;opacity:.7;margin-left:6px}
+#stats{font-size:13px;opacity:.7;font-variant-numeric:tabular-nums;margin-top:2px}
+#hint{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 112px);text-align:center;font-size:13px;opacity:.6;transition:opacity .8s;pointer-events:none}
+#bar{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:0 12px}
+#bar button{font:inherit;font-size:14px;color:var(--fg);background:var(--panel);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:0 14px;min-height:44px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;transition:transform .08s}
+#bar button[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+#bar button:disabled{opacity:.4}
+#bar button:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="rpm"><span id="rpmv">0</span><small>rpm</small></div><div id="stats"></div></div>
+<div id="hint">指で回す・はじく ／ タップでブレーキ</div>
+<div id="bar">
+  <button id="bTheme"></button>
+  <button id="bArms"></button>
+  <button id="bSound"></button>
+  <button id="bTimbre"></button>
+  <button id="bVib"></button>
+  <button id="bStop">止める</button>
+</div>
+<script>
+(() => {
+'use strict';
+
+/* ---------- 定数・設定 ---------- */
+const TAU = Math.PI * 2;
+const MAX_W = 420;                       // rad/s（約4000rpm）上限
+const ARMS = [3, 2, 4, 5];
+const THEMES = ['metal', 'neon', 'rainbow', 'wood', 'matte'];
+const THEME_NAME = { metal: 'メタル', neon: 'ネオン', rainbow: 'レインボー', wood: 'ウッド', matte: 'マット' };
+const TIMBRES = ['metal', 'wood', 'plastic'];
+const TIMBRE_NAME = { metal: '金属', wood: '木', plastic: 'プラ' };
+const KEY = 'fidget-spinner-v1';
+const DEF = { theme: 'metal', timbre: 'metal', arms: 3, sound: true, vib: true, best: 0 };
+
+function loadSettings() {
+  try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); }
+  catch (e) { return Object.assign({}, DEF); }
+}
+function saveSettings() {
+  try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch (e) { /* 保存できなくても動く */ }
+}
+const settings = loadSettings();
+const canVib = 'vibrate' in navigator;
+
+const hsl = (h, s, l) => `hsl(${((h % 360) + 360) % 360},${s}%,${l}%)`;
+const grad = (c, w, stops) => {
+  const g = c.createLinearGradient(0, -w, 0, w);
+  for (const [o, col] of stops) g.addColorStop(o, col);
+  return g;
+};
+
+// テーマごとの見た目
+const THEME = {
+  metal: {
+    arm: (c, w) => grad(c, w, [[0, '#4a525e'], [0.42, '#e9eef4'], [0.6, '#9aa5b2'], [1, '#3a414c']]),
+    hub: [[0, '#ffffff'], [0.5, '#b9c2cd'], [1, '#4b5360']],
+    hole: '#14181e', ring: '#e6ecf3', edge: 'rgba(255,255,255,.4)', shadow: 'rgba(0,0,0,.55)',
+    spark: '255,226,180', accent: '#cfd8e3'
+  },
+  neon: {
+    arm: (c, w) => grad(c, w, [[0, '#1d2333'], [1, '#080a10']]),
+    hub: [[0, '#d8fbff'], [0.45, '#1a2536'], [1, '#05070b']],
+    hole: '#020304', ring: null, edge: null, shadow: null,   // null = 色相で変化
+    spark: '120,240,255', accent: '#3ee8ff'
+  },
+  rainbow: {
+    arm: (c, w, k, n, hue) => { const h = hue + k * 360 / n; return grad(c, w, [[0, hsl(h, 95, 72)], [1, hsl(h, 90, 38)]]); },
+    hub: [[0, '#ffffff'], [0.6, '#cccccc'], [1, '#555555']],
+    hole: '#101014', ring: '#ffffff', edge: 'rgba(255,255,255,.5)', shadow: 'rgba(0,0,0,.45)',
+    spark: '255,255,255', accent: '#ff8fd1'
+  },
+  wood: {
+    arm: (c, w) => grad(c, w, [[0, '#e7bd86'], [0.5, '#b07540'], [1, '#6a3e1c']]),
+    hub: [[0, '#f6dcae'], [1, '#6a3e1c']],
+    hole: '#2b180a', ring: '#f0cf9a', edge: 'rgba(40,20,8,.5)', shadow: 'rgba(0,0,0,.5)',
+    spark: '255,190,110', accent: '#e0a96d'
+  },
+  matte: {
+    arm: (c, w) => grad(c, w, [[0, '#4b505d'], [1, '#20232b']]),
+    hub: [[0, '#7a8090'], [1, '#17191f']],
+    hole: '#0b0c0f', ring: '#ff5d8f', edge: 'rgba(255,255,255,.12)', shadow: 'rgba(0,0,0,.6)',
+    spark: '255,93,143', accent: '#ff5d8f'
+  }
+};
+
+// 音色（ティック音のパラメータ）
+const TIMBRE = {
+  metal:   { osc: 'triangle', f: 2600, dec: 0.035, gain: 0.5,  nf: 4500, nq: 4,   nd: 0.02 },
+  wood:    { osc: 'sine',     f: 900,  dec: 0.06,  gain: 0.6,  nf: 1800, nq: 1.5, nd: 0.03 },
+  plastic: { osc: 'square',   f: 1700, dec: 0.02,  gain: 0.22, nf: 2600, nq: 2,   nd: 0.015 }
+};
+
+/* ---------- 状態 ---------- */
+const S = {
+  theta: 0, prevTheta: 0, omega: 0, gripV: 0,
+  turns: 0, tickIdx: null, lastRpm: -1,
+  hue: 200, dragging: false, particles: []
+};
+let drag = null;             // 指の操作中の情報
+let dirty = false, lastSave = 0;
+
+/* ---------- DOM ---------- */
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const rpmEl = document.getElementById('rpmv');
+const statsEl = document.getElementById('stats');
+const hintEl = document.getElementById('hint');
+const bTheme = document.getElementById('bTheme');
+const bArms = document.getElementById('bArms');
+const bSound = document.getElementById('bSound');
+const bTimbre = document.getElementById('bTimbre');
+const bVib = document.getElementById('bVib');
+const bStop = document.getElementById('bStop');
+
+let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, R = 100;
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  R = Math.min(W, H) * 0.38;
+  cx = W / 2; cy = H * 0.45;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ---------- オーディオ（Web Audio で合成） ---------- */
+let ac = null, master = null, noiseBuf = null;
+let whirrGain, whirrFilter, humOsc, humGain;
+
+function initAudio() {
+  if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try {
+    ac = new AC();
+    master = ac.createGain(); master.gain.value = settings.sound ? 0.9 : 0; master.connect(ac.destination);
+
+    // ノイズ素材（1秒のホワイトノイズ）
+    noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+    // ベアリングの「シャー」というノイズ（速度で音量・音程が変化）
+    const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    whirrFilter = ac.createBiquadFilter(); whirrFilter.type = 'bandpass'; whirrFilter.Q.value = 0.9; whirrFilter.frequency.value = 300;
+    whirrGain = ac.createGain(); whirrGain.gain.value = 0;
+    src.connect(whirrFilter).connect(whirrGain).connect(master); src.start();
+
+    // ブレードが通過する「ブーン」という低音
+    humOsc = ac.createOscillator(); humOsc.type = 'sawtooth'; humOsc.frequency.value = 40;
+    const humLP = ac.createBiquadFilter(); humLP.type = 'lowpass'; humLP.frequency.value = 900;
+    humGain = ac.createGain(); humGain.gain.value = 0;
+    humOsc.connect(humLP).connect(humGain).connect(master); humOsc.start();
+  } catch (e) { ac = null; }
+}
+
+// 1回のティック音（ブレードが固定点を通過した時）
+function click(vol) {
+  if (!ac || !settings.sound || vol <= 0.01) return;
+  const T = TIMBRE[settings.timbre] || TIMBRE.metal;
+  const t = ac.currentTime;
+
+  const o = ac.createOscillator();
+  o.type = T.osc;
+  o.frequency.setValueAtTime(T.f * (0.95 + Math.random() * 0.1), t);
+  o.frequency.exponentialRampToValueAtTime(T.f * 0.6, t + T.dec);
+  const og = ac.createGain();
+  og.gain.setValueAtTime(T.gain * vol, t);
+  og.gain.exponentialRampToValueAtTime(0.0001, t + T.dec);
+  o.connect(og).connect(master); o.start(t); o.stop(t + T.dec + 0.02);
+
+  const n = ac.createBufferSource(); n.buffer = noiseBuf; n.playbackRate.value = 0.9 + Math.random() * 0.2;
+  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = T.nf; f.Q.value = T.nq;
+  const ng = ac.createGain();
+  ng.gain.setValueAtTime(0.8 * vol, t);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + T.nd);
+  n.connect(f).connect(ng).connect(master); n.start(t, Math.random() * 0.5); n.stop(t + T.nd + 0.02);
+}
+
+function audioUpdate() {
+  if (!ac) return;
+  const a = Math.abs(S.omega), t = ac.currentTime;
+  master.gain.setTargetAtTime(settings.sound ? 0.9 : 0, t, 0.05);
+  whirrGain.gain.setTargetAtTime(0.2 * Math.min(1, a / 120), t, 0.08);
+  whirrFilter.frequency.setTargetAtTime(280 + Math.min(a, 350) * 3.2, t, 0.06);
+  humOsc.frequency.setTargetAtTime(Math.min(600, Math.max(25, a * settings.arms / TAU)), t, 0.03);
+  humGain.gain.setTargetAtTime(0.035 * Math.min(1, a / 50), t, 0.08);
+}
+
+/* ---------- 振動 ---------- */
+let lastVib = 0;
+function vib(ms) {
+  if (!settings.vib || !canVib) return;
+  const now = performance.now();
+  if (now - lastVib < 38) return;   // 連打しすぎない
+  lastVib = now;
+  try { navigator.vibrate(ms); } catch (e) { /* 無視 */ }
+}
+
+/* ---------- 物理 ---------- */
+const wrap = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
+
+function physics(dt) {
+  const w = S.omega, a = Math.abs(w);
+  if (a > 0) {
+    // 粘性＋空気抵抗（2乗）＋軸受けの一定摩擦
+    const dec = 0.028 * a + 0.000018 * a * a + 0.35;
+    const na = a - dec * dt;
+    S.omega = na <= 0 ? 0 : Math.sign(w) * na;
+  }
+  S.theta += S.omega * dt;
+}
+
+function onTick(a) {
+  if (a > 8 && a < 320) {
+    click(Math.min(1, 0.3 + a / 140) * (1 - a / 360));
+  }
+  if (a > 6) vib(Math.round(Math.min(9, Math.max(2, 2 + a / 30))));
+}
+
+/* ---------- 指の操作 ---------- */
+function pos(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+
+canvas.addEventListener('pointerdown', e => {
+  initAudio();
+  const p = pos(e);
+  const d = Math.hypot(p.x - cx, p.y - cy);
+  if (d > R * 1.3) return;
+  e.preventDefault();
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  const now = performance.now();
+  drag = {
+    id: e.pointerId, sx: p.x, sy: p.y, t0: now, moved: 0,
+    lastPhi: Math.atan2(p.y - cy, p.x - cx), lastT: now, lastMove: now,
+    inside: d < R * 1.05, omega0: S.omega
+  };
+  S.gripV = 0; S.dragging = true;
+  hintEl.style.opacity = 0;
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const p = pos(e), now = performance.now();
+  const phi = Math.atan2(p.y - cy, p.x - cx);
+  const dphi = wrap(phi - drag.lastPhi);
+  const dt = Math.max(0.004, (now - drag.lastT) / 1000);
+  // 指に吸い付くように回す
+  S.theta += dphi;
+  const v = Math.max(-MAX_W, Math.min(MAX_W, dphi / dt));
+  S.gripV = S.gripV * 0.5 + v * 0.5;
+  drag.moved += Math.hypot(e.movementX || 0, e.movementY || 0);
+  drag.lastPhi = phi; drag.lastT = now; drag.lastMove = now;
+});
+
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const now = performance.now();
+  const isTap = drag.moved < 10 && now - drag.t0 < 250;
+  if (isTap && drag.inside) {
+    S.omega = drag.omega0 * 0.2;              // タップでブレーキ
+    vib(6);
+  } else {
+    const quiet = now - drag.lastMove > 90;   // 止まってから離したら速度ゼロ
+    S.omega = quiet ? 0 : Math.max(-MAX_W, Math.min(MAX_W, S.gripV));
+    if (Math.abs(S.omega) > 150) vib(12);     // はじいた時の「ビュッ」
+  }
+  drag = null; S.dragging = false; S.gripV = 0;
+}
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// PC用：矢印キーで回す／Spaceでブレーキ
+window.addEventListener('keydown', e => {
+  initAudio();
+  if (e.key === 'ArrowLeft') { S.omega = Math.max(-MAX_W, S.omega - 60); hintEl.style.opacity = 0; }
+  else if (e.key === 'ArrowRight') { S.omega = Math.min(MAX_W, S.omega + 60); hintEl.style.opacity = 0; }
+  else if (e.code === 'Space') { S.omega *= 0.2; e.preventDefault(); }
+});
+
+/* ---------- 描画 ---------- */
+function armPath(c) {
+  const tipD = R * 0.66, tipR = R * 0.24, w0 = R * 0.2;
+  c.beginPath();
+  c.moveTo(0, -w0);
+  c.quadraticCurveTo(tipD * 0.5, -w0 * 0.9, tipD, -tipR);
+  c.arc(tipD, 0, tipR, -Math.PI / 2, Math.PI / 2, false);
+  c.quadraticCurveTo(tipD * 0.5, w0 * 0.9, 0, w0);
+  c.closePath();
+}
+
+function drawSpinner(th, full) {
+  const c = ctx, name = settings.theme, P = THEME[name], n = settings.arms, step = TAU / n;
+  const tipD = R * 0.66, tipR = R * 0.24, hubR = R * 0.2;
+  const neonCol = hsl(S.hue, 100, 62);
+  const edge = P.edge || neonCol;
+  const ring = P.ring || neonCol;
+  const shadow = P.shadow || hsl(S.hue, 100, 55);
+
+  c.save();
+  c.translate(cx, cy);
+  c.rotate(th);
+
+  for (let k = 0; k < n; k++) {
+    c.save();
+    c.rotate(k * step);
+    if (full) {
+      c.shadowColor = shadow;
+      c.shadowBlur = name === 'neon' ? R * 0.22 : R * 0.1;
+      c.shadowOffsetY = name === 'neon' ? 0 : R * 0.04;
+    }
+    armPath(c);
+    c.fillStyle = P.arm(c, R * 0.24, k, n, S.hue);
+    c.fill();
+    c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetY = 0;
+
+    if (name === 'wood') {               // 木目
+      c.save(); armPath(c); c.clip();
+      c.strokeStyle = 'rgba(70,35,12,.22)'; c.lineWidth = 1.2;
+      for (let j = -3; j <= 3; j++) {
+        const y = j * tipR * 0.3;
+        c.beginPath(); c.moveTo(0, y);
+        c.bezierCurveTo(tipD * 0.3, y + 4, tipD * 0.6, y - 4, tipD + tipR, y);
+        c.stroke();
+      }
+      c.restore();
+    }
+
+    armPath(c);
+    c.strokeStyle = edge; c.lineWidth = Math.max(1, R * 0.012); c.stroke();
+
+    // ベアリング穴（先端）
+    c.beginPath(); c.arc(tipD, 0, tipR * 0.5, 0, TAU);
+    c.fillStyle = P.hole; c.fill();
+    c.strokeStyle = ring; c.lineWidth = R * 0.012; c.stroke();
+    c.restore();
+  }
+
+  // ハブ
+  const hg = c.createRadialGradient(-hubR * 0.3, -hubR * 0.3, hubR * 0.05, 0, 0, hubR);
+  for (const [o, col] of P.hub) hg.addColorStop(o, col);
+  c.beginPath(); c.arc(0, 0, hubR, 0, TAU);
+  c.fillStyle = hg; c.fill();
+  c.strokeStyle = edge; c.lineWidth = R * 0.012; c.stroke();
+
+  // 中心のベアリングキャップ
+  c.beginPath(); c.arc(0, 0, hubR * 0.42, 0, TAU);
+  c.fillStyle = name === 'neon' ? '#05070b' : '#262c35'; c.fill();
+  c.strokeStyle = ring; c.lineWidth = R * 0.012; c.stroke();
+  c.beginPath(); c.arc(0, 0, hubR * 0.12, 0, TAU);
+  c.fillStyle = P.hole; c.fill();
+
+  c.restore();
+}
+
+function spawnSparks(a) {
+  if (a < 140 || S.particles.length > 80 || Math.random() > 0.6) return;
+  const n = settings.arms;
+  const k = Math.floor(Math.random() * n);
+  const ang = S.theta + k * (TAU / n);
+  const r = R * 0.9;
+  const sgn = Math.sign(S.omega) || 1;
+  const sp = a * r * (0.015 + Math.random() * 0.01);
+  const dir = ang + sgn * Math.PI / 2;
+  const spread = (Math.random() - 0.5) * 0.8;
+  S.particles.push({
+    x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r,
+    vx: Math.cos(dir + spread) * sp + Math.cos(ang) * sp * 0.2,
+    vy: Math.sin(dir + spread) * sp + Math.sin(ang) * sp * 0.2,
+    life: 0.25 + Math.random() * 0.3, max: 0.5
+  });
+  S.particles[S.particles.length - 1].max = S.particles[S.particles.length - 1].life;
+}
+
+function updateParticles(dt) {
+  const arr = S.particles, damp = Math.exp(-6 * dt);
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const p = arr[i];
+    p.life -= dt;
+    if (p.life <= 0) { arr.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= damp; p.vy *= damp;
+  }
+}
+
+function draw(a) {
+  const P = THEME[settings.theme];
+  // 背景（回すほど少し明るくなる）
+  const glow = Math.min(1, a / 260);
+  const g = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, Math.max(W, H) * 0.75);
+  g.addColorStop(0, `rgb(${30 + glow * 50 | 0},${36 + glow * 40 | 0},${52 + glow * 60 | 0})`);
+  g.addColorStop(1, '#050608');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // 床の影
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.beginPath(); ctx.ellipse(cx, cy + R * 1.08, R * 0.95, R * 0.14, 0, 0, TAU); ctx.fill();
+
+  // 残像（速い時のモーションブラー）
+  if (a > 25) {
+    const alphas = [0.2, 0.11, 0.05];
+    for (let i = 3; i >= 1; i--) {
+      ctx.globalAlpha = alphas[i - 1];
+      drawSpinner(S.theta - S.omega * 0.012 * i, false);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  drawSpinner(S.theta, true);
+
+  // 火花
+  for (const p of S.particles) {
+    const t = Math.max(0, p.life / p.max);
+    ctx.strokeStyle = `rgba(${P.spark},${t})`;
+    ctx.lineWidth = 0.5 + 2 * t;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+    ctx.stroke();
+  }
+}
+
+/* ---------- メインループ ---------- */
+let lastFrame = performance.now();
+function frame(now) {
+  const dt = Math.min(1 / 30, Math.max(0, (now - lastFrame) / 1000));
+  lastFrame = now;
+
+  if (drag) S.omega = S.gripV; else physics(dt);
+  S.hue = (S.hue + dt * 25) % 360;
+
+  S.turns += Math.abs(S.theta - S.prevTheta) / TAU;
+  S.prevTheta = S.theta;
+
+  // ブレードが固定点を通過したらティック
+  const step = TAU / settings.arms;
+  const idx = Math.floor(S.theta / step);
+  if (S.tickIdx === null) S.tickIdx = idx;
+  if (idx !== S.tickIdx) { S.tickIdx = idx; onTick(Math.abs(S.omega)); }
+
+  const a = Math.abs(S.omega);
+  const rpm = Math.round(a * 60 / TAU);
+  if (rpm !== S.lastRpm) { S.lastRpm = rpm; rpmEl.textContent = rpm; }
+  if (rpm > settings.best) { settings.best = rpm; dirty = true; }
+  if (dirty && now - lastSave > 1500) { saveSettings(); dirty = false; lastSave = now; }
+
+  if (Math.floor(now / 250) !== frame.lastStat) {
+    frame.lastStat = Math.floor(now / 250);
+    statsEl.textContent = `最高 ${settings.best} rpm ・ 今回 ${Math.floor(S.turns)} 回転`;
+  }
+
+  audioUpdate();
+  spawnSparks(a);
+  updateParticles(dt);
+  draw(a);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- UI ---------- */
+function refreshUI() {
+  const P = THEME[settings.theme];
+  document.documentElement.style.setProperty('--accent', P.accent);
+  bTheme.textContent = `テーマ：${THEME_NAME[settings.theme]}`;
+  bArms.textContent = `${settings.arms}本`;
+  bSound.textContent = `音：${settings.sound ? 'ON' : 'OFF'}`;
+  bSound.setAttribute('aria-pressed', settings.sound);
+  bTimbre.textContent = `音色：${TIMBRE_NAME[settings.timbre]}`;
+  bVib.textContent = canVib ? `振動：${settings.vib ? 'ON' : 'OFF'}` : '振動（非対応）';
+  bVib.disabled = !canVib;
+  bVib.setAttribute('aria-pressed', settings.vib && canVib);
+  if (ac && master) master.gain.setTargetAtTime(settings.sound ? 0.9 : 0, ac.currentTime, 0.05);
+}
+
+function cycle(list, cur) { return list[(list.indexOf(cur) + 1) % list.length]; }
+
+bTheme.addEventListener('click', () => { settings.theme = cycle(THEMES, settings.theme); S.hue = 200; saveSettings(); refreshUI(); });
+bArms.addEventListener('click', () => { settings.arms = cycle(ARMS, settings.arms); S.tickIdx = null; saveSettings(); refreshUI(); });
+bSound.addEventListener('click', () => { initAudio(); settings.sound = !settings.sound; saveSettings(); refreshUI(); });
+bTimbre.addEventListener('click', () => { settings.timbre = cycle(TIMBRES, settings.timbre); saveSettings(); refreshUI(); });
+bVib.addEventListener('click', () => { settings.vib = !settings.vib; saveSettings(); refreshUI(); vib(10); });
+bStop.addEventListener('click', () => { initAudio(); S.omega = 0; });
+
+// 別タブに行った時は音を止める
+document.addEventListener('visibilitychange', () => {
+  if (!ac) return;
+  if (document.hidden) ac.suspend(); else ac.resume();
+});
+
+refreshUI();
+setTimeout(() => { hintEl.style.opacity = 0; }, 6000);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
