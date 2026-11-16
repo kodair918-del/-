@@ -110,31 +110,31 @@ const THEME = {
     arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#4a525e'], [0.42, '#e9eef4'], [0.6, '#9aa5b2'], [1, '#3a414c']], ang),
     hub: [[0, '#ffffff'], [0.5, '#b9c2cd'], [1, '#4b5360']],
     hole: '#14181e', ring: '#e6ecf3', edge: 'rgba(255,255,255,.4)', shadow: 'rgba(0,0,0,.55)',
-    spark: '255,226,180', accent: '#cfd8e3', side: [89, 97, 109]
+    spark: '255,226,180', accent: '#cfd8e3', side: [89, 97, 109], shade: '0,2,12'
   },
   neon: {
     arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#1d2333'], [1, '#080a10']], ang),
     hub: [[0, '#d8fbff'], [0.45, '#1a2536'], [1, '#05070b']],
     hole: '#020304', ring: null, edge: null, shadow: null,   // null = 色相で変化
-    spark: '120,240,255', accent: '#3ee8ff', side: [8, 10, 18]
+    spark: '120,240,255', accent: '#3ee8ff', side: [8, 10, 18], shade: '20,0,50'
   },
   rainbow: {
     arm: (c, w, k, n, hue, ang) => { const h = hue + k * 360 / n; return grad(c, w, [[0, hsl(h, 95, 72)], [1, hsl(h, 90, 38)]], ang); },
     hub: [[0, '#ffffff'], [0.6, '#cccccc'], [1, '#555555']],
     hole: '#101014', ring: '#ffffff', edge: 'rgba(255,255,255,.5)', shadow: 'rgba(0,0,0,.45)',
-    spark: '255,255,255', accent: '#ff8fd1', side: [58, 52, 92]
+    spark: '255,255,255', accent: '#ff8fd1', side: [58, 52, 92], shade: '12,4,30'
   },
   wood: {
     arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#e7bd86'], [0.5, '#b07540'], [1, '#6a3e1c']], ang),
     hub: [[0, '#f6dcae'], [1, '#6a3e1c']],
     hole: '#2b180a', ring: '#f0cf9a', edge: 'rgba(40,20,8,.5)', shadow: 'rgba(0,0,0,.5)',
-    spark: '255,190,110', accent: '#e0a96d', side: [92, 54, 26]
+    spark: '255,190,110', accent: '#e0a96d', side: [92, 54, 26], shade: '30,12,2'
   },
   matte: {
     arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#4b505d'], [1, '#20232b']], ang),
     hub: [[0, '#7a8090'], [1, '#17191f']],
     hole: '#0b0c0f', ring: '#ff5d8f', edge: 'rgba(255,255,255,.12)', shadow: 'rgba(0,0,0,.6)',
-    spark: '255,93,143', accent: '#ff5d8f', side: [28, 30, 38]
+    spark: '255,93,143', accent: '#ff5d8f', side: [28, 30, 38], shade: '0,0,6'
   }
 };
 
@@ -572,7 +572,7 @@ function drawSpinner(th, full, target, ox, oy) {
   // 厚み：少しずつずらして重ねた側面。傾けるほど側面が見える
   const ext = full && !target;
   if (ext) {
-    const T = R * 0.05, N = 8;
+    const T = R * 0.05, N = c.globalAlpha < 0.99 ? 3 : 8;      // ぶれと重ねている間は層を減らして軽くする
     const ex = S.vtx * T * 1.2, ey = S.vty * T * 1.2 + T * 0.55;                  // 画面上のずれ
     const lx = ex * Math.cos(th) + ey * Math.sin(th), ly = -ex * Math.sin(th) + ey * Math.cos(th);   // 回転後の座標に直す
     const sc = P.side;
@@ -580,12 +580,6 @@ function drawSpinner(th, full, target, ox, oy) {
       const f = j / N, br = 0.6 + 0.4 * (1 - f);
       c.save();
       c.translate(lx * f, ly * f);
-      if (j === N) {                                                               // 一番下の層に影を付ける
-        c.shadowColor = shadow;
-        c.shadowBlur = (name === 'neon' ? R * 0.22 : R * 0.12) * dpr;
-        c.shadowOffsetX = -S.vtx * R * 0.08 * dpr;
-        c.shadowOffsetY = (name === 'neon' ? 0 : R * 0.05 + S.vty * R * 0.03) * dpr;
-      }
       c.fillStyle = `rgb(${sc[0] * br | 0},${sc[1] * br | 0},${sc[2] * br | 0})`;
       for (let k = 0; k < n; k++) { c.save(); c.rotate(k * step); armPath(c); c.fill(); c.restore(); }
       c.beginPath(); c.arc(0, 0, hubR, 0, TAU); c.fill();
@@ -655,6 +649,16 @@ function drawSpinner(th, full, target, ox, oy) {
       c.fillStyle = hgr; c.fill();
     }
     c.strokeStyle = ring; c.lineWidth = R * 0.012; c.stroke();
+    c.restore();
+  }
+
+  // ハブの影：盛り上がった中心が、光と反対側の腕に影を落とす（影の向きは画面に固定）
+  if (full) {
+    const L2 = lightAng();
+    c.save();
+    c.shadowColor = 'rgba(0,0,0,.5)'; c.shadowBlur = R * 0.07 * dpr;
+    c.shadowOffsetX = -Math.cos(L2) * R * 0.05 * dpr; c.shadowOffsetY = -Math.sin(L2) * R * 0.05 * dpr;
+    c.fillStyle = '#000'; c.beginPath(); c.arc(0, 0, hubR * 0.98, 0, TAU); c.fill();
     c.restore();
   }
 
@@ -971,6 +975,22 @@ function drawFinger(a) {
 // 光源の向き（画面に固定。傾けると少し動く）
 const lightAng = () => -2.36 + S.vtx * 0.9 - S.vty * 0.5;
 
+// 影用に、画像を半分ずつ縮めた段を作っておく（一度に縮めすぎるとギザギザになるため）
+function mipChain(src, prev) {
+  const out = [src];
+  let cur = src;
+  for (let i = 1; i <= 3; i++) {
+    const w = Math.max(8, Math.ceil(cur.width / 2));
+    const cv = (prev && prev[i]) || document.createElement('canvas');
+    cv.width = w; cv.height = w;
+    const c = cv.getContext('2d');
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+    c.drawImage(cur, 0, 0, w, w);
+    out.push(cv); cur = cv;
+  }
+  return out;
+}
+
 // ぶれ用の画像：アーム1枚と、ぶれきった「円盤」を事前に作っておく（毎コマの描画を軽くする）
 let sprite = null;
 function getSprite() {
@@ -995,7 +1015,8 @@ function getSprite() {
     c2.drawImage(arm, -size / 2, -size / 2);
     c2.restore();
   }
-  sprite = { key, arm, disc };
+  const pa = sprite && sprite.armM, pd = sprite && sprite.discM;
+  sprite = { key, arm, disc, armM: mipChain(arm, pa), discM: mipChain(disc, pd) };
   return sprite;
 }
 
@@ -1008,17 +1029,67 @@ function drawBlurred(arc, weight) {
   ctx.translate(cx, cy);
   if (dd > 0) { ctx.globalAlpha = dd * weight; ctx.drawImage(spr.disc, -R, -R, 2 * R, 2 * R); }
   if (dd < 1) {
-    const M = Math.min(14, Math.max(3, Math.ceil(arc / 0.05) + 1));
+    const M = Math.min(16, Math.max(3, Math.ceil(arc / 0.04) + 1));       // 滑らかさと軽さの兼ね合いで16枚まで
+    const lv = M > 5 ? 2 : 1;                              // 低解像度の画像で重ねる：軽く、縁もほどよくぼけて輪が目立たない
     const sgn = Math.sign(S.omega) || 1;
     ctx.globalAlpha = Math.min(1, 2.4 / M) * (1 - dd) * weight;
     for (let k = 0; k < M; k++) {
       ctx.save();
       ctx.rotate(S.theta - sgn * arc * (k / (M - 1)));
-      ctx.drawImage(spr.arm, -R, -R, 2 * R, 2 * R);
+      ctx.drawImage(spr.armM[lv], -R, -R, 2 * R, 2 * R);
       ctx.restore();
     }
   }
   ctx.restore();
+}
+
+// スピナー自身の形（シルエット）を床に落とす。縮小した画像を拡大して描くので、自然にぼける（軽い）
+const shCv = [document.createElement('canvas'), document.createElement('canvas'), document.createElement('canvas')];
+function castShadow(i, mips, theta, ox, oy, down, alpha, scale, rgb) {
+  if (alpha < 0.01) return;
+  const half = R * 1.3;
+  const px = Math.max(8, Math.ceil(2 * half * down));
+  const cv = shCv[i];
+  if (cv.width !== px) { cv.width = px; cv.height = px; }
+  const c = cv.getContext('2d');
+  c.clearRect(0, 0, px, px);
+  let lv = 0;                                                         // 縮小が2倍以内で済む段を選ぶ
+  while (lv < 3 && dpr / Math.pow(2, lv + 1) >= down) lv++;
+  const src = mips[lv], k = down / (dpr / Math.pow(2, lv));
+  const dw = src.width * k * scale;
+  c.save();
+  c.translate(px / 2, px / 2); c.rotate(theta);
+  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'low';
+  c.drawImage(src, -dw / 2, -dw / 2, dw, dw);
+  c.restore();
+  c.globalCompositeOperation = 'source-in';                           // 形はそのまま、色だけ影の色に
+  c.fillStyle = `rgb(${rgb})`; c.fillRect(0, 0, px, px);
+  c.globalCompositeOperation = 'source-over';
+
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(S.vph); ctx.scale(S.vsc, 1); ctx.rotate(-S.vph);   // 斜めから見た床
+  ctx.translate(ox, oy);
+  ctx.globalAlpha = alpha;
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low';
+  ctx.drawImage(cv, -half, -half, 2 * half, 2 * half);
+  ctx.restore();
+}
+
+// 3層の影：接地に近い所は濃くくっきり、離れるほど薄くぼやける（本物の影のように）
+function drawShadows(blend) {
+  const spr = getSprite(), P = THEME[settings.theme];
+  const L = lightAng();
+  const lx = -Math.cos(L), ly = -Math.sin(L);                         // 影が伸びる向き（光の反対）
+  const layers = [                                                    // [浮いている高さ, 縮小率(小さいほどぼける), 濃さ, 拡大]
+    [R * 0.06, 0.5, 0.52, 1.00],
+    [R * 0.34, 0.2, 0.36, 1.04],
+    [R * 0.65, 0.1, 0.22, 1.10]
+  ];
+  for (let i = 0; i < 3; i++) {
+    const [h, down, al, sc] = layers[i], ox = lx * h, oy = ly * h;
+    if (blend < 1) castShadow(i, spr.armM, S.theta, ox, oy, down, al * (1 - blend), sc, P.shade);
+    if (blend > 0) castShadow(i, spr.discM, 0, ox, oy, down, al * blend, sc, P.shade);
+  }
 }
 
 function draw(a) {
@@ -1058,14 +1129,12 @@ function draw(a) {
   ctx.scale(zoom, zoom);
   ctx.translate(-cx, -cy);
 
-  // 床の影
-  ctx.fillStyle = 'rgba(0,0,0,.35)';
-  ctx.beginPath(); ctx.ellipse(cx - S.vtx * R * 0.3, cy + R * 1.08 + S.vty * R * 0.08, R * 0.95, R * 0.14, 0, 0, TAU); ctx.fill();
 
   // 1コマで回る角度に応じて、くっきり → ぶれ へ滑らかに切り替える
   const pitch = TAU / settings.arms;
   const arc = Math.min(a * S.frameDt * 0.6, pitch);         // シャッター開放中に回る角度（アーム1本ぶんが上限）
   const blend = Math.min(1, Math.max(0, (arc - 0.12) / 0.3));
+  drawShadows(blend);
   ctx.save();                                               // 傾けた方向に少し縮めて、斜めから見たように
   ctx.translate(cx, cy); ctx.rotate(S.vph); ctx.scale(S.vsc, 1); ctx.rotate(-S.vph); ctx.translate(-cx, -cy);
   if (blend < 1) { ctx.globalAlpha = 1 - blend; drawSpinner(S.theta, true); ctx.globalAlpha = 1; }
