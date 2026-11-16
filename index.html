@@ -91,7 +91,7 @@ function saveSettings() {
 const settings = loadSettings();
 if (![0, 1].includes(settings.fx)) settings.fx = 1;             // 演出：0=最小 1=控えめ
 const FXM = [0, 0.45];                                           // 演出の強さ（光のにじみ・尾）
-const FX_NAME = ['最小', '控えめ'];
+const FX_NAME = ['リアル', '控えめ'];
 const canVib = 'vibrate' in navigator;
 
 const hsl = (h, s, l) => `hsl(${((h % 360) + 360) % 360},${s}%,${l}%)`;
@@ -292,7 +292,7 @@ function rattle(vol) {
 
 // はじいた瞬間の「ヒュッ」（ノイズの帯域が上に抜けていく）
 function whoosh(vol) {
-  if (!ac || !settings.sound) return;
+  if (!ac || !settings.sound || settings.fx === 0) return;
   const t = ac.currentTime;
   const n = ac.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
   const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
@@ -306,7 +306,7 @@ function whoosh(vol) {
 
 // 節目の「キラーン」。i が大きいほど高い音
 function chime(i) {
-  if (!ac || !settings.sound) return;
+  if (!ac || !settings.sound || settings.fx === 0) return;
   const t = ac.currentTime;
   const base = [523.25, 587.33, 659.25, 783.99, 880, 987.77][Math.min(i, 5)];
   [1, 1.5, 2].forEach((m, j) => {
@@ -351,7 +351,7 @@ function audioUpdate() {
   humOsc.frequency.setTargetAtTime(3000 * Math.tanh(pass / 3000), t, 0.03);           // 頭打ちにならず滑らかに上がる
   humOsc.detune.setTargetAtTime(S.ty * 180 + S.tySlow * 120, t, 0.1);
   whine.frequency.setTargetAtTime(Math.min(6500, 220 * Math.pow(2, S.L * 0.55)) * (1 + S.ty * 0.12), t, 0.05);
-  whineGain.gain.setTargetAtTime(settings.sound ? 0.022 * Math.min(1, a / 80) : 0, t, 0.1);
+  whineGain.gain.setTargetAtTime(settings.sound && settings.fx > 0 ? 0.022 * Math.min(1, a / 80) : 0, t, 0.1);
   if (pan) pan.pan.setTargetAtTime(S.tx * 0.85, t, 0.08);                              // 傾けた側から聞こえる
   tone.frequency.setTargetAtTime(Math.min(20000, 9000 * Math.pow(2, S.ty * 1.2 + S.tySlow * 0.8)), t, 0.1);
   // 開いてからの動きの合計が増えるほど、残響が広がる
@@ -617,6 +617,13 @@ function drawSpinner(th, full, target, ox, oy) {
       }
     }
 
+    if (full && (name === 'metal' || name === 'matte')) {   // 腕の長さ方向のヘアライン
+      c.save(); armPath(c); c.clip();
+      c.strokeStyle = 'rgba(255,255,255,.05)'; c.lineWidth = 0.7;
+      for (let j = -9; j <= 9; j++) { c.beginPath(); c.moveTo(-R * 0.05, j * R * 0.026); c.lineTo(tipD + tipR, j * R * 0.026); c.stroke(); }
+      c.restore();
+    }
+
     if (name === 'wood') {               // 木目
       c.save(); armPath(c); c.clip();
       c.strokeStyle = 'rgba(70,35,12,.22)'; c.lineWidth = 1.2;
@@ -676,6 +683,19 @@ function drawSpinner(th, full, target, ox, oy) {
   c.strokeStyle = ring; c.lineWidth = R * 0.012; c.stroke();
   c.beginPath(); c.arc(0, 0, hubR * 0.12, 0, TAU);
   c.fillStyle = P.hole; c.fill();
+
+  if (full) {
+    for (let i = 0; i < 60; i++) {                          // ハブの縁の刻み目（光に向いた側ほど明るい）
+      const a = i * TAU / 60, lit = Math.max(0, Math.cos(a - hla));
+      c.strokeStyle = i % 2 ? `rgba(255,255,255,${0.1 + 0.25 * lit})` : 'rgba(0,0,0,.22)';
+      c.lineWidth = Math.max(0.8, R * 0.007);
+      c.beginPath(); c.moveTo(Math.cos(a) * hubR * 0.84, Math.sin(a) * hubR * 0.84); c.lineTo(Math.cos(a) * hubR * 0.97, Math.sin(a) * hubR * 0.97); c.stroke();
+    }
+    c.strokeStyle = 'rgba(255,255,255,.09)'; c.lineWidth = 0.8;   // ベアリングカバーの同心円の削り跡
+    for (const f of [0.52, 0.62, 0.72]) { c.beginPath(); c.arc(0, 0, hubR * f, 0, TAU); c.stroke(); }
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = Math.max(1, R * 0.01);   // カバーの光の反射
+    c.beginPath(); c.arc(0, 0, hubR * 0.42, hla - 0.7, hla + 0.7); c.stroke();
+  }
 
   c.restore();
 }
@@ -773,8 +793,9 @@ const c255 = v => Math.max(0, Math.min(255, v)) | 0;
 function rng(seed) { let x = seed >>> 0; return () => (x = (x * 1664525 + 1013904223) >>> 0) / 4294967296; }
 
 // 動かない質感（テーマごとに1回だけ描いて使い回す）
-function paintTexture(c, theme, w, h, pad) {
+function paintTexture(c, theme0, w, h, pad, real) {
   const rnd = rng(7);
+  const theme = real && (theme0 === 'neon' || theme0 === 'rainbow') ? 'matte' : theme0;   // リアルでは光る床や虹色の床はやめる
   if (theme === 'metal') {                         // ヘアライン加工の金属板
     for (let i = 0; i < 1400; i++) {
       const x = rnd() * w, y = rnd() * h, len = 60 + rnd() * 320;
@@ -807,18 +828,54 @@ function paintTexture(c, theme, w, h, pad) {
     c.strokeStyle = 'rgba(120,220,255,0.16)'; c.lineWidth = 1;
     for (let i = -14; i <= 14; i++) { c.beginPath(); c.moveTo(w / 2 + i * w * 0.012, yH); c.lineTo(w / 2 + i * w * 0.17, h); c.stroke(); }
   }
+  if (real) paintRealExtras(c, theme, w, h, rnd);
+}
+
+// リアル用の細かい質感：傷、年輪、節、ゴムの粒
+function paintRealExtras(c, theme, w, h, rnd) {
+  if (theme === 'metal') {
+    for (let i = 0; i < 1800; i++) {                       // ヘアライン（明暗）
+      const x = rnd() * w, y = rnd() * h, len = 40 + rnd() * 260;
+      c.strokeStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '0,0,0'},${0.012 + rnd() * 0.03})`; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + len, y + (rnd() - 0.5)); c.stroke();
+    }
+    for (let i = 0; i < 36; i++) {                         // 使い込んだ細かい傷
+      const x = rnd() * w, y = rnd() * h, r = 20 + rnd() * 90, a0 = rnd() * 6.28;
+      c.strokeStyle = `rgba(255,255,255,${0.04 + rnd() * 0.06})`; c.lineWidth = 0.6;
+      c.beginPath(); c.arc(x, y, r, a0, a0 + 0.2 + rnd() * 0.5); c.stroke();
+    }
+  } else if (theme === 'wood') {
+    for (let k = 0; k < 5; k++) {                          // 年輪（山形の木目）
+      const x = rnd() * w, y = rnd() * h;
+      for (let j = 1; j < 10; j++) {
+        c.strokeStyle = `rgba(50,26,10,${0.05 - j * 0.003})`; c.lineWidth = 1;
+        c.beginPath(); c.ellipse(x, y, 10 + j * 7, 60 + j * 26, 0, 0, TAU); c.stroke();
+      }
+    }
+    for (let i = 0; i < 2; i++) {                          // 節
+      const x = rnd() * w, y = rnd() * h;
+      const g = c.createRadialGradient(x, y, 0, x, y, 26);
+      g.addColorStop(0, 'rgba(30,14,4,.55)'); g.addColorStop(0.6, 'rgba(50,26,10,.25)'); g.addColorStop(1, 'rgba(50,26,10,0)');
+      c.fillStyle = g; c.beginPath(); c.ellipse(x, y, 18, 30, 0, 0, TAU); c.fill();
+    }
+  } else if (theme === 'matte') {
+    for (let i = 0; i < 6000; i++) {                       // ゴムマットの細かい粒
+      c.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '0,0,0'},${0.02 + rnd() * 0.05})`;
+      c.fillRect(rnd() * w, rnd() * h, 1.2, 1.2);
+    }
+  }
 }
 
 let bgCache = null, dotSprite = null;
 function getBgStatic() {
-  const key = [settings.theme, W, H, dpr, Math.round(cx), Math.round(cy), Math.round(R)].join('|');
+  const key = [settings.theme, settings.fx === 0 ? 'real' : 'std', W, H, dpr, Math.round(cx), Math.round(cy), Math.round(R)].join('|');
   if (bgCache && bgCache.key === key) return bgCache;
   const pad = Math.round(Math.max(W, H) * 0.08);
   const cv = bgCache ? bgCache.canvas : document.createElement('canvas');
   cv.width = Math.ceil((W + pad * 2) * dpr); cv.height = Math.ceil((H + pad * 2) * dpr);
   const c = cv.getContext('2d');
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
-  paintTexture(c, settings.theme, W + pad * 2, H + pad * 2, pad);
+  paintTexture(c, settings.theme, W + pad * 2, H + pad * 2, pad, settings.fx === 0);
   bgCache = { key, canvas: cv, pad };
   return bgCache;
 }
@@ -900,16 +957,25 @@ function drawBlobs() {
   ctx.restore();
 }
 
+const BGR = {   // リアル用：彩度を抑えた、現実の机や板の色
+  metal:   { c0: [58, 61, 68], c1: [10, 11, 13] },
+  neon:    { c0: [38, 38, 44], c1: [8, 8, 10] },
+  rainbow: { c0: [62, 60, 64], c1: [10, 10, 12] },
+  wood:    { c0: [92, 61, 38], c1: [17, 11, 7] },
+  matte:   { c0: [50, 50, 55], c1: [9, 9, 11] }
+};
 function drawBackground() {
-  const B = BG[settings.theme];
+  const real = settings.fx === 0;
+  const B = real ? BGR[settings.theme] : BG[settings.theme];
+  const tk = real ? 0.12 : 1;                               // 傾きによる色づきの強さ
   const glow = (1 - Math.exp(-S.L / 3.2)) * (settings.fx > 0 ? 0.7 : 0);
   S.auT += S.frameDt * (0.25 + 0.12 * S.L);
   S.drift += S.frameDt * (1 + 0.8 * S.L);
 
   // 土台：光源は傾けた方向に動き、色味も変わる（右＝暖色、左＝寒色）
-  const gcx = cx + S.tx * W * 0.5, gcy = cy + S.ty * H * 0.2;
+  const gcx = cx + S.tx * W * (real ? 0.12 : 0.5), gcy = cy + S.ty * H * (real ? 0.05 : 0.2);
   const g = ctx.createRadialGradient(gcx, gcy, R * 0.1, gcx, gcy, Math.max(W, H) * 0.75);
-  g.addColorStop(0, `rgb(${c255(B.c0[0] + glow * 40 + Math.max(0, S.tx) * 70)},${c255(B.c0[1] + glow * 30 + S.ty * 8)},${c255(B.c0[2] + glow * 50 + Math.max(0, -S.tx) * 80)})`);
+  g.addColorStop(0, `rgb(${c255(B.c0[0] + glow * 40 + Math.max(0, S.tx) * 70 * tk)},${c255(B.c0[1] + glow * 30 + S.ty * 8 * tk)},${c255(B.c0[2] + glow * 50 + Math.max(0, -S.tx) * 80 * tk)})`);
   g.addColorStop(1, `rgb(${B.c1.join(',')})`);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
@@ -927,13 +993,33 @@ function drawBackground() {
 
   // 傾けた側にたまる光
   const tm = Math.min(1, Math.hypot(S.tx, S.ty * 0.6));
-  if (tm > 0.03) {
+  if (tm > 0.03 && !real) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     const ax = cx + S.tx * W * 0.7, ay = cy - S.ty * H * 0.18 + H * 0.1;
     const ag = ctx.createRadialGradient(ax, ay, 0, ax, ay, Math.max(W, H) * 0.6);
     ag.addColorStop(0, glowColor(0.22 * tm)); ag.addColorStop(1, glowColor(0));
     ctx.fillStyle = ag; ctx.fillRect(0, 0, W, H); ctx.restore();
   }
+}
+
+let grainPat = null;
+function drawLens() {
+  const g = ctx.createRadialGradient(W / 2, H * 0.48, Math.min(W, H) * 0.35, W / 2, H * 0.48, Math.max(W, H) * 0.78);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.5)');       // レンズの周辺減光
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (!grainPat) {                                                                 // フィルムのざらつき
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const c = cv.getContext('2d'), id = c.createImageData(128, 128);
+    for (let i = 0; i < id.data.length; i += 4) { const v = 128 + (Math.random() - 0.5) * 160; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255; }
+    c.putImageData(id, 0, 0);
+    grainPat = ctx.createPattern(cv, 'repeat');
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.09;
+  ctx.translate(Math.random() * 128, Math.random() * 128);
+  ctx.fillStyle = grainPat; ctx.fillRect(-128, -128, canvas.width + 256, canvas.height + 256);
+  ctx.restore();
 }
 
 function drawFinger(a) {
@@ -1182,6 +1268,7 @@ function draw(a) {
 
   drawFinger(a);
 
+  if (settings.fx === 0) drawLens();
   // 節目の閃光
   if (S.flash > 0.02) {
     ctx.fillStyle = `rgba(255,255,255,${S.flash * 0.16})`;
@@ -1211,7 +1298,7 @@ function frame(now) {
   S.txSlow += (S.tx - S.txSlow) * (1 - Math.exp(-dt / 10));
   S.tySlow += (S.ty - S.tySlow) * (1 - Math.exp(-dt / 10));
   if (S.shakeE > 2.5 && now - S.lastRattle > 55) { S.lastRattle = now; rattle(Math.min(1, S.shakeE / 12)); }
-  S.hue = (S.hue + dt * 25) % 360;
+  if (settings.fx > 0) S.hue = (S.hue + dt * 25) % 360;     // リアルでは色は動かさない
 
   S.turns += Math.abs(S.theta - S.prevTheta) / TAU;
   S.prevTheta = S.theta;
@@ -1230,13 +1317,13 @@ function frame(now) {
   for (let i = 0; i < MILES.length; i++) {
     if (rpm >= MILES[i] && S.milestone < MILES[i]) {
       S.milestone = MILES[i];
-      showToast(`${MILES[i].toLocaleString('en-US')} RPM!`); thump(1); chime(i);
+      showToast(`${MILES[i].toLocaleString('en-US')} RPM!`); if (settings.fx > 0) { thump(1); chime(i); }
       if (settings.fx >= 2) { addRing(1); S.flash = 1; }
     }
   }
   if (rpm > settings.best) {
     if (settings.best >= 300 && !S.recordShown) {
-      S.recordShown = true; showToast('NEW RECORD!'); chime(4);
+      S.recordShown = true; showToast('NEW RECORD!'); if (settings.fx > 0) chime(4);
       if (settings.fx >= 2) { S.flash = 0.6; addRing(1); }
     }
     settings.best = rpm; dirty = true;
