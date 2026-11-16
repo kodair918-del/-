@@ -554,6 +554,12 @@ function whoosh(vol) {
   n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.55);
 }
 
+function boom(vol) {                                                  // バーストの爆発音
+  if (!ac || !settings.sound) return;
+  const t = ac.currentTime;
+  osc('sine', 150, 30, 0.8, 0.95 * vol, t); nz(900, 0.7, 0.55, 0.9 * vol, t, 'lowpass'); nz(5200, 3, 0.3, 0.5 * vol, t, 'highpass');
+  osc('square', 1100, 180, 0.2, 0.25 * vol, t); for (let i = 0; i < 5; i++) osc('triangle', 2500 + Math.random() * 3000, 900, 0.05, 0.25 * vol, t + 0.05 + i * 0.06 + Math.random() * 0.05);
+}
 // 節目の「キラーン」。i が大きいほど高い音
 function chime(i) {
   if (!ac || !settings.sound || settings.fx === 0) return;
@@ -1768,8 +1774,8 @@ bFx.addEventListener('click', () => {
 
 /* ================= バトル ================= */
 let MODE = 'free';                                         // 'free'(ふつうに回す) | 'spin'(5秒間回す) | 'battle'
-let BS = 0.22, Q = BS / 0.36;                                // R=1 のスピナーの半径（アリーナ半径=1 に対する比）。小さいほどフィールドが広い。Q＝旧サイズ(0.36)との比で、速さ・力を合わせる                                            // R=1 のスピナーの半径（アリーナ半径=1 に対する比）
-const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.1, DASH: 1.6, DASH_CD: 1.4, TIME: 75 };   // シミュレーションで調整した値
+let BS = 0.14, Q = BS / 0.36;                                // R=1 のスピナーの半径（アリーナ半径=1 に対する比）。小さいほどフィールドが広い。Q＝旧サイズ(0.36)との比で、速さ・力を合わせる                                            // R=1 のスピナーの半径（アリーナ半径=1 に対する比）
+const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5 };   // シミュレーションで調整した値
 const $b = id => document.getElementById(id);
 
 // 材質：dens=重さ hard=硬さ bear=軸の滑らかさ grip=グリップ（相手へ寄っていく強さ）
@@ -1781,8 +1787,11 @@ const MAT_STAT = {
   matte: { dens: 1.05, hard: 1.05, bear: 1.0, grip: 1.3 },  ice: { dens: 0.7, hard: 0.8, bear: 1.3, grip: 0.7 }
 };
 const HOLE_STAT = { round: { m: 1, sta: 1 }, big: { m: 0.9, sta: 0.97 }, small: { m: 1.05, sta: 1.02 }, weight: { m: 1.28, sta: 1.22 } };
+const MAT_BURST = { metal: 1, gold: 0.9, copper: 0.95, titan: 1.3, black: 1.15, neon: 0.95, rainbow: 0.9, wood: 0.8, matte: 1, ice: 0.65 };
+const SHAPE_BURST = { round: 1.1, slim: 0.85, fat: 1.25, long: 0.8, pointy: 0.75, leaf: 0.95 }, HOLE_BURST = { round: 1, big: 0.88, small: 1, weight: 1.12 };
 const SHAPE_SHARP = { round: 1.0, slim: 1.1, fat: 0.8, long: 1.05, pointy: 1.3, leaf: 1.15 };
 
+const fh = r => r <= 1 ? PHYS.DEPTH * r * r : r < 1.1 ? PHYS.DEPTH + 0.02 : -0.12;   // すり鉢の床の高さ（外側は一段低い台）
 function withDesign(d, r, fn) {                            // 一時的に別のデザイン・大きさで描く／計算する
   const sD = DSG, sR = R;
   DSG = d; R = r;
@@ -1806,7 +1815,8 @@ function statsOf(d) {
   const atk = sharp * (0.6 + reach) * (0.75 + 0.08 * n) * (0.8 + 0.2 * m.hard);
   const def = m.hard * (0.55 + 2.0 * g.tipR) * (0.85 + 0.05 * n) * (0.8 + 0.2 * mass);
   const sta = m.bear * h.sta * (0.8 + 0.2 * mass) / (1 + 0.06 * (n - 3));                // アームが多いほど空気抵抗で回転が落ちやすい
-  return { mass, reach, atk, def, sta, grip: m.grip, sharp, atkE: Math.pow(atk, 0.45), defE: Math.pow(def, 0.45) };
+  const bres = Math.pow(MAT_BURST[d.material] * SHAPE_BURST[d.shape] * HOLE_BURST[d.hole] * (0.82 + 0.06 * n) * (0.7 + 0.3 * mass), 0.6);   // 頑丈さ（バーストしにくさ）
+  return { mass, reach, atk, def, sta, bres, grip: m.grip, sharp, atkE: Math.pow(atk, 0.45), defE: Math.pow(def, 0.45) };
 }
 // 当たり判定：腕の形から作る円の集まり（中心・腕の途中・先端）。形が違えば当たり判定も違う
 function hitCircles(d) {
@@ -1824,7 +1834,7 @@ function hitCircles(d) {
 let statRange = null;
 function ranges() {                                         // 全1,200通りの性能の最小・最大（棒グラフの目盛り）
   if (statRange) return statRange;
-  const r = { atk: [9, 0], def: [9, 0], sta: [9, 0], mass: [9, 0], reach: [9, 0] };
+  const r = { atk: [9, 0], def: [9, 0], sta: [9, 0], mass: [9, 0], reach: [9, 0], bres: [9, 0] };
   for (const material of MATS) for (const shape of SHAPE_IDS) for (const arms of ARMS) for (const hole of HOLE_IDS) {
     const st = statsOf({ material, shape, arms, hole });
     for (const k of Object.keys(r)) { r[k][0] = Math.min(r[k][0], st[k]); r[k][1] = Math.max(r[k][1], st[k]); }
@@ -1833,7 +1843,7 @@ function ranges() {                                         // 全1,200通りの
 }
 function fillBars(el, st) {
   const r = ranges(), nrm = (k, v) => 0.08 + 0.92 * (v - r[k][0]) / ((r[k][1] - r[k][0]) || 1);
-  el.innerHTML = [['攻撃', 'atk'], ['防御', 'def'], ['持久', 'sta'], ['重さ', 'mass'], ['リーチ', 'reach']]
+  el.innerHTML = [['攻撃', 'atk'], ['防御', 'def'], ['持久', 'sta'], ['重さ', 'mass'], ['リーチ', 'reach'], ['頑丈', 'bres']]
     .map(([l, k]) => `<span>${l}</span><div class="bar"><i style="width:${(nrm(k, st[k]) * 100) | 0}%"></i></div>`).join('');
 }
 function drawHitPreview(cv, d) {                            // スピナーに当たり判定の円を重ねて見せる
@@ -1852,13 +1862,13 @@ function drawHitPreview(cv, d) {                            // スピナーに�
 
 /* ---------- ファイターとバトルの計算 ---------- */
 function makeFighter(d, rpm, name, side) {
-  const r = Math.max(120, Math.min(rpm, 9000)), w = r * TAU / 60;
-  return { d, name, side, st: statsOf(d), circles: hitCircles(d), x: 0, y: 0, vx: 0, vy: 0, th: Math.random() * TAU, dir: Math.random() < 0.5 ? 1 : -1,
+  const r = Math.max(120, Math.min(rpm, 50000)), w = r * TAU / 60;
+  return { d, name, side, st: statsOf(d), circles: hitCircles(d), x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, bg: 0, burst: false, land: 0, th: Math.random() * TAU, dir: Math.random() < 0.5 ? 1 : -1,
     w, w0: w, lk: 0.85 + Math.random() * 0.3, dashCd: 0, dashReq: false, pairCd: 0, out: false, fin: false, outT: 0, hits: 0, taken: 0, maxHit: 0, dashed: 0, aiT: 0, rpm: Math.round(r) };
 }
-let START = 0.5;
+let START = 0.6;
 function makeBattle(a, b) {
-  a.x = 0; a.y = START; a.vy = -0.2 * Q; b.x = 0; b.y = -START; b.vy = 0.2 * Q;
+  a.x = 0; a.y = START; a.z = fh(START); a.vy = -0.2 * Q; b.x = 0; b.y = -START; b.z = fh(START); b.vy = 0.2 * Q;
   return { A: a, B: b, t: 0, over: false, winner: null, reason: '', ev: [] };
 }
 function worldCircles(f) {
@@ -1867,20 +1877,35 @@ function worldCircles(f) {
   return out;
 }
 function stepFighter(f, o, dt) {
-  if (f.out) { f.outT += dt; f.x += f.vx * dt * 1.5; f.y += f.vy * dt * 1.5; f.th += f.w * f.dir * dt; return; }
+  if (f.burst) { f.outT += dt; return; }
+  if (f.out) { f.outT += dt; f.x += f.vx * dt * 1.5; f.y += f.vy * dt * 1.5; f.th += f.w * f.dir * dt; f.vz -= PHYS.G * dt; f.z = Math.max(-0.5, f.z + f.vz * dt); return; }
   f.dashCd = Math.max(0, f.dashCd - dt); f.pairCd = Math.max(0, f.pairCd - dt);
   const w = f.w, wn = Math.min(1, w / 250);
   f.w = Math.max(0, w - (PHYS.C0 + PHYS.C1 * w) * dt / (Math.pow(f.st.sta, 0.7) * f.lk));     // lk=そのバトルの調子（運）
-  let ax = -PHYS.BOWL * f.x, ay = -PHYS.BOWL * f.y;                                   // すり鉢の中心へ
-  const dx = o.x - f.x, dy = o.y - f.y, dist = Math.hypot(dx, dy) || 1e-6;
-  const att = PHYS.ATT * wn * f.st.grip / Math.sqrt(f.st.mass);                         // 回転が速いほど相手へ寄っていく
-  ax += dx / dist * att * Q; ay += dy / dist * att * Q;
-  const rr = Math.hypot(f.x, f.y) || 1e-6;
-  ax += -f.y / rr * PHYS.ORBIT * Q * wn * f.dir; ay += f.x / rr * PHYS.ORBIT * Q * wn * f.dir; // 回転の向きに沿って周回
-  if (f.w < 70) { const j = (1 - f.w / 70) * 6 * Q; ax += (Math.random() - 0.5) * j; ay += (Math.random() - 0.5) * j; }   // 回転が落ちるとふらつく
-  f.vx += ax * dt; f.vy += ay * dt;
-  const dr = Math.exp(-PHYS.DRAG * dt); f.vx *= dr; f.vy *= dr;
+  const r0 = Math.hypot(f.x, f.y), gnd = f.z - fh(r0) < 0.004 && f.vz <= 0.05;
+  if (gnd) {
+    let ax = -PHYS.BOWL * f.x, ay = -PHYS.BOWL * f.y;                                   // すり鉢の斜面（重力の水平成分）
+    const dx = o.x - f.x, dy = o.y - f.y, dist = Math.hypot(dx, dy) || 1e-6;
+    const att = PHYS.ATT * wn * f.st.grip / Math.sqrt(f.st.mass);                         // 回転が速いほど相手へ寄っていく
+    ax += dx / dist * att * Q; ay += dy / dist * att * Q;
+    const rr = r0 || 1e-6;
+    ax += -f.y / rr * PHYS.ORBIT * Q * wn * f.dir; ay += f.x / rr * PHYS.ORBIT * Q * wn * f.dir; // 回転の向きに沿って周回
+    if (f.w < 70) { const j = (1 - f.w / 70) * 6 * Q; ax += (Math.random() - 0.5) * j; ay += (Math.random() - 0.5) * j; }   // 回転が落ちるとふらつく
+    f.vx += ax * dt; f.vy += ay * dt;
+    const dr = Math.exp(-PHYS.DRAG * dt); f.vx *= dr; f.vy *= dr; f.vz = 0;
+  } else {                                                                              // 空中：重力だけで飛ぶ
+    const dr = Math.exp(-PHYS.DRAG * 0.25 * dt); f.vx *= dr; f.vy *= dr; f.vz -= PHYS.G * dt;
+  }
   f.x += f.vx * dt; f.y += f.vy * dt;
+  const fl = fh(Math.hypot(f.x, f.y));
+  if (gnd) f.z = fl;
+  else {
+    f.z += f.vz * dt;
+    if (f.z <= fl) {                                                                    // 着地
+      const imp = -f.vz; f.z = fl;
+      if (imp > 0.45) { f.vz = imp * 0.25; f.vx *= 0.85; f.vy *= 0.85; f.w *= 0.995; f.land = Math.max(f.land, imp); } else f.vz = 0;
+    }
+  }
   f.th += f.w * f.dir * dt;
 }
 function applyDash(f, o) {
@@ -1888,7 +1913,7 @@ function applyDash(f, o) {
   f.dashReq = false;
   if (f.dashCd > 0 || f.out || f.fin) return;
   const dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy) || 1e-6, k = PHYS.DASH * Q / Math.sqrt(f.st.mass);
-  f.vx += dx / d * k; f.vy += dy / d * k; f.w *= 0.94; f.dashCd = PHYS.DASH_CD; f.dashed++;
+  f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dashCd = PHYS.DASH_CD; f.dashed++;
 }
 const KIND_ATK = { tip: 1, mid: 0.55, hub: 0.4 }, KIND_DEF = { tip: 0.8, mid: 1, hub: 1.1 };
 function collide(Bt, A, B) {
@@ -1898,8 +1923,8 @@ function collide(Bt, A, B) {
     const dx = b.x - a.x, dy = b.y - a.y, rr = a.r + b.r, d2 = dx * dx + dy * dy;
     if (d2 < rr * rr) { const d = Math.sqrt(d2) || 1e-6, pen = rr - d; if (!best || pen > best.pen) best = { a, b, dx, dy, d, pen }; }
   }
-  if (!best) return;
-  const nx = best.dx / best.d, ny = best.dy / best.d, mA = A.st.mass, mB = B.st.mass, tot = mA + mB;
+  if (!best || Math.abs(A.z - B.z) > BS * 1.4) return;                       // 高さが合わなければ当たらない（空中の相手は飛び越える）
+  const nx = best.dx / best.d, ny = best.dy / best.d, gy = w => 1 + 0.35 * Math.log2(1 + w / 260), mA = A.st.mass * gy(A.w), mB = B.st.mass * gy(B.w), tot = mA + mB;   // 速く回るほど、はじかれにくい（ジャイロ効果）
   A.x -= nx * best.pen * mB / tot; A.y -= ny * best.pen * mB / tot; B.x += nx * best.pen * mA / tot; B.y += ny * best.pen * mA / tot;   // めり込みを戻す
   const rax = best.a.x - A.x, ray = best.a.y - A.y, rbx = best.b.x - B.x, rby = best.b.y - B.y;
   const wa = Math.sqrt(A.w * 150), wb = Math.sqrt(B.w * 150);                       // 回転数の効き方は緩やかに（2倍回しても2倍強くはならない）
@@ -1913,9 +1938,15 @@ function collide(Bt, A, B) {
   const rnd = () => 0.75 + Math.random() * 0.5;                               // ダメージには毎回少しばらつき
   const dB = PHYS.DMG * J * rnd() * A.lk * A.st.atkE * KIND_ATK[best.a.kind] / (B.st.defE * KIND_DEF[best.b.kind]);   // 相手が受ける回転ダメージ
   const dA = PHYS.DMG * J * rnd() * B.lk * B.st.atkE * KIND_ATK[best.b.kind] / (A.st.defE * KIND_DEF[best.a.kind]);
+  const up = () => 0.6 + Math.random() * 0.8;
+  A.vz = Math.min(1.6, A.vz + Jk / mA * PHYS.LIFT * B.st.sharp * up()); B.vz = Math.min(1.6, B.vz + Jk / mB * PHYS.LIFT * A.st.sharp * up());   // ぶつかると浮く（とがった相手ほど高く）
+  A.z += 0.002; B.z += 0.002;
+  const stress = w => 0.6 + 0.4 * Math.min(4, Math.sqrt(w / 260));                  // 攻める側の回転が速いほど、相手が壊れやすい
+  A.bg += PHYS.BURST * J * rnd() * B.st.atkE * KIND_ATK[best.b.kind] * stress(B.w) / (A.st.bres * KIND_DEF[best.a.kind]);   // バーストゲージ
+  B.bg += PHYS.BURST * J * rnd() * A.st.atkE * KIND_ATK[best.a.kind] * stress(A.w) / (B.st.bres * KIND_DEF[best.b.kind]);
   A.w = Math.max(0, A.w - dA); B.w = Math.max(0, B.w - dB);
   A.pairCd = B.pairCd = PHYS.PAIR_CD; A.hits++; B.hits++; A.taken += dA; B.taken += dB; A.maxHit = Math.max(A.maxHit, dB); B.maxHit = Math.max(B.maxHit, dA);
-  Bt.ev.push({ type: 'hit', x: (best.a.x + best.b.x) / 2, y: (best.a.y + best.b.y) / 2, p: J, da: dA, db: dB });
+  Bt.ev.push({ type: 'hit', x: (best.a.x + best.b.x) / 2, y: (best.a.y + best.b.y) / 2, z: (A.z + B.z) / 2, p: J, da: dA, db: dB });
 }
 const higherW = (A, B) => Math.abs(A.w - B.w) < 1e-6 ? (Math.random() < 0.5 ? 'A' : 'B') : (A.w > B.w ? 'A' : 'B');   // 同点はランダム（どちらかが有利にならないように）
 function stepBattle(Bt, dt) {
@@ -1925,16 +1956,19 @@ function stepBattle(Bt, dt) {
   applyDash(A, B); applyDash(B, A);
   const sA = { x: A.x, y: A.y }, sB = { x: B.x, y: B.y };      // 2人を同時に動かす（先に動く側が有利にならないように）
   stepFighter(A, sB, dt); stepFighter(B, sA, dt);
-  if (!A.out && !B.out) collide(Bt, A, B);
+  if (!A.out && !B.out && !A.burst && !B.burst) collide(Bt, A, B);
   for (const f of [A, B]) {
-    if (!f.out && Math.hypot(f.x, f.y) > 1.02) { f.out = true; f.outT = 0; Bt.ev.push({ type: 'out', who: f.side }); }
-    if (!f.out && !f.fin && f.w < 6) { f.fin = true; Bt.ev.push({ type: 'fin', who: f.side }); }
+    if (f.land > 0) { Bt.ev.push({ type: 'land', x: f.x, y: f.y, z: f.z, p: f.land }); f.land = 0; }
+    if (!f.out && !f.burst && f.bg >= 100) { f.burst = true; f.outT = 0; Bt.ev.push({ type: 'burst', who: f.side, x: f.x, y: f.y, z: f.z, th: f.th }); }
+    if (!f.out && !f.burst && Math.hypot(f.x, f.y) > 1.02) { f.out = true; f.outT = 0; Bt.ev.push({ type: 'out', who: f.side }); }
+    if (!f.out && !f.burst && !f.fin && f.w < 6) { f.fin = true; Bt.ev.push({ type: 'fin', who: f.side }); }
   }
-  const aDown = A.out || A.fin, bDown = B.out || B.fin;
+  const aDown = A.out || A.fin || A.burst, bDown = B.out || B.fin || B.burst;
   if (aDown || bDown) {
     Bt.over = true;
     Bt.winner = aDown && bDown ? higherW(A, B) : aDown ? 'B' : 'A';
-    Bt.reason = (Bt.winner === 'A' ? B : A).out ? 'ringout' : 'stop';
+    const L = Bt.winner === 'A' ? B : A;
+    Bt.reason = L.burst ? 'burst' : L.out ? 'ringout' : 'stop';
   } else if (Bt.t > PHYS.TIME) { Bt.over = true; Bt.winner = higherW(A, B); Bt.reason = 'time'; }
 }
 function aiDash(f, o, diff, dt) {                           // CPUのダッシュ：近づいた時に、つよいほど頻繁に使う
@@ -1943,12 +1977,12 @@ function aiDash(f, o, diff, dt) {                           // CPUのダッシ�
   f.aiT = [0.55, 0.32, 0.18][diff - 1] * (0.7 + Math.random() * 0.6);
   if (f.dashCd <= 0 && !f.out && Math.hypot(o.x - f.x, o.y - f.y) < 0.85 * Q * 1.4 && Math.random() < [0.2, 0.5, 0.85][diff - 1]) f.dashReq = true;
 }
-const cpuRpm = diff => Math.round([900, 2200, 4200][diff - 1] * (0.8 + Math.random() * 0.4));
+const cpuRpm = diff => Math.round([900, 2200, 5000][diff - 1] * (0.8 + Math.random() * 0.4));
 
 /* ---------- 画面の流れ ---------- */
 const btEl = $b('bt'), SCREENS = ['sMenu', 'sP2', 'sOnline', 'sResult'];
 const BT = { type: null, diff: 1, phase: 'idle', lock: false, role: 'local', flip: false, saved: null, p1: null, p2: null, name1: '', name2: '',
-  rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
+  rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
 function showScreen(id) { for (const s of SCREENS) $b(s).hidden = s !== id; btEl.classList.add('show'); document.body.classList.add('btmode'); }
 function hideOverlay() { btEl.classList.remove('show'); }
 function refreshMenu() {
@@ -2010,7 +2044,7 @@ function endBattle(toMenu) {
 }
 function showResult() {
   const Bt = BT.battle, meSide = BT.flip ? 'B' : 'A', win = Bt.winner === meSide;
-  const why = { ringout: '場外に押し出した！', stop: '回転を止めた！', time: 'タイムアップ（残りの回転数で判定）' }[Bt.reason];
+  const why = { burst: 'バースト！相手のスピナーを壊した！', ringout: '場外に押し出した！', stop: '回転を止めた！', time: 'タイムアップ（残りの回転数で判定）' }[Bt.reason];
   let title;
   if (BT.type === 'local') title = (Bt.winner === 'A' ? '1P' : '2P') + ' の勝ち！';
   else {
@@ -2019,121 +2053,203 @@ function showResult() {
   }
   const me = BT.flip ? Bt.B : Bt.A, op = BT.flip ? Bt.A : Bt.B;
   $b('resTitle').textContent = title;
-  $b('resBody').innerHTML = `${win || BT.type === 'local' ? why : (Bt.reason === 'ringout' ? '場外に出された…' : Bt.reason === 'stop' ? '回転が止まった…' : why)}<br>
+  $b('resBody').innerHTML = `${win || BT.type === 'local' ? why : (Bt.reason === 'burst' ? 'スピナーが壊れた…' : Bt.reason === 'ringout' ? '場外に出された…' : Bt.reason === 'stop' ? '回転が止まった…' : why)}<br>
     ${Bt.t.toFixed(1)}秒 ／ ヒット ${me.hits}回 ／ 最大ダメージ ${Math.round(me.maxHit)} ／ ダッシュ ${me.dashed}回<br>
     あなた ${me.rpm.toLocaleString('en-US')}rpm（${designLabel(me.d)}）<br>相手 ${op.rpm.toLocaleString('en-US')}rpm（${designLabel(op.d)}）`;
   $b('resAgain').disabled = BT.type === 'online';
   showScreen('sResult');
 }
 
-/* ---------- バトル中の更新と描画 ---------- */
+/* ---------- バトル中の更新と描画（3Dカメラ） ---------- */
+const CAM = { tx: 0, ty: 0, tz: 0, yaw: 0, pitch: 1.2, dist: 3.4, shake: 0, punch: 0, kick: 0, t: 0, init: false, focus: null };
+function camReset() { Object.assign(CAM, { tx: 0, ty: 0, tz: 0.05, yaw: 1.4, pitch: 1.2, dist: 3.4, shake: 0, punch: 0, kick: 0, t: 0, init: true, focus: null }); BT.ts = 1; BT.debris = []; BT.rings = []; BT.flash = 0; }
+function camFocus(o) { CAM.focus = Object.assign({ t: 2, dist: 0.8, pitch: 0.55, spin: 0.45 }, o); }
+function camUpdate(dt, Bt) {
+  if (!CAM.init) camReset();
+  CAM.t += dt;
+  const A = Bt.A, B = Bt.B;
+  let tx, ty, tz, dist, pitch, yawT = Math.sin(CAM.t * 0.33) * 0.38 + CAM.kick, spin = 0;
+  if (BT.phase === 'count') {                                // 入場：高い所から回り込みながら舞い降りる
+    const u = Math.min(1, Math.max(0, 1 - BT.count / 3.2)), e = u * u * (3 - 2 * u);
+    tx = 0; ty = 0; tz = 0.05; dist = 3.4 - 1.5 * e; pitch = 1.2 - 0.3 * e; yawT = (1 - e) * 1.4 + Math.sin(CAM.t * 0.33) * 0.38 * e;
+  } else if (CAM.focus && CAM.focus.t > 0) {                 // 見せ場：場外・バースト・決着
+    const f = CAM.focus; f.t -= dt;
+    const o = f.who ? (f.who === 'A' ? A : B) : null;
+    tx = o ? o.x : f.x; ty = o ? o.y : f.y; tz = (o ? o.z : f.z) + 0.03; dist = f.dist; pitch = f.pitch; spin = f.spin;
+  } else {
+    const sep = Math.hypot(A.x - B.x, A.y - B.y), sp = Math.hypot(A.vx - B.vx, A.vy - B.vy);
+    tx = (A.x + B.x) / 2; ty = (A.y + B.y) / 2; tz = (A.z + B.z) / 2 + 0.03;
+    dist = Math.max(0.8, Math.min(3.0, (sep / 2 + BS * 3.2) / 0.42)) * (1 - 0.1 * CAM.punch);
+    pitch = 0.95 + 0.1 * Math.sin(CAM.t * 0.5) - Math.min(0.12, sp * 0.05);
+  }
+  const k = 1 - Math.exp(-dt * (CAM.focus && CAM.focus.t > 0 ? 3 : 4));
+  CAM.tx += (tx - CAM.tx) * k; CAM.ty += (ty - CAM.ty) * k; CAM.tz += (tz - CAM.tz) * k;
+  CAM.dist += (dist - CAM.dist) * (1 - Math.exp(-dt * 3)); CAM.pitch += (pitch - CAM.pitch) * (1 - Math.exp(-dt * 2.5));
+  if (spin) CAM.yaw += spin * dt; else CAM.yaw += (yawT - CAM.yaw) * (1 - Math.exp(-dt * 1.6));
+  CAM.shake *= Math.exp(-dt * 6); CAM.punch *= Math.exp(-dt * 5); CAM.kick *= Math.exp(-dt * 0.7);
+}
+// --- 透視投影 ---
+let CV = null, PX = 0, PY = 0, PS = 1;
+function camSetup() {
+  const yaw = CAM.yaw + (BT.flip ? Math.PI : 0), pit = Math.min(1.45, Math.max(0.12, CAM.pitch)), cp = Math.cos(pit), sp = Math.sin(pit), sy = Math.sin(yaw), cy = Math.cos(yaw);
+  const fx = -cp * sy, fy = -cp * cy, fz = -sp;
+  let rx = fy, ry = -fx; const rl = Math.hypot(rx, ry) || 1; rx /= rl; ry /= rl;
+  const sh = CAM.shake * 7;
+  CV = { fx, fy, fz, rx, ry, ux: ry * fz, uy: -rx * fz, uz: rx * fy - ry * fx, f: Math.min(W * 0.95, H * 0.7), cx: W / 2 + (Math.random() - 0.5) * sh, cy: H * 0.47 + (Math.random() - 0.5) * sh,
+    d: CAM.dist * (1 - CAM.punch * 0.03), roll: (Math.random() - 0.5) * CAM.shake * 0.025 };
+}
+function pj(x, y, z) {
+  const rx = x - CAM.tx, ry = y - CAM.ty, rz = z - CAM.tz, C = CV;
+  const dep = Math.max(0.05, C.d + rx * C.fx + ry * C.fy + rz * C.fz), X = rx * C.rx + ry * C.ry, Y = rx * C.ux + ry * C.uy + rz * C.uz, s = C.f / dep;
+  let sx = X * s, sy = -Y * s;
+  if (C.roll) { const c = Math.cos(C.roll), n = Math.sin(C.roll), t = sx * c - sy * n; sy = sx * n + sy * c; sx = t; }
+  PX = C.cx + sx; PY = C.cy + sy; PS = s; return dep;
+}
+function aff(x, y, z, rad) {                                  // 地面の円（半径rad）が画面でどう見えるかの座標系にする
+  pj(x, y, z); const x0 = PX, y0 = PY;
+  pj(x + rad, y, z); const ax = PX - x0, ay = PY - y0;
+  pj(x, y + rad, z); ctx.transform(ax, ay, PX - x0, PY - y0, x0, y0);
+}
+function ringPath(r, z, n) { for (let i = 0; i <= n; i++) { const a = i / n * TAU; pj(Math.cos(a) * r, Math.sin(a) * r, z); i ? ctx.lineTo(PX, PY) : ctx.moveTo(PX, PY); } }
+const mixc = (c0, c1, t) => `rgb(${(c0[0] + (c1[0] - c0[0]) * t) | 0},${(c0[1] + (c1[1] - c0[1]) * t) | 0},${(c0[2] + (c1[2] - c0[2]) * t) | 0})`;
+
 function btEvents(Bt) {
   for (const e of Bt.ev.splice(0)) {
     if (e.type === 'hit') {
-      CAM.shake = Math.min(1, CAM.shake + 0.25 + e.p * 0.35); CAM.punch = Math.min(1, CAM.punch + 0.5 + e.p * 0.3);
-      for (let i = 0; i < 9 + Math.min(10, e.p * 8 | 0); i++) { const a = Math.random() * TAU, v = 0.4 + Math.random() * 1.1; BT.sparks.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.35 + Math.random() * 0.25 }); }
+      CAM.shake = Math.min(1, CAM.shake + 0.22 + e.p * 0.3); CAM.punch = Math.min(1, CAM.punch + 0.5 + e.p * 0.3); CAM.kick += (Math.random() - 0.5) * 0.35 * Math.min(1, e.p);
+      for (let i = 0; i < 9 + Math.min(10, e.p * 8 | 0); i++) { const a = Math.random() * TAU, v = 0.3 + Math.random() * 0.9; BT.sparks.push({ x: e.x, y: e.y, z: (e.z || 0) + 0.02, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 0.4 + Math.random() * 0.9, life: 0.35 + Math.random() * 0.3 }); }
       click(Math.min(1, 0.35 + e.p * 0.35)); if (e.p > 0.8) thump(Math.min(1, e.p * 0.35)); vib(Math.min(40, 12 + e.p * 14));
-    } else if (e.type === 'out') { whoosh(0.8); vib(40); CAM.shake = 1; CAM.punch = 1; } else if (e.type === 'fin') settle();
+    } else if (e.type === 'land') { click(0.25 + Math.min(0.5, e.p * 0.3)); thump(Math.min(0.5, e.p * 0.3)); CAM.shake = Math.min(1, CAM.shake + e.p * 0.15); }
+    else if (e.type === 'out') { whoosh(0.8); vib(40); CAM.shake = 0.8; BT.ts = 0.45; camFocus({ who: e.who, dist: 0.95, pitch: 0.5, spin: 0.35, t: 2.2 }); }
+    else if (e.type === 'burst') {
+      boom(1); vib(90); CAM.shake = 1; CAM.punch = 1; BT.ts = 0.22; BT.flash = 1; BT.rings.push({ x: e.x, y: e.y, z: e.z, t: 0 });
+      const f = e.who === 'A' ? Bt.A : Bt.B; spawnDebris(f, e);
+      camFocus({ x: e.x, y: e.y, z: e.z, dist: 0.65, pitch: 0.6, spin: 0.5, t: 2.6 });
+    } else if (e.type === 'fin') settle();
   }
 }
+function spawnDebris(f, e) {
+  const P = THEME[f.d.material], n = f.d.arms, out = BT.debris;
+  const mk = (kind, a, sp, up, size) => out.push({ kind, x: e.x, y: e.y, z: e.z + 0.02, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vz: up, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 24, size, col: P.accent, side: P.side, life: 7 });
+  for (let k = 0; k < n; k++) mk('blade', e.th + k * TAU / n + (Math.random() - 0.5) * 0.4, 0.5 + Math.random() * 1.2, 0.8 + Math.random() * 2.0, BS * (0.75 + Math.random() * 0.4));
+  for (let k = 0; k < 3; k++) mk('blade', Math.random() * TAU, 0.4 + Math.random() * 1.4, 0.8 + Math.random() * 2.2, BS * 0.4);
+  mk('hub', Math.random() * TAU, 0.3 + Math.random() * 0.4, 1.3 + Math.random(), BS * 0.42);
+  for (let k = 0; k < 7; k++) mk('bolt', Math.random() * TAU, 0.6 + Math.random() * 1.6, 1.0 + Math.random() * 2.2, BS * 0.1);
+  for (let i = 0; i < 40; i++) { const a = Math.random() * TAU, v = 0.5 + Math.random() * 1.8; BT.sparks.push({ x: e.x, y: e.y, z: e.z + 0.03, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 0.5 + Math.random() * 2, life: 0.5 + Math.random() * 0.6 }); }
+}
 function battleFrame(now, rawDt) {
-  const Bt = BT.battle, dt = Math.min(0.05, rawDt), isGuest = BT.role === 'guest';
+  const Bt = BT.battle, isGuest = BT.role === 'guest';
   if (!Bt) return;
-  const me = BT.flip ? Bt.B : Bt.A;
+  const dt = Math.min(0.05, rawDt), me = BT.flip ? Bt.B : Bt.A;
+  BT.ts += (1 - BT.ts) * (1 - Math.exp(-dt * 1.6));
+  const sdt = dt * BT.ts;
   if (BT.phase === 'count') {
     BT.count -= dt;
     for (const f of [Bt.A, Bt.B]) f.th += f.w * f.dir * dt * 0.2;
     if (BT.count <= 0) BT.phase = 'fight';
   } else if (BT.phase === 'fight' && !isGuest) {
-    if (BT.type === 'cpu') aiDash(Bt.B, Bt.A, BT.diff, dt);
-    const n = Math.max(1, Math.ceil(dt / (1 / 120)));
-    for (let i = 0; i < n; i++) stepBattle(Bt, dt / n);
+    if (BT.type === 'cpu') aiDash(Bt.B, Bt.A, BT.diff, sdt);
+    const n = Math.max(1, Math.ceil(sdt / (1 / 120)));
+    for (let i = 0; i < n; i++) stepBattle(Bt, sdt / n);
     if (BT.role === 'host') {
       BT.snapT += dt;
       if (BT.snapT >= 1 / 30) { BT.snapT = 0; netSend(snapOf(Bt)); }
     }
     btEvents(Bt);
-    if (Bt.over) { BT.phase = 'end'; BT.endT = 0; if (BT.role === 'host') netSend(snapOf(Bt)); }
+    if (Bt.over) { BT.phase = 'end'; BT.endT = 0; endFocus(Bt); if (BT.role === 'host') netSend(snapOf(Bt)); }
   } else if (isGuest && BT.phase === 'fight') {
     for (const f of [Bt.A, Bt.B]) {                          // ホストから届いた位置へなめらかに寄せる
-      if (f.tx !== undefined) { f.x += (f.tx - f.x) * 0.4; f.y += (f.ty - f.y) * 0.4; f.w += (f.tw - f.w) * 0.4; }
-      f.th += f.w * f.dir * dt; f.dashCd = Math.max(0, f.dashCd - dt); if (f.out) f.outT += dt;
+      if (f.tx !== undefined) { f.x += (f.tx - f.x) * 0.4; f.y += (f.ty - f.y) * 0.4; if (!f.out) f.z += (f.tz - f.z) * 0.4; f.w += (f.tw - f.w) * 0.4; }
+      f.th += f.w * f.dir * dt; f.dashCd = Math.max(0, f.dashCd - dt);
+      if (f.out) { f.outT += dt; f.vz -= PHYS.G * dt * 1.5; f.z = Math.max(-0.5, f.z + f.vz * dt); }
     }
     btEvents(Bt);
-    if (Bt.over) { BT.phase = 'end'; BT.endT = 0; }
+    if (Bt.over) { BT.phase = 'end'; BT.endT = 0; endFocus(Bt); }
   } else if (BT.phase === 'end') {
     BT.endT += dt;
-    for (const f of [Bt.A, Bt.B]) { if (f.out) stepFighter(f, f, dt); else { f.th += f.w * f.dir * dt; f.w *= Math.exp(-dt * 2); } }
-    if (BT.endT > 1.6 && btEl.classList.contains('show') === false) showResult();
+    for (const f of [Bt.A, Bt.B]) { if (f.out || f.burst) stepFighter(f, f, sdt); else { f.th += f.w * f.dir * sdt; f.w *= Math.exp(-sdt * 2); } }
+    btEvents(Bt);
+    if (BT.endT > (Bt.reason === 'burst' ? 3.2 : 2.2) && btEl.classList.contains('show') === false) showResult();
   }
-  S.omega = me.out ? 0 : me.w; audioUpdate();               // 自分のスピナーの回転音を鳴らす
+  S.omega = me.out || me.burst ? 0 : me.w; audioUpdate();    // 自分のスピナーの回転音を鳴らす
   drawBattle(dt, Bt);
 }
-const CAM = { x: 0, y: 0, z: 1, rot: 0, shake: 0, punch: 0, t: 0, init: false };
-function camReset() { CAM.x = CAM.y = 0; CAM.z = 1; CAM.rot = 0.5; CAM.shake = CAM.punch = CAM.t = 0; CAM.init = true; }
-function camUpdate(dt, Bt, L) {                              // カメラワーク：2人を追いかけてズーム、ヒットで揺れる、決着で勝者へ寄る
-  if (!CAM.init) camReset();
-  CAM.t += dt;
-  const A = Bt.A, B = Bt.B, k = 1 - Math.exp(-dt * 4.5);
-  let tx, ty, tz, tr = Math.sin(CAM.t * 0.45) * 0.05;
-  if (BT.phase === 'count') {                                // 入場：広い画面から、ぐるっと回り込んでスピナーへ寄る
-    const u = Math.min(1, Math.max(0, 1 - BT.count / 3.2));
-    tx = 0; ty = 0; tz = 1 + 0.9 * u * u; tr = (1 - u) * 0.5;
-  } else if (BT.phase === 'end' && (A.out || A.fin || B.out || B.fin)) {
-    const w = Bt.winner === 'A' ? A : B, lo = w === A ? B : A;
-    const f = lo.out ? lo : w;                               // 場外なら飛んでいく方を、止まったなら勝者を追う
-    tx = f.x * 0.9; ty = f.y * 0.9; tz = lo.out ? 1.5 : 2.6; tr = 0;
-  } else {
-    const sep = Math.hypot(A.x - B.x, A.y - B.y), mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
-    const span = sep / 2 + BS * 2.1;                          // 2人が画面に収まる広さ
-    tz = Math.max(1, Math.min(2.7, (Math.min(W, H) * 0.42) / (L.AR * span)));
-    tx = mx; ty = my;
-    const speed = Math.hypot(A.vx - B.vx, A.vy - B.vy); tz *= 1 + Math.min(0.08, speed * 0.02);
-  }
-  CAM.x += (tx - CAM.x) * k; CAM.y += (ty - CAM.y) * k; CAM.z += (tz - CAM.z) * k; CAM.rot += (tr - CAM.rot) * (1 - Math.exp(-dt * 2.5));
-  CAM.shake *= Math.exp(-dt * 7); CAM.punch *= Math.exp(-dt * 6);
+function endFocus(Bt) {                                      // 決着：場外・バーストは専用のカメラ、それ以外は勝者に寄る
+  if (CAM.focus && CAM.focus.t > 0.4) return;
+  camFocus({ who: Bt.winner, dist: 0.8, pitch: 0.5, spin: 0.4, t: 3 });
 }
-function battleLayout() { return { AR: Math.max(110, Math.min(W * 0.5, (H - 190) / 2)), ax: W / 2, ay: H * 0.5 }; }
+
 function drawBattle(dt, Bt) {
-  const L = battleLayout(), sgn = BT.flip ? -1 : 1, P = THEME[settings.material];
+  const sgn = 1, P = THEME[settings.material];
   S.drawDt += dt; S.L = Math.log2(1 + Math.abs(S.omega) / 40);
   drawBackground(); S.drawDt = 0;
-  camUpdate(dt, Bt, L);
-  const zz = CAM.z * (1 + CAM.punch * 0.06), shx = (Math.random() - 0.5) * CAM.shake * 9, shy = (Math.random() - 0.5) * CAM.shake * 9;
+  camUpdate(dt, Bt); camSetup();
+  const DP = PHYS.DEPTH, TOP = DP + 0.02, BOT = -0.12;
   ctx.save();
-  ctx.translate(L.ax + shx, L.ay + shy); ctx.rotate(CAM.rot); ctx.scale(zz, zz); ctx.translate(-sgn * CAM.x * L.AR, -sgn * CAM.y * L.AR);
-  const AR = L.AR, W0 = { ax: 0, ay: 0, AR };
-  // すり鉢のアリーナ（広い）
-  let g = ctx.createRadialGradient(0, 0, AR * 0.1, 0, 0, AR * 1.1);
-  g.addColorStop(0, 'rgba(50,57,72,.96)'); g.addColorStop(0.75, 'rgba(20,23,31,.97)'); g.addColorStop(1, 'rgba(6,7,10,.98)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, AR * 1.07, 0, TAU); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1 / zz * 1.2;
-  ctx.beginPath(); for (let i = 1; i < 8; i++) { ctx.moveTo(AR * i / 8, 0); ctx.arc(0, 0, AR * i / 8, 0, TAU); }
-  for (let i = 0; i < 16; i++) { const a = i * TAU / 16; ctx.moveTo(Math.cos(a) * AR * 0.125, Math.sin(a) * AR * 0.125); ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); } ctx.stroke();
-  ctx.strokeStyle = P.accent; ctx.globalAlpha = 0.16; ctx.lineWidth = AR * 0.02; ctx.beginPath(); ctx.arc(0, 0, AR * 0.22, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
-  g = ctx.createLinearGradient(-AR, -AR, AR, AR);
-  g.addColorStop(0, '#b4bdcc'); g.addColorStop(0.5, '#4a5160'); g.addColorStop(1, '#d3dbe8');
-  ctx.strokeStyle = g; ctx.lineWidth = AR * 0.07; ctx.beginPath(); ctx.arc(0, 0, AR * 1.04, 0, TAU); ctx.stroke();
-  ctx.strokeStyle = P.accent; ctx.globalAlpha = 0.55; ctx.lineWidth = 2 / zz * 1.5; ctx.beginPath(); ctx.arc(0, 0, AR * 1.0, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
-  for (const f of [Bt.A, Bt.B]) drawFighter(f, W0, sgn);
+  // 外側の台
+  ctx.fillStyle = 'rgba(8,10,14,.9)'; ctx.beginPath(); ringPath(2.2, BOT, 48); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.05)'; ctx.lineWidth = 1; ctx.beginPath(); ringPath(1.6, BOT, 48); ctx.moveTo(0, 0); ctx.stroke();
+  // すり鉢の床：外側から中心へ重ね塗り
+  const NR = 14;
+  for (let i = NR; i >= 1; i--) {
+    const r = i / NR, t = 1 - r;
+    ctx.fillStyle = mixc([9, 11, 16], [60, 68, 86], Math.pow(t, 0.9));
+    ctx.beginPath(); ringPath(r, DP * r * r, 56); ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (const r of [0.25, 0.5, 0.75]) ringPath(r, DP * r * r, 56);
+  for (let k = 0; k < 16; k++) { const a = k * TAU / 16; for (let j = 1; j <= 8; j++) { const r = j / 8; pj(Math.cos(a) * r, Math.sin(a) * r, DP * r * r); j === 1 ? ctx.moveTo(PX, PY) : ctx.lineTo(PX, PY); } }
+  ctx.stroke();
+  ctx.strokeStyle = P.accent; ctx.globalAlpha = 0.3; ctx.lineWidth = 2.2; ctx.beginPath(); ringPath(0.22, DP * 0.0484, 40); ctx.stroke();
+  ctx.globalAlpha = 0.55; ctx.lineWidth = 2; ctx.beginPath(); ringPath(0.99, DP * 0.98, 72); ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.restore();
+  // 縁（リム）：奥のぶんを先に、手前のぶんは選手の後に描く
+  const NS = 72, rim = [];
+  for (let i = 0; i < NS; i++) {
+    const a0 = i / NS * TAU, a1 = (i + 1) / NS * TAU, c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
+    const dep = pj(Math.cos((a0 + a1) / 2) * 1.05, Math.sin((a0 + a1) / 2) * 1.05, TOP), lum = 0.5 + 0.5 * Math.cos((a0 + a1) / 2 - 2.2);
+    const am = (a0 + a1) / 2; rim.push({ dep, c0, s0, c1, s1, lum, fc: -(Math.cos(am) * CV.fx + Math.sin(am) * CV.fy) });   // fc>0：外壁がカメラの方を向いている
+  }
+  const drawRim = near => {
+    for (const q of rim) {
+      if ((q.dep <= CV.d) !== near) continue;
+      const face = (r0, z0, r1, z1, col) => { ctx.fillStyle = col; ctx.beginPath(); pj(q.c0 * r0, q.s0 * r0, z0); ctx.moveTo(PX, PY); pj(q.c1 * r0, q.s1 * r0, z0); ctx.lineTo(PX, PY); pj(q.c1 * r1, q.s1 * r1, z1); ctx.lineTo(PX, PY); pj(q.c0 * r1, q.s0 * r1, z1); ctx.lineTo(PX, PY); ctx.fill(); };
+      if (q.fc > 0) face(1.1, BOT, 1.1, TOP, mixc([22, 25, 32], [70, 78, 92], q.lum));              // 外壁（手前側だけ）
+      face(1.0, TOP, 1.1, TOP, mixc([70, 78, 92], [205, 214, 228], q.lum));           // 上面
+      if (q.fc < 0) face(1.0, DP, 1.0, TOP, mixc([40, 46, 58], [150, 160, 178], q.lum));            // 内側のへり（奥側だけ）
+    }
+  };
+  ctx.save(); drawRim(false); ctx.restore();
+  // 衝撃波
+  for (let i = BT.rings.length - 1; i >= 0; i--) {
+    const q = BT.rings[i]; q.t += dt; if (q.t > 0.8) { BT.rings.splice(i, 1); continue; }
+    ctx.save(); aff(q.x, q.y, fh(Math.hypot(q.x, q.y)) + 0.003, 1); ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = `rgba(${P.spark},${(1 - q.t / 0.8) * 0.8})`; ctx.lineWidth = 0.04 * (1 - q.t); ctx.beginPath(); ctx.arc(0, 0, q.t * 1.3, 0, TAU); ctx.stroke(); ctx.restore();
+  }
+  // 選手：奥から手前へ
+  const fs = [Bt.A, Bt.B].map(f => ({ f, dep: pj(f.x, f.y, f.z) })).sort((a, b) => b.dep - a.dep);
+  for (const o of fs) drawFighter(o.f);
+  drawDebris(dt);
   // 火花
-  ctx.globalCompositeOperation = 'lighter';
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
   for (let i = BT.sparks.length - 1; i >= 0; i--) {
     const p = BT.sparks[i]; p.life -= dt; if (p.life <= 0) { BT.sparks.splice(i, 1); continue; }
-    p.x += p.vx * dt; p.y += p.vy * dt;
-    ctx.fillStyle = `rgba(${P.spark},${Math.min(1, p.life * 2.5)})`;
-    ctx.beginPath(); ctx.arc(sgn * p.x * AR, sgn * p.y * AR, 2.6, 0, TAU); ctx.fill();
+    p.vz -= PHYS.G * 1.2 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z = Math.max(fh(Math.hypot(p.x, p.y)), p.z + p.vz * dt);
+    pj(p.x, p.y, p.z); ctx.fillStyle = `rgba(${P.spark},${Math.min(1, p.life * 2.5)})`;
+    ctx.beginPath(); ctx.arc(PX, PY, Math.max(1.3, 0.011 * PS), 0, TAU); ctx.fill();
   }
   ctx.restore();
+  ctx.save(); drawRim(true); ctx.restore();
+  if (BT.flash > 0.01) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,240,220,${BT.flash * 0.55})`; ctx.fillRect(0, 0, W, H); ctx.restore(); BT.flash *= Math.exp(-dt * 5); }
   drawBattleHud(Bt);
   ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.shadowColor = P.accent; ctx.shadowBlur = 24;
   if (BT.phase === 'count') {
     const n = Math.ceil(BT.count - 0.2);
-    ctx.font = '800 84px system-ui, sans-serif'; ctx.fillText(n > 0 ? String(n) : 'FIGHT!', W / 2, H * 0.5);
+    ctx.font = '800 84px system-ui, sans-serif'; ctx.fillText(n > 0 ? String(n) : 'FIGHT!', W / 2, H * 0.4);
   } else if (BT.phase === 'end') {
     ctx.font = '800 44px system-ui, sans-serif';
     const me = BT.flip ? 'B' : 'A';
-    ctx.fillText(BT.type === 'local' ? 'FINISH!' : (Bt.winner === me ? 'WIN!' : 'LOSE...'), W / 2, H * 0.5);
+    ctx.fillText(Bt.reason === 'burst' ? 'BURST!!' : BT.type === 'local' ? 'FINISH!' : (Bt.winner === me ? 'WIN!' : 'LOSE...'), W / 2, H * 0.3);
   }
   ctx.restore();
   // ダッシュのボタンの充電表示
@@ -2141,22 +2257,41 @@ function drawBattle(dt, Bt) {
   $b('dash1').firstChild.style.width = ((1 - mine.dashCd / PHYS.DASH_CD) * 100) + '%';
   if (BT.type === 'local') $b('dash2').firstChild.style.width = ((1 - Bt.B.dashCd / PHYS.DASH_CD) * 100) + '%';
 }
-function drawFighter(f, L, sgn) {
-  const RB = BS * L.AR, fade = f.out ? Math.max(0, 1 - f.outT * 0.9) : 1;
+function drawFighter(f) {
+  if (f.burst) return;
+  const fade = f.out ? Math.max(0, 1 - f.outT * 0.7) : 1;
   if (fade <= 0) return;
-  const sp = withDesign(f.d, Math.round(RB * 2.4), getSprite);
-  const sx = L.ax + sgn * f.x * L.AR, sy = L.ay + sgn * f.y * L.AR, rot = f.th + (BT.flip ? Math.PI : 0);
-  ctx.save(); ctx.translate(sx, sy); ctx.globalAlpha = fade;
-  const sc = f.out ? 0.6 + 0.4 * fade : 1; ctx.scale(sc, sc);
-  const sg = ctx.createRadialGradient(0, 0, RB * 0.3, 0, 0, RB * 1.15);
-  sg.addColorStop(0, 'rgba(0,0,0,.5)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(RB * 0.12, RB * 0.16, RB * 1.15, 0, TAU); ctx.fill();
-  if (f.w > 25) { const off = Math.max(-1.2, Math.min(1.2, f.w * f.dir * 0.012)); for (let i = 2; i >= 1; i--) { ctx.save(); ctx.rotate(rot - off * i); ctx.globalAlpha = fade * (i === 1 ? 0.18 : 0.08); ctx.drawImage(sp.arm, -RB, -RB, 2 * RB, 2 * RB); ctx.restore(); } }
-  ctx.rotate(rot); ctx.drawImage(sp.arm, -RB, -RB, 2 * RB, 2 * RB);
-  ctx.restore();
-  if (!f.out) {                                             // 回転数のリング（満タン＝最初の回転数）
-    ctx.save(); ctx.lineWidth = 3; ctx.strokeStyle = THEME[f.d.material].accent; ctx.globalAlpha = 0.85;
-    ctx.beginPath(); ctx.arc(sx, sy, RB * 1.12, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, f.w / f.w0)); ctx.stroke(); ctx.restore();
+  const sp = withDesign(f.d, 72, getSprite), r = Math.hypot(f.x, f.y), gz = f.out ? Math.min(f.z, fh(r)) : fh(r), h = Math.max(0, f.z - gz);
+  ctx.save(); ctx.globalAlpha = fade;
+  // 影（高く浮くほど薄く広がる）
+  ctx.save(); aff(f.x, f.y, gz + 0.002, BS * (1 + h * 2));
+  const sg = ctx.createRadialGradient(0.1, 0.12, 0.3, 0.1, 0.12, 1.2); sg.addColorStop(0, `rgba(0,0,0,${0.55 / (1 + h * 14)})`); sg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0.1, 0.12, 1.2, 0, TAU); ctx.fill(); ctx.restore();
+  if (!f.out) {                                              // 床に敷く回転数のリング（満タン＝最初の回転数）
+    ctx.save(); aff(f.x, f.y, gz + 0.004, BS); ctx.lineWidth = 0.07; ctx.strokeStyle = THEME[f.d.material].accent; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.arc(0, 0, 1.2, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, f.w / f.w0)); ctx.stroke(); ctx.restore();
+  }
+  // 本体
+  ctx.save(); aff(f.x, f.y, f.z + 0.01, BS);
+  if (f.w > 25) { const off = Math.max(-1.2, Math.min(1.2, f.w * f.dir * 0.012)); for (let i = 2; i >= 1; i--) { ctx.save(); ctx.rotate(f.th - off * i); ctx.globalAlpha = fade * (i === 1 ? 0.18 : 0.08); ctx.drawImage(sp.arm, -1, -1, 2, 2); ctx.restore(); } }
+  ctx.rotate(f.th); ctx.drawImage(sp.arm, -1, -1, 2, 2);
+  ctx.restore(); ctx.restore();
+}
+function drawDebris(dt) {
+  const L = BT.debris;
+  for (let i = L.length - 1; i >= 0; i--) {
+    const p = L[i]; p.life -= dt; if (p.life <= 0) { L.splice(i, 1); continue; }
+    p.vz -= PHYS.G * 1.6 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.rot += p.vr * dt;
+    const fl = fh(Math.hypot(p.x, p.y)) + p.size * 0.1;
+    if (p.z < fl) { p.z = fl; if (p.vz < -0.4) { p.vz = -p.vz * 0.38; p.vx *= 0.7; p.vy *= 0.7; p.vr *= 0.7; } else { p.vz = 0; p.vx *= 0.9; p.vy *= 0.9; p.vr *= 0.9; } }
+    ctx.save(); ctx.globalAlpha = Math.min(1, p.life);
+    aff(p.x, p.y, p.z, p.size); ctx.rotate(p.rot);
+    ctx.fillStyle = p.col; ctx.strokeStyle = `rgb(${p.side})`; ctx.lineWidth = 0.09;
+    ctx.beginPath();
+    if (p.kind === 'blade') { ctx.moveTo(-0.2, -0.28); ctx.lineTo(1, -0.1); ctx.lineTo(0.9, 0.12); ctx.lineTo(-0.2, 0.3); ctx.closePath(); }
+    else if (p.kind === 'hub') { ctx.arc(0, 0, 1, 0, TAU); ctx.moveTo(0.35, 0); ctx.arc(0, 0, 0.35, 0, TAU, true); }
+    else ctx.arc(0, 0, 1, 0, TAU);
+    ctx.fill('evenodd'); ctx.stroke(); ctx.restore();
   }
 }
 function drawBattleHud(Bt) {
@@ -2173,6 +2308,9 @@ function hudRow(f, y, upside) {
   ctx.textAlign = 'right'; ctx.fillText(Math.round(f.w * 60 / TAU).toLocaleString('en-US') + ' rpm', x0 + bw, y - 9);
   ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.roundRect(x0, y, bw, 8, 4); ctx.fill();
   ctx.fillStyle = THEME[f.d.material].accent; ctx.beginPath(); ctx.roundRect(x0, y, Math.max(8, bw * Math.min(1, f.w / f.w0)), 8, 4); ctx.fill();
+  const bgr = Math.min(1, f.bg / 100);                      // バーストゲージ（満タンで壊れる）
+  ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.roundRect(x0, y + 13, bw, 4, 2); ctx.fill();
+  if (bgr > 0.01) { ctx.fillStyle = bgr > 0.75 ? '#ff4d4d' : '#ff9a4d'; ctx.beginPath(); ctx.roundRect(x0, y + 13, Math.max(4, bw * bgr), 4, 2); ctx.fill(); }
   ctx.restore();
 }
 
@@ -2252,7 +2390,7 @@ function maybeBeginOnline() {
   netSend({ t: 'start', A: { d: a.d, rpm: a.rpm, dir: a.dir }, B: { d: b.d, rpm: b.rpm, dir: b.dir } });
   enterBattleView();
 }
-const snapOf = Bt => ({ t: 'snap', tm: Bt.t, a: [Bt.A.x, Bt.A.y, Bt.A.w, +Bt.A.out, +Bt.A.fin, Bt.A.dashCd], b: [Bt.B.x, Bt.B.y, Bt.B.w, +Bt.B.out, +Bt.B.fin, Bt.B.dashCd],
+const snapOf = Bt => ({ t: 'snap', tm: Bt.t, a: [Bt.A.x, Bt.A.y, Bt.A.w, +Bt.A.out, +Bt.A.fin, Bt.A.dashCd, Bt.A.z, +Bt.A.burst, Bt.A.bg], b: [Bt.B.x, Bt.B.y, Bt.B.w, +Bt.B.out, +Bt.B.fin, Bt.B.dashCd, Bt.B.z, +Bt.B.burst, Bt.B.bg],
   ev: Bt.ev.map(e => ({ ...e })), over: Bt.over, win: Bt.winner, why: Bt.reason, ha: [Bt.A.hits, Bt.A.maxHit, Bt.A.dashed], hb: [Bt.B.hits, Bt.B.maxHit, Bt.B.dashed] });
 function handleNet(m) {
   if (m.t === 'hello') { BT.peer = m; maybeStartOnlineSpin(); }
@@ -2265,8 +2403,8 @@ function handleNet(m) {
   } else if (m.t === 'snap' && BT.role === 'guest' && BT.battle) {
     const Bt = BT.battle;
     for (const [f, s2, h] of [[Bt.A, m.a, m.ha], [Bt.B, m.b, m.hb]]) {
-      f.tx = s2[0]; f.ty = s2[1]; f.tw = s2[2]; f.out = !!s2[3]; f.fin = !!s2[4]; f.dashCd = s2[5];
-      if (f.x === 0 && f.y === 0 || f.out) { f.x = s2[0]; f.y = s2[1]; }
+      f.tx = s2[0]; f.ty = s2[1]; f.tw = s2[2]; f.out = !!s2[3]; f.fin = !!s2[4]; f.dashCd = s2[5]; f.tz = s2[6]; f.burst = !!s2[7]; f.bg = s2[8];
+      if (f.x === 0 && f.y === 0 || f.out) { f.x = s2[0]; f.y = s2[1]; f.z = s2[6]; }
       f.hits = h[0]; f.maxHit = h[1]; f.dashed = h[2];
     }
     for (const e of m.ev) Bt.ev.push(e);
@@ -2307,7 +2445,7 @@ const dashPress = who => e => {
   (who === 1 ? BT.battle.A : BT.battle.B).dashReq = true;
 };
 $b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventListener('pointerdown', dashPress(2));
-window.__bt = { setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign };
+window.__bt = { setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
 
 // 別タブに行った時は音を止める
 document.addEventListener('visibilitychange', () => {
