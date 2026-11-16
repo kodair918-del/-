@@ -1849,6 +1849,8 @@ function statsRaw(d) {
   return { mass, reach, atk, def, sta, bres, grip: m.grip, sharp };
 }
 // タイプ（じゃんけん）：攻撃型 > 持久型 > 防御型 > 攻撃型。総合的な強さの差は小さくして、「何が得意か」で勝ち負けが決まるようにする
+// 環境の調整：シミュレーションで全デザインを戦わせ、強すぎる／弱すぎる部品を補正した倍率（1＝補正なし）
+const PW = { material: { metal: 1, gold: 1, copper: 1, titan: 1, black: 1, neon: 1, rainbow: 1, wood: 1, matte: 1, ice: 1 }, shape: { round: 1, slim: 1, fat: 1, long: 1, pointy: 1, leaf: 1 }, hole: { round: 1, big: 1, small: 1, weight: 1 }, arms: { 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 }, type: { atk: 1, def: 1, sta: 1, bal: 1 } };
 const TYPE_NAME = { atk: '攻撃型', def: '防御型', sta: '持久型', bal: 'バランス型' };
 function statsOf(d) {
   const st = statsRaw(d), r = ranges();
@@ -1857,6 +1859,7 @@ function statsOf(d) {
   const sh = { atk: 3 * na / sum, def: 3 * nd / sum, sta: 3 * ns / sum };             // 3つの能力のうち、どれに偏っているか（平均＝1）
   const o = Object.entries(sh).sort((a, b) => b[1] - a[1]);
   st.type = o[0][1] - o[1][1] > PHYS.TYPE_GAP ? o[0][0] : 'bal'; st.sh = sh;
+  st.pw = PW.material[d.material] * PW.shape[d.shape] * PW.hole[d.hole] * PW.arms[d.arms] * PW.type[st.type];
   st.atkE = Math.pow(st.atk, 0.45 * PHYS.LAM) * Math.pow(sh.atk, PHYS.MU);
   st.defE = Math.pow(st.def, 0.45 * PHYS.LAM) * Math.pow(sh.def, PHYS.MU);
   st.staE = Math.pow(st.sta, PHYS.LAM) * Math.pow(sh.sta, PHYS.MU * 0.8);
@@ -1962,7 +1965,7 @@ function stepFighter(f, o, dt) {
   f.dashCd = Math.max(0, f.dashCd - dt); f.pairCd = Math.max(0, f.pairCd - dt);
   f.sp = Math.min(100, f.sp + PHYS.SPPASS * dt); for (const k of ['rush', 'guard', 'eco']) f.sk[k] = Math.max(0, f.sk[k] - dt);
   const w = f.w, wn = Math.min(1, w / 250);
-  f.w = Math.max(0, w - (PHYS.C0 + PHYS.C1 * w) * dt / (Math.pow(f.st.staE, 0.7) * f.lk * PHYS.SDUR * (f.sk.eco > 0 ? 2.5 : 1)));     // lk=そのバトルの調子（運）
+  f.w = Math.max(0, w - (PHYS.C0 + PHYS.C1 * w) * dt / (Math.pow(f.st.staE, 0.7) * Math.sqrt(f.st.pw) * f.lk * PHYS.SDUR * (f.sk.eco > 0 ? 2.5 : 1)));     // lk=そのバトルの調子（運）
   const r0 = Math.hypot(f.x, f.y), gnd = f.z - fh(r0) < 0.004 && f.vz <= 0.05;
   if (gnd) {
     let ax = -PHYS.BOWL * f.x, ay = -PHYS.BOWL * f.y;                                   // すり鉢の斜面（重力の水平成分）
@@ -2028,15 +2031,16 @@ function collide(Bt, A, B) {
   const Jk = Math.min(J, (A.sk.rush > 0 || B.sk.rush > 0) ? PHYS.JMAX * 1.5 : PHYS.JMAX) * Q;                        // はじき飛ばす力には上限（ダメージは大きくなっても、1発で場外にならないように）
   A.vx -= Jk / mA * nx * PHYS.KNOCK; A.vy -= Jk / mA * ny * PHYS.KNOCK; B.vx += Jk / mB * nx * PHYS.KNOCK; B.vy += Jk / mB * ny * PHYS.KNOCK;
   const rnd = () => 0.75 + Math.random() * 0.5;                               // ダメージには毎回少しばらつき
+  const pwr = A.st.pw / B.st.pw;                              // 部品ごとの強さの補正
   const rA = A.sk.rush > 0 ? PHYS.RUSH : 1, rB = B.sk.rush > 0 ? PHYS.RUSH : 1, gA = A.sk.guard > 0 ? PHYS.GUARD : 1, gB = B.sk.guard > 0 ? PHYS.GUARD : 1;
-  const dB = rA * gB * PHYS.DMG * J * rnd() * A.lk * A.st.atkE * rps(A.st.type, B.st.type) * KIND_ATK[best.a.kind] / (B.st.defE * KIND_DEF[best.b.kind]);   // 相手が受ける回転ダメージ
-  const dA = rB * gA * PHYS.DMG * J * rnd() * B.lk * B.st.atkE * rps(B.st.type, A.st.type) * KIND_ATK[best.b.kind] / (A.st.defE * KIND_DEF[best.a.kind]);
+  const dB = pwr * rA * gB * PHYS.DMG * J * rnd() * A.lk * A.st.atkE * rps(A.st.type, B.st.type) * KIND_ATK[best.a.kind] / (B.st.defE * KIND_DEF[best.b.kind]);   // 相手が受ける回転ダメージ
+  const dA = rB * gA / pwr * PHYS.DMG * J * rnd() * B.lk * B.st.atkE * rps(B.st.type, A.st.type) * KIND_ATK[best.b.kind] / (A.st.defE * KIND_DEF[best.a.kind]);
   const up = () => 0.6 + Math.random() * 0.8;
   A.vz = Math.min(1.6, A.vz + Jk / mA * PHYS.LIFT * B.st.sharp * up()); B.vz = Math.min(1.6, B.vz + Jk / mB * PHYS.LIFT * A.st.sharp * up());   // ぶつかると浮く（とがった相手ほど高く）
   A.z += 0.002; B.z += 0.002;
   const stress = w => 0.6 + 0.4 * Math.min(4, Math.sqrt(w / 260));                  // 攻める側の回転が速いほど、相手が壊れやすい
-  A.bg += rB * gA * PHYS.BURST / PHYS.DUR * J * rnd() * B.st.atkE * KIND_ATK[best.b.kind] * stress(B.w) / (A.st.bres * KIND_DEF[best.a.kind]);   // バーストゲージ
-  B.bg += rA * gB * PHYS.BURST / PHYS.DUR * J * rnd() * A.st.atkE * KIND_ATK[best.a.kind] * stress(A.w) / (B.st.bres * KIND_DEF[best.b.kind]);
+  A.bg += rB * gA / pwr * PHYS.BURST / PHYS.DUR * J * rnd() * B.st.atkE * KIND_ATK[best.b.kind] * stress(B.w) / (A.st.bres * KIND_DEF[best.a.kind]);   // バーストゲージ
+  B.bg += rA * gB * pwr * PHYS.BURST / PHYS.DUR * J * rnd() * A.st.atkE * KIND_ATK[best.a.kind] * stress(A.w) / (B.st.bres * KIND_DEF[best.b.kind]);
   A.w = Math.max(0, A.w - dA); B.w = Math.max(0, B.w - dB);
   A.sp = Math.min(100, A.sp + 12 + (dA > dB ? 6 : 0)); B.sp = Math.min(100, B.sp + 12 + (dB > dA ? 6 : 0));        // 当てても当てられてもゲージがたまる
   if (A.sk.rush > 0) A.sk.rush = 0; if (B.sk.rush > 0) B.sk.rush = 0;
@@ -2793,7 +2797,7 @@ const skillPress = who => e => {
 };
 $b('skill1').addEventListener('pointerdown', skillPress(1)); $b('skill2').addEventListener('pointerdown', skillPress(2));
 $b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventListener('pointerdown', dashPress(2));
-window.__bt = { setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
+window.__bt = { PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
 
 // 別タブに行った時は音を止める
 document.addEventListener('visibilitychange', () => {
