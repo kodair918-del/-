@@ -47,7 +47,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 
 /* ---------- 定数・設定 ---------- */
 const TAU = Math.PI * 2;
-const MAX_W = 600;                       // rad/s（約5700rpm）上限
+// 回転速度に決め打ちの上限はない（空気抵抗で自然に頭打ちになるだけ）
 const ARMS = [3, 2, 4, 5];
 const THEMES = ['metal', 'neon', 'rainbow', 'wood', 'matte'];
 const THEME_NAME = { metal: 'メタル', neon: 'ネオン', rainbow: 'レインボー', wood: 'ウッド', matte: 'マット' };
@@ -367,7 +367,7 @@ canvas.addEventListener('pointermove', e => {
   // 指の動きのうち「円周方向」の成分だけを回転速度にする（画面のどこをなぞっても回る）
   const tang = (rx * dy - ry * dx) / rl;
   const rRef = Math.min(R, Math.max(R * 0.45, rl));      // 中心近くでも暴れないように
-  const v = Math.max(-MAX_W * 1.5, Math.min(MAX_W * 1.5, tang / rRef / dt));
+  const v = tang / rRef / dt;
   drag.vf = drag.vf * 0.5 + v * 0.5;
   drag.moved += Math.hypot(dx, dy);
   drag.x = p.x; drag.y = p.y; drag.lastT = now; drag.lastMove = now; drag.dx = dx; drag.dy = dy;
@@ -390,14 +390,12 @@ function dragPhysics(dt, now) {
     const dir = Math.sign(S.omega) || Math.sign(drag.vf);
     const along = drag.vf * dir;
     if (along > 0) {
-      const room = 1 - Math.pow(Math.min(1, Math.abs(S.omega) / MAX_W), 3);   // 上限の直前までほぼ弱まらない
-      S.omega += dir * 22 * along * room * dt;
+      S.omega += dir * 22 * along * dt;
       spawnFingerSparks();
     }
     const target = drag.vf * 1.3;                         // 1.3倍＝はじきやすい
     if (Math.abs(target) > Math.abs(S.omega)) {           // 指のほうが速い時だけ引っぱる
       S.omega += (target - S.omega) * (1 - Math.exp(-dt * 20));
-      S.omega = Math.max(-MAX_W, Math.min(MAX_W, S.omega));
     }
   }
 }
@@ -424,8 +422,8 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 // PC用：矢印キーで回す／Spaceでブレーキ
 window.addEventListener('keydown', e => {
   initAudio();
-  if (e.key === 'ArrowLeft') { S.omega = Math.max(-MAX_W, S.omega - 60); hintEl.style.opacity = 0; }
-  else if (e.key === 'ArrowRight') { S.omega = Math.min(MAX_W, S.omega + 60); hintEl.style.opacity = 0; }
+  if (e.key === 'ArrowLeft') { S.omega -= 60; hintEl.style.opacity = 0; }
+  else if (e.key === 'ArrowRight') { S.omega += 60; hintEl.style.opacity = 0; }
   else if (e.code === 'Space') { S.omega *= 0.2; e.preventDefault(); }
 });
 
@@ -524,7 +522,7 @@ function spawnSparks(a) {
   const ang = S.theta + k * (TAU / n);
   const r = R * 0.9;
   const sgn = Math.sign(S.omega) || 1;
-  const sp = a * r * (0.015 + Math.random() * 0.01);
+  const sp = Math.min(2200, a * r * (0.015 + Math.random() * 0.01));
   const dir = ang + sgn * Math.PI / 2;
   const spread = (Math.random() - 0.5) * 0.8;
   S.particles.push({
@@ -547,7 +545,7 @@ function updateParticles(dt) {
   }
 }
 
-const MILES = [500, 1000, 2000, 3000, 4000, 5000];
+const MILES = [500, 1000, 2000, 3000, 4000, 5000, 7500, 10000, 20000, 50000, 100000, 200000, 500000, 1000000];
 const DUST = Array.from({ length: 44 }, () => ({
   a: Math.random() * TAU, k: 0.5 + Math.random() * 1.6, s: 0.8 + Math.random() * 1.8, al: 0.12 + Math.random() * 0.3
 }));
@@ -671,7 +669,7 @@ function draw(a) {
     const alphas = [0.2, 0.11, 0.05];
     for (let i = 3; i >= 1; i--) {
       ctx.globalAlpha = alphas[i - 1];
-      drawSpinner(S.theta - S.omega * 0.012 * i, false);
+      drawSpinner(S.theta - Math.max(-1.2, Math.min(1.2, S.omega * 0.012)) * i, false);
     }
     ctx.globalAlpha = 1;
   }
@@ -746,12 +744,12 @@ function frame(now) {
 
   const a = Math.abs(S.omega);
   const rpm = Math.round(a * 60 / TAU);
-  if (rpm !== S.lastRpm) { S.lastRpm = rpm; rpmEl.textContent = rpm; }
+  if (rpm !== S.lastRpm) { S.lastRpm = rpm; rpmEl.textContent = rpm.toLocaleString('en-US'); }
   if (rpm < 150) { S.milestone = 0; S.recordShown = false; }
   for (let i = 0; i < MILES.length; i++) {
     if (rpm >= MILES[i] && S.milestone < MILES[i]) {
       S.milestone = MILES[i];
-      showToast(`${MILES[i]} RPM!`); addRing(1); thump(1); chime(i); S.flash = 1;
+      showToast(`${MILES[i].toLocaleString('en-US')} RPM!`); addRing(1); thump(1); chime(i); S.flash = 1;
     }
   }
   if (rpm > settings.best) {
@@ -764,7 +762,7 @@ function frame(now) {
 
   if (Math.floor(now / 250) !== frame.lastStat) {
     frame.lastStat = Math.floor(now / 250);
-    statsEl.textContent = `最高 ${settings.best} rpm ・ 今回 ${Math.floor(S.turns)} 回転`;
+    statsEl.textContent = `最高 ${settings.best.toLocaleString('en-US')} rpm ・ 今回 ${Math.floor(S.turns)} 回転`;
   }
 
   audioUpdate();
