@@ -1527,7 +1527,7 @@ let comboTimer = 0;
 function showCombo(msg) {                                  // 画面の下に、今の組み合わせを数秒だけ表示
   comboEl.textContent = msg || `No.${comboNo().toLocaleString('en-US')} / ${COMBOS.toLocaleString('en-US')}　${MAT_NAME[settings.material]}・${SHAPES[settings.shape].name}・${settings.arms}本・穴${HOLES[settings.hole].name}・${BG_NAME[settings.bg]}`;
   comboEl.classList.add('show');
-  clearTimeout(comboTimer); comboTimer = setTimeout(() => comboEl.classList.remove('show'), 3200);
+  clearTimeout(comboTimer); comboTimer = setTimeout(() => comboEl.classList.remove('show'), msg ? 5000 : 3200);
 }
 function randomize() {
   const pick = list => list[Math.floor(Math.random() * list.length)];
@@ -1543,7 +1543,7 @@ function randomize() {
 }
 randBtn.addEventListener('click', randomize);
 
-// フルスクリーン（iPhoneのSafariなど、対応していない端末ではボタンを隠す）
+// フルスクリーン（iPhoneなど対応していない端末でもボタンは出し、押すと理由を表示する）
 const fsRoot = document.documentElement;
 const fsRequest = fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen;
 const fsExit = document.exitFullscreen || document.webkitExitFullscreen;
@@ -1551,12 +1551,13 @@ const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenEle
 const ICON_EXPAND = '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
 const ICON_COMPRESS = '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>';
 function updateFsIcon() { document.getElementById('fsIcon').innerHTML = isFs() ? ICON_COMPRESS : ICON_EXPAND; }
-if (!fsRequest) fsBtn.hidden = true;
+const FS_NG = 'この環境ではフルスクリーンにできません（iPhoneは「ホーム画面に追加」して開くと全画面になります）';
 fsBtn.addEventListener('click', () => {
+  if (!fsRequest) { showCombo(FS_NG); return; }
   try {
     const r = isFs() ? fsExit.call(document) : fsRequest.call(fsRoot);
-    if (r && r.catch) r.catch(() => showCombo('このページではフルスクリーンにできません'));
-  } catch (e) { showCombo('このページではフルスクリーンにできません'); }
+    if (r && r.catch) r.catch(() => showCombo(FS_NG));
+  } catch (e) { showCombo(FS_NG); }
 });
 document.addEventListener('fullscreenchange', updateFsIcon);
 document.addEventListener('webkitfullscreenchange', updateFsIcon);
