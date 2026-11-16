@@ -1,0 +1,14 @@
+{
+  "name": "スピン・アリーナ",
+  "short_name": "スピン・アリーナ",
+  "description": "指で回せる疑似ハンドスピナーと、ベイブレード風のスピナーバトル",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#07080b",
+  "theme_color": "#07080b",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
