@@ -1850,7 +1850,7 @@ function statsRaw(d) {
 }
 // タイプ（じゃんけん）：攻撃型 > 持久型 > 防御型 > 攻撃型。総合的な強さの差は小さくして、「何が得意か」で勝ち負けが決まるようにする
 // 環境の調整：シミュレーションで全デザインを戦わせ、強すぎる／弱すぎる部品を補正した倍率（1＝補正なし）
-const PW = { material: { metal: 0.958, gold: 0.965, copper: 0.962, titan: 1.088, black: 0.878, neon: 0.987, rainbow: 1.029, wood: 1.128, matte: 0.906, ice: 1.213 }, shape: { round: 0.985, slim: 1.092, fat: 0.956, long: 1.024, pointy: 1.012, leaf: 0.979 }, hole: { round: 1.019, big: 1.065, small: 1.004, weight: 0.943 }, arms: { 2: 1.161, 3: 1.02, 4: 0.968, 5: 0.95, 6: 0.951 }, type: { atk: 1.029, def: 0.924, sta: 1.019, bal: 1.027 } };
+const PW = { material: { metal: 0.95, gold: 0.972, copper: 0.973, titan: 1.07, black: 0.891, neon: 0.973, rainbow: 1.023, wood: 1.135, matte: 0.903, ice: 1.27 }, shape: { round: 0.977, slim: 1.109, fat: 0.932, long: 1.058, pointy: 1.017, leaf: 0.983 }, hole: { round: 1.017, big: 1.062, small: 0.996, weight: 0.969 }, arms: { 2: 1.202, 3: 1.044, 4: 0.964, 5: 0.939, 6: 0.929 }, type: { atk: 1.038, def: 0.803, sta: 1.172, bal: 1.031 } };
 const TYPE_NAME = { atk: '攻撃型', def: '防御型', sta: '持久型', bal: 'バランス型' };
 function statsOf(d) {
   const st = statsRaw(d), r = ranges();
@@ -1866,7 +1866,7 @@ function statsOf(d) {
   return st;
 }
 const BEATS = { atk: 'sta', sta: 'def', def: 'atk' };                                    // 攻撃は持久に強く、持久は防御に強く、防御は攻撃に強い
-const RPS_X = { atk: 0.95, sta: 1.4, def: 1.15 };                                           // 各相性の効き具合（シミュレーションで、どの組み合わせも7割前後で勝つように調整）
+const RPS_X = { atk: 1.377, sta: 1.498, def: 1.783 };                                           // 各相性の効き具合（シミュレーションで、どの組み合わせも7割前後で勝つように調整）
 const rps = (a, b) => BEATS[a] === b ? RPS_X[a] : BEATS[b] === a ? 1 / RPS_X[b] : 1;
 // 当たり判定：腕の形から作る円の集まり（中心・腕の途中・先端）。形が違えば当たり判定も違う
 function hitCircles(d) {
