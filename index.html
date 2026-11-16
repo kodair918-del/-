@@ -1775,7 +1775,7 @@ bFx.addEventListener('click', () => {
 /* ================= バトル ================= */
 let MODE = 'free';                                         // 'free'(ふつうに回す) | 'spin'(5秒間回す) | 'battle'
 let BS = 0.14, Q = BS / 0.36;                                // R=1 のスピナーの半径（アリーナ半径=1 に対する比）。小さいほどフィールドが広い。Q＝旧サイズ(0.36)との比で、速さ・力を合わせる                                            // R=1 のスピナーの半径（アリーナ半径=1 に対する比）
-const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5, DUR: 7.5, SDUR: 1 };   // DUR=バーストの耐久、SDUR=回転の持久（どちらも倍率）   // シミュレーションで調整した値
+const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5, DUR: 7.5, SDUR: 1, LAM: 0.4, MU: 0.8, TYPE_GAP: 0.12 };   // DUR=バーストの耐久、SDUR=回転の持久（どちらも倍率）   // シミュレーションで調整した値
 const $b = id => document.getElementById(id);
 
 // 材質：dens=重さ hard=硬さ bear=軸の滑らかさ grip=グリップ（相手へ寄っていく強さ）
@@ -1806,7 +1806,7 @@ function randomDesign() {
 const designLabel = d => `${MAT_NAME[d.material]}・${SHAPES[d.shape].name}・${d.arms}本・穴${HOLES[d.hole].name}`;
 
 // デザインから決まる性能。材質・形・アームの数・穴のすべてが効く
-function statsOf(d) {
+function statsRaw(d) {
   const g = SHAPES[d.shape], m = MAT_STAT[d.material], h = HOLE_STAT[d.hole], n = d.arms;
   const armArea = (g.w0 * 0.7 + g.tipR * 1.3) * g.tipD;
   const mass = Math.pow(m.dens * (0.35 + n * armArea * 0.55) * h.m / 0.84, 0.55);   // 重さの差は圧縮（軽いものが一方的にならないように）
@@ -1816,8 +1816,25 @@ function statsOf(d) {
   const def = m.hard * (0.55 + 2.0 * g.tipR) * (0.85 + 0.05 * n) * (0.8 + 0.2 * mass);
   const sta = m.bear * h.sta * (0.8 + 0.2 * mass) / (1 + 0.06 * (n - 3));                // アームが多いほど空気抵抗で回転が落ちやすい
   const bres = Math.pow(MAT_BURST[d.material] * SHAPE_BURST[d.shape] * HOLE_BURST[d.hole] * (0.82 + 0.06 * n) * (0.7 + 0.3 * mass), 0.6);   // 頑丈さ（バーストしにくさ）
-  return { mass, reach, atk, def, sta, bres, grip: m.grip, sharp, atkE: Math.pow(atk, 0.45), defE: Math.pow(def, 0.45) };
+  return { mass, reach, atk, def, sta, bres, grip: m.grip, sharp };
 }
+// タイプ（じゃんけん）：攻撃型 > 持久型 > 防御型 > 攻撃型。総合的な強さの差は小さくして、「何が得意か」で勝ち負けが決まるようにする
+const TYPE_NAME = { atk: '攻撃型', def: '防御型', sta: '持久型', bal: 'バランス型' };
+function statsOf(d) {
+  const st = statsRaw(d), r = ranges();
+  const nz = k => 0.05 + 0.95 * (st[k] - r[k][0]) / ((r[k][1] - r[k][0]) || 1);
+  const na = nz('atk'), nd = nz('def'), ns = nz('sta'), sum = na + nd + ns;
+  const sh = { atk: 3 * na / sum, def: 3 * nd / sum, sta: 3 * ns / sum };             // 3つの能力のうち、どれに偏っているか（平均＝1）
+  const o = Object.entries(sh).sort((a, b) => b[1] - a[1]);
+  st.type = o[0][1] - o[1][1] > PHYS.TYPE_GAP ? o[0][0] : 'bal'; st.sh = sh;
+  st.atkE = Math.pow(st.atk, 0.45 * PHYS.LAM) * Math.pow(sh.atk, PHYS.MU);
+  st.defE = Math.pow(st.def, 0.45 * PHYS.LAM) * Math.pow(sh.def, PHYS.MU);
+  st.staE = Math.pow(st.sta, PHYS.LAM) * Math.pow(sh.sta, PHYS.MU * 0.8);
+  return st;
+}
+const BEATS = { atk: 'sta', sta: 'def', def: 'atk' };                                    // 攻撃は持久に強く、持久は防御に強く、防御は攻撃に強い
+const RPS_X = { atk: 0.95, sta: 1.4, def: 1.15 };                                           // 各相性の効き具合（シミュレーションで、どの組み合わせも7割前後で勝つように調整）
+const rps = (a, b) => BEATS[a] === b ? RPS_X[a] : BEATS[b] === a ? 1 / RPS_X[b] : 1;
 // 当たり判定：腕の形から作る円の集まり（中心・腕の途中・先端）。形が違えば当たり判定も違う
 function hitCircles(d) {
   const G = withDesign(d, 1, geom);
@@ -1836,7 +1853,7 @@ function ranges() {                                         // 全1,200通りの
   if (statRange) return statRange;
   const r = { atk: [9, 0], def: [9, 0], sta: [9, 0], mass: [9, 0], reach: [9, 0], bres: [9, 0] };
   for (const material of MATS) for (const shape of SHAPE_IDS) for (const arms of ARMS) for (const hole of HOLE_IDS) {
-    const st = statsOf({ material, shape, arms, hole });
+    const st = statsRaw({ material, shape, arms, hole });
     for (const k of Object.keys(r)) { r[k][0] = Math.min(r[k][0], st[k]); r[k][1] = Math.max(r[k][1], st[k]); }
   }
   return (statRange = r);
@@ -1881,7 +1898,7 @@ function stepFighter(f, o, dt) {
   if (f.out) { f.outT += dt; f.x += f.vx * dt * 1.5; f.y += f.vy * dt * 1.5; f.th += f.w * f.dir * dt; f.vz -= PHYS.G * dt; f.z = Math.max(-0.5, f.z + f.vz * dt); return; }
   f.dashCd = Math.max(0, f.dashCd - dt); f.pairCd = Math.max(0, f.pairCd - dt);
   const w = f.w, wn = Math.min(1, w / 250);
-  f.w = Math.max(0, w - (PHYS.C0 + PHYS.C1 * w) * dt / (Math.pow(f.st.sta, 0.7) * f.lk * PHYS.SDUR));     // lk=そのバトルの調子（運）
+  f.w = Math.max(0, w - (PHYS.C0 + PHYS.C1 * w) * dt / (Math.pow(f.st.staE, 0.7) * f.lk * PHYS.SDUR));     // lk=そのバトルの調子（運）
   const r0 = Math.hypot(f.x, f.y), gnd = f.z - fh(r0) < 0.004 && f.vz <= 0.05;
   if (gnd) {
     let ax = -PHYS.BOWL * f.x, ay = -PHYS.BOWL * f.y;                                   // すり鉢の斜面（重力の水平成分）
@@ -1936,8 +1953,8 @@ function collide(Bt, A, B) {
   const Jk = Math.min(J, PHYS.JMAX) * Q;                        // はじき飛ばす力には上限（ダメージは大きくなっても、1発で場外にならないように）
   A.vx -= Jk / mA * nx * PHYS.KNOCK; A.vy -= Jk / mA * ny * PHYS.KNOCK; B.vx += Jk / mB * nx * PHYS.KNOCK; B.vy += Jk / mB * ny * PHYS.KNOCK;
   const rnd = () => 0.75 + Math.random() * 0.5;                               // ダメージには毎回少しばらつき
-  const dB = PHYS.DMG * J * rnd() * A.lk * A.st.atkE * KIND_ATK[best.a.kind] / (B.st.defE * KIND_DEF[best.b.kind]);   // 相手が受ける回転ダメージ
-  const dA = PHYS.DMG * J * rnd() * B.lk * B.st.atkE * KIND_ATK[best.b.kind] / (A.st.defE * KIND_DEF[best.a.kind]);
+  const dB = PHYS.DMG * J * rnd() * A.lk * A.st.atkE * rps(A.st.type, B.st.type) * KIND_ATK[best.a.kind] / (B.st.defE * KIND_DEF[best.b.kind]);   // 相手が受ける回転ダメージ
+  const dA = PHYS.DMG * J * rnd() * B.lk * B.st.atkE * rps(B.st.type, A.st.type) * KIND_ATK[best.b.kind] / (A.st.defE * KIND_DEF[best.a.kind]);
   const up = () => 0.6 + Math.random() * 0.8;
   A.vz = Math.min(1.6, A.vz + Jk / mA * PHYS.LIFT * B.st.sharp * up()); B.vz = Math.min(1.6, B.vz + Jk / mB * PHYS.LIFT * A.st.sharp * up());   // ぶつかると浮く（とがった相手ほど高く）
   A.z += 0.002; B.z += 0.002;
@@ -1986,12 +2003,14 @@ const BT = { type: null, diff: 1, phase: 'idle', lock: false, role: 'local', fli
   rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
 function showScreen(id) { for (const s of SCREENS) $b(s).hidden = s !== id; btEl.classList.add('show'); document.body.classList.add('btmode'); }
 function hideOverlay() { btEl.classList.remove('show'); }
+const TYPE_COL = { atk: '#ff6b6b', def: '#5db4ff', sta: '#6bdc8b', bal: '#d0d0d0' };
+const typeBadge = st => `<br><b style="color:${TYPE_COL[st.type]}">${TYPE_NAME[st.type]}</b> <span style="opacity:.65;font-size:11px">相性：攻撃→持久→防御→攻撃</span>`;
 function refreshMenu() {
   const d = designOf(), st = statsOf(d);
-  $b('mineName').textContent = designLabel(d); fillBars($b('mineBars'), st); drawHitPreview($b('hbCv'), d);
+  $b('mineName').innerHTML = designLabel(d) + typeBadge(st); fillBars($b('mineBars'), st); drawHitPreview($b('hbCv'), d);
   $b('btRecord').textContent = `戦績 ${settings.wins}勝 ${settings.losses}敗`;
 }
-function refreshP2() { const d = designOf(); $b('mineName2').textContent = designLabel(d); fillBars($b('mineBars2'), statsOf(d)); drawHitPreview($b('hbCv2'), d); }
+function refreshP2() { const d = designOf(), st = statsOf(d); $b('mineName2').innerHTML = designLabel(d) + typeBadge(st); fillBars($b('mineBars2'), st); drawHitPreview($b('hbCv2'), d); }
 window.__btRefresh = () => { if (btEl.classList.contains('show')) { if (!$b('sMenu').hidden) refreshMenu(); if (!$b('sP2').hidden) refreshP2(); } };
 function openMenu() { if (MODE !== 'free') return; initAudio(); refreshMenu(); showScreen('sMenu'); }
 function closeMenu() { hideOverlay(); document.body.classList.remove('btmode'); }
@@ -2329,7 +2348,7 @@ function hudRow(f, y, upside) {
   ctx.save();
   if (upside) { ctx.translate(W / 2, y); ctx.rotate(Math.PI); ctx.translate(-W / 2, -y); }
   ctx.font = '600 13px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.92)';
-  ctx.textAlign = 'left'; ctx.fillText(f.name + '　' + SHAPES[f.d.shape].name + '・' + f.d.arms + '本', x0, y - 9);
+  ctx.textAlign = 'left'; ctx.fillText(f.name + '　' + SHAPES[f.d.shape].name + '・' + f.d.arms + '本・' + TYPE_NAME[f.st.type], x0, y - 9);
   ctx.textAlign = 'right'; ctx.fillText(Math.round(f.w * 60 / TAU).toLocaleString('en-US') + ' rpm', x0 + bw, y - 9);
   ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.roundRect(x0, y, bw, 8, 4); ctx.fill();
   ctx.fillStyle = THEME[f.d.material].accent; ctx.beginPath(); ctx.roundRect(x0, y, Math.max(8, bw * Math.min(1, f.w / f.w0)), 8, 4); ctx.fill();
@@ -2470,7 +2489,7 @@ const dashPress = who => e => {
   (who === 1 ? BT.battle.A : BT.battle.B).dashReq = true;
 };
 $b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventListener('pointerdown', dashPress(2));
-window.__bt = { setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
+window.__bt = { setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
 
 // 別タブに行った時は音を止める
 document.addEventListener('visibilitychange', () => {
