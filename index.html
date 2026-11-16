@@ -138,8 +138,12 @@ body.inbattle #hud,body.inbattle #hint,body.inbattle #toast,body.inbattle #combo
   </div>
   <div class="btcard" id="sOnline" hidden>
     <h2>オンライン対戦</h2>
-    <p id="olHelp">サーバーを使わず、友だちとコードを送り合ってつなぎます（LINEなどで送れます）。</p>
-    <div class="btgrid" id="olStep0"><button class="btn" id="olHost">ルームを作る</button><button class="btn" id="olJoin">ルームに入る</button></div>
+    <p id="olHelp">ランダム対戦は、同じタイミングで遊んでいる人と自動でつながります。友だちとは、コードを送り合って対戦できます。</p>
+    <div class="col" id="olStep0">
+      <input id="olNick" maxlength="10" placeholder="ニックネーム（10文字まで）" autocomplete="off" style="background:#1c1f27;color:#fff;border:1px solid #3a3f4b;border-radius:12px;padding:12px;font-size:16px;text-align:center">
+      <button class="btn main wide" id="olRandom">ランダム対戦</button>
+      <div class="btgrid"><button class="btn" id="olHost">友だちとルームを作る</button><button class="btn" id="olJoin">ルームに入る</button></div>
+    </div>
     <div id="olHostBox" class="col" hidden>
       <h3>① このコードを友だちに送る</h3>
       <textarea class="codebox" id="olHostCode" readonly></textarea>
@@ -2000,7 +2004,7 @@ const cpuRpm = diff => Math.round([10000, 18000, 26000][diff - 1] * (0.85 + Math
 /* ---------- 画面の流れ ---------- */
 const btEl = $b('bt'), SCREENS = ['sMenu', 'sP2', 'sOnline', 'sResult'];
 const BT = { type: null, diff: 1, phase: 'idle', lock: false, role: 'local', flip: false, saved: null, p1: null, p2: null, name1: '', name2: '',
-  rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
+  rand: false, rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
 function showScreen(id) { for (const s of SCREENS) $b(s).hidden = s !== id; btEl.classList.add('show'); document.body.classList.add('btmode'); }
 function hideOverlay() { btEl.classList.remove('show'); }
 const TYPE_COL = { atk: '#ff6b6b', def: '#5db4ff', sta: '#6bdc8b', bal: '#d0d0d0' };
@@ -2076,8 +2080,8 @@ function showResult() {
   $b('resTitle').textContent = title;
   $b('resBody').innerHTML = `${Bt.draw ? '相打ち！ 同時に倒れた' : win || BT.type === 'local' ? why : (Bt.reason === 'burst' ? 'スピナーが壊れた…' : Bt.reason === 'ringout' ? '場外に出された…' : Bt.reason === 'stop' ? '回転が止まった…' : why)}<br>
     ${Bt.t.toFixed(1)}秒 ／ ヒット ${me.hits}回 ／ 最大ダメージ ${Math.round(me.maxHit)} ／ ダッシュ ${me.dashed}回<br>
-    あなた ${me.rpm.toLocaleString('en-US')}rpm（${designLabel(me.d)}）<br>相手 ${op.rpm.toLocaleString('en-US')}rpm（${designLabel(op.d)}）`;
-  $b('resAgain').disabled = BT.type === 'online';
+    あなた ${me.rpm.toLocaleString('en-US')}rpm（${designLabel(me.d)}）<br>${BT.type === 'online' ? op.name : '相手'} ${op.rpm.toLocaleString('en-US')}rpm（${designLabel(op.d)}）`;
+  $b('resAgain').disabled = BT.type === 'online' && !BT.rand;
   showScreen('sResult');
 }
 
@@ -2377,7 +2381,7 @@ function olReset() {
 }
 function netClose() {                                       // 自分から閉じる時は「切れた」と誤検出しないよう、先に監視をはずす
   try { if (Net.dc) { Net.dc.onclose = null; Net.dc.close(); } if (Net.pc) { Net.pc.onconnectionstatechange = null; Net.pc.close(); } } catch (e) { /* 無視 */ }
-  Net.pc = Net.dc = null; Net.open = false;
+  Net.pc = Net.dc = null; Net.open = false; mmClose();
 }
 function newPC() {
   const pc = new RTCPeerConnection(RTC_CFG);
@@ -2418,9 +2422,83 @@ async function olMakeAns() {
     $b('olAnsCode').value = enc(pc.localDescription); olStatus('このコードを友だちに送り返してください。つながるまで待ちます');
   } catch (e) { olStatus('コードが正しくありません'); }
 }
-function onNetOpen() {                                      // つながった：お互いのデザインを交換して、同時に5秒間回す
-  BT.type = 'online'; BT.p1 = designOf(); BT.saved = designOf(); BT.name1 = 'あなた'; BT.name2 = '相手'; BT.mySpun = BT.peerSpun = false; BT.peer = null; BT.sentHello = true;
-  netSend({ t: 'hello', design: BT.p1 }); olStatus('つながりました！'); maybeStartOnlineSpin();
+/* ---- ランダム対戦：PeerJS の公開サーバーを「待ち合わせ場所」にして、空いている部屋番号に先に入った人が待ち、あとの人がつながる ---- */
+const MM = { peer: null, lobby: null, tm: null, talk: null, matched: false, active: false, guestId: null };
+const LOBBY = 'spinbattle-r1-';
+const peerCfg = () => window.__peerCfg || { host: '0.peerjs.com', port: 443, secure: true, path: '/' };
+const cleanNick = v => String(v || '').replace(/[\u0000-\u001f<>&"']/g, '').trim().slice(0, 10);
+const myNick = () => cleanNick($b('olNick').value) || 'ななし';
+function loadPeerJS() {
+  return new Promise((res, rej) => {
+    if (window.Peer) return res();
+    const sc = document.createElement('script'); sc.src = window.__peerSrc || 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
+    sc.onload = () => window.Peer ? res() : rej(new Error('peerjs')); sc.onerror = () => rej(new Error('load')); document.head.appendChild(sc);
+  });
+}
+function mmLobbyClose() { try { if (MM.lobby) MM.lobby.destroy(); } catch (e) { /* 無視 */ } MM.lobby = null; clearTimeout(MM.tm); }
+function mmClose() {
+  MM.active = false; MM.matched = false; MM.guestId = null; clearTimeout(MM.tm); clearTimeout(MM.talk);
+  mmLobbyClose(); try { if (MM.peer) MM.peer.destroy(); } catch (e) { /* 無視 */ } MM.peer = null;
+}
+function mmRestart(msg) { MM.matched = false; MM.guestId = null; if (msg) olStatus(msg); setTimeout(() => mmScan(0), 600); }
+function mmWire(conn, role) {
+  const adapter = { readyState: 'open', send: s => { try { conn.send(s); } catch (e) { /* 無視 */ } }, close: () => { try { conn.close(); } catch (e) { /* 無視 */ } }, onclose: null };
+  conn.on('data', d => { try { handleNet(JSON.parse(d)); } catch (e) { /* 無視 */ } });
+  conn.on('close', () => { if (Net.dc !== adapter) return; Net.open = false; if (MODE !== 'free' || BT.phase !== 'idle') netLost(); });
+  const up = () => { clearTimeout(MM.talk); BT.role = role; BT.flip = role === 'guest'; Net.dc = adapter; Net.open = true; mmLobbyClose(); onNetOpen(true); };
+  if (conn.open) up(); else conn.on('open', up);
+}
+function mmScan(slot) {
+  if (!MM.active || MM.matched) return;
+  if (slot > 7) slot = 0;
+  olStatus('対戦相手をさがしています…');
+  const lobby = new Peer(LOBBY + slot, peerCfg()); MM.lobby = lobby; let settled = false;
+  lobby.on('open', () => {                                    // 空いていた：ここで待つ
+    if (!MM.active) return; settled = true; olStatus('対戦相手を待っています…（誰かが来るまで）');
+    lobby.on('connection', c => {
+      c.on('open', () => {
+        if (MM.matched) { try { c.send('busy'); } catch (e) { /* 無視 */ } setTimeout(() => c.close(), 300); return; }
+        MM.matched = true; MM.guestId = c.peer; clearTimeout(MM.tm); c.send(JSON.stringify({ t: 'go', id: MM.peer.id }));
+        setTimeout(() => { if (MM.lobby === lobby) mmLobbyClose(); }, 800);
+        MM.talk = setTimeout(() => { if (!Net.open) mmRestart('相手とつながりませんでした。もう一度さがします…'); }, 10000);
+      });
+    });
+    MM.tm = setTimeout(() => { mmLobbyClose(); mmScan(0); }, 5000 + Math.random() * 5000);   // 待ち続けると、別の部屋で待つ人とすれ違うので、時々さがしなおす
+  });
+  lobby.on('error', err => {
+    if (settled || !MM.active) return;
+    if (err.type === 'unavailable-id') { try { lobby.destroy(); } catch (e) { /* 無視 */ } MM.lobby = null; mmJoin(slot); }
+    else { try { lobby.destroy(); } catch (e) { /* 無視 */ } MM.lobby = null; olStatus('サーバーにつなげません。少し待ってやり直します…'); MM.tm = setTimeout(() => mmScan(slot), 3000); }
+  });
+}
+function mmJoin(slot) {                                       // その部屋で誰かが待っている：声をかける
+  const c = MM.peer.connect(LOBBY + slot, { serialization: 'raw' }); let done = false;
+  const next = () => { if (done) return; done = true; try { c.close(); } catch (e) { /* 無視 */ } setTimeout(() => mmScan(slot + 1), 200); };
+  MM.talk = setTimeout(next, 4000);
+  c.on('data', d => {
+    if (done) return; let m; try { m = JSON.parse(d); } catch (e) { m = { t: String(d) }; }
+    if (m.t === 'go') {
+      done = true; clearTimeout(MM.talk); MM.matched = true; olStatus('対戦相手が見つかりました！つないでいます…');
+      const g = MM.peer.connect(m.id, { serialization: 'raw' }); mmWire(g, 'guest');
+      MM.talk = setTimeout(() => { if (!Net.open) mmRestart('つながりませんでした。もう一度さがします…'); }, 10000);
+    } else next();
+  });
+  c.on('error', next); c.on('close', () => { if (!done) next(); });
+}
+async function olRandom() {
+  try { localStorage.setItem('spinNick', myNick()); } catch (e) { /* 無視 */ }
+  mmClose(); BT.rand = true; BT.role = 'host'; BT.flip = false;
+  $b('olStep0').hidden = true; olStatus('サーバーにつないでいます…');
+  try { await loadPeerJS(); } catch (e) { olStatus('通信ライブラリを読み込めませんでした（ネットワークを確認してください）'); $b('olStep0').hidden = false; return; }
+  MM.active = true;
+  const peer = new Peer(undefined, peerCfg()); MM.peer = peer;
+  peer.on('open', () => mmScan(0));
+  peer.on('connection', conn => { if (MM.matched && conn.peer === MM.guestId) { clearTimeout(MM.talk); mmWire(conn, 'host'); } else conn.close(); });
+  peer.on('error', () => { if (MM.active && !MM.matched) olStatus('サーバーにつなげません。ネットワークを確認して、もどってやり直してください'); });
+}
+function onNetOpen(keep) {                                      // つながった：お互いのデザインを交換して、同時に5秒間回す
+  BT.type = 'online'; BT.p1 = designOf(); BT.saved = designOf(); BT.name1 = 'あなた'; BT.name2 = '相手'; BT.mySpun = BT.peerSpun = false; if (!keep) BT.peer = null; BT.sentHello = true;
+  netSend({ t: 'hello', design: BT.p1, nick: myNick() }); olStatus('つながりました！'); maybeStartOnlineSpin();
 }
 function maybeStartOnlineSpin() {
   if (!BT.sentHello || !BT.peer || MODE !== 'free' || BT.phase !== 'idle') return;
@@ -2429,7 +2507,7 @@ function maybeStartOnlineSpin() {
 }
 function maybeBeginOnline() {
   if (BT.role !== 'host' || !BT.mySpun || !BT.peerSpun) return;
-  const a = makeFighter(BT.p1, BT.rpm1, 'あなた', 'A'), b = makeFighter(BT.p2, BT.rpm2, '相手', 'B');
+  const a = makeFighter(BT.p1, BT.rpm1, 'あなた', 'A'), b = makeFighter(BT.p2, BT.rpm2, cleanNick(BT.peer && BT.peer.nick) || '相手', 'B');
   BT.battle = makeBattle(a, b);
   netSend({ t: 'start', A: { d: a.d, rpm: a.rpm, dir: a.dir }, B: { d: b.d, rpm: b.rpm, dir: b.dir } });
   enterBattleView();
@@ -2440,7 +2518,7 @@ function handleNet(m) {
   if (m.t === 'hello') { BT.peer = m; maybeStartOnlineSpin(); }
   else if (m.t === 'spun') { BT.rpm2 = m.rpm; BT.peerSpun = true; maybeBeginOnline(); }
   else if (m.t === 'start' && BT.role === 'guest') {
-    const fa = makeFighter(m.A.d, m.A.rpm, '相手', 'A'), fb = makeFighter(m.B.d, m.B.rpm, 'あなた', 'B');   // A=ホスト、B=ゲスト（自分）
+    const fa = makeFighter(m.A.d, m.A.rpm, cleanNick(BT.peer && BT.peer.nick) || '相手', 'A'), fb = makeFighter(m.B.d, m.B.rpm, 'あなた', 'B');   // A=ホスト、B=ゲスト（自分）
     fa.dir = m.A.dir; fb.dir = m.B.dir;
     BT.battle = makeBattle(fa, fb);
     enterBattleView();
@@ -2472,11 +2550,13 @@ $b('p2Go').addEventListener('click', () => {
   BT.p2 = designOf();
   startSpin('2P', rpm => { BT.rpm2 = rpm; beginBattle(); });
 });
-$b('resAgain').addEventListener('click', () => { const t = BT.type, d = BT.diff; endBattle(false); btStart(t, d); });
+$b('resAgain').addEventListener('click', () => { const t = BT.type, d = BT.diff, rand = BT.rand; endBattle(false); btStart(t, d); if (t === 'online' && rand) olRandom(); });
 $b('resMenu').addEventListener('click', () => endBattle(true));
 $b('olBack').addEventListener('click', () => { netClose(); BT.phase = 'idle'; endBattle(true); });
-$b('olHost').addEventListener('click', olHost);
-$b('olJoin').addEventListener('click', () => { $b('olStep0').hidden = true; $b('olJoinBox').hidden = false; });
+$b('olHost').addEventListener('click', () => { BT.rand = false; olHost(); });
+$b('olRandom').addEventListener('click', olRandom);
+try { $b('olNick').value = localStorage.getItem('spinNick') || ''; } catch (e) { /* 無視 */ }
+$b('olJoin').addEventListener('click', () => { BT.rand = false; $b('olStep0').hidden = true; $b('olJoinBox').hidden = false; });
 $b('olConnect').addEventListener('click', olConnect);
 $b('olMakeAns').addEventListener('click', olMakeAns);
 const copyTo = (id, label) => async () => { const el = $b(id); el.select(); try { await navigator.clipboard.writeText(el.value); olStatus(label + 'をコピーしました'); } catch (e) { document.execCommand && document.execCommand('copy'); olStatus('選択しました。コピーしてください'); } };
