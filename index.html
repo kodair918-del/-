@@ -21,11 +21,22 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 #toast.show{animation:pop 1.4s ease-out}
 #toast.lite{font-size:18px;font-weight:600;letter-spacing:.08em;text-shadow:0 1px 8px rgba(0,0,0,.6);opacity:.75}
 @keyframes pop{0%{opacity:0;transform:scale(.6)}14%{opacity:1;transform:scale(1.18)}28%{transform:scale(1)}78%{opacity:1}100%{opacity:0;transform:translateY(-16px)}}
-#bar{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:0 12px}
-#bar button{font:inherit;font-size:14px;color:var(--fg);background:var(--panel);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:0 14px;min-height:44px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;transition:transform .08s}
-#bar button[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
-#bar button:disabled{opacity:.4}
-#bar button:active{transform:scale(.96)}
+#gear{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 18px);width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:var(--panel);color:var(--fg);display:grid;place-items:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:.6;cursor:pointer;transition:opacity .2s}
+#gear:active,#gear[aria-expanded="true"]{opacity:1}
+#scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s}
+#scrim.open{opacity:1;pointer-events:auto}
+#sheet{position:fixed;left:0;right:0;bottom:0;max-height:80%;overflow:auto;background:rgba(16,19,26,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-radius:22px 22px 0 0;border:1px solid rgba(255,255,255,.1);border-bottom:0;padding:10px max(16px,env(safe-area-inset-left,0px)) calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateY(105%);visibility:hidden;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s .3s;touch-action:pan-y;overscroll-behavior:contain}
+#sheet.open{transform:none;visibility:visible;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s}
+.grab{width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.25);margin:2px auto 4px}
+#sheet h3{font-size:12px;font-weight:500;opacity:.55;letter-spacing:.1em;margin:14px 4px 6px}
+.rows{display:flex;flex-direction:column;border-radius:14px;overflow:hidden;background:rgba(255,255,255,.05)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:50px;padding:0 16px;background:none;border:0;border-bottom:1px solid rgba(255,255,255,.07);color:var(--fg);font:inherit;font-size:15px;text-align:left;cursor:pointer}
+.row:last-child{border-bottom:0}
+.row b{font-weight:500;opacity:.75}
+.row[aria-pressed="true"] b{color:var(--accent);opacity:1}
+.row:active{background:rgba(255,255,255,.07)}
+.row:disabled{opacity:.4;cursor:default}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
 </style>
 </head>
 <body>
@@ -33,16 +44,27 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <div id="hud"><div id="rpm"><span id="rpmv">0</span><small>rpm</small></div><div id="stats"></div></div>
 <div id="toast"></div>
 <div id="hint">どこでもスワイプで回る ／ 指を置くと止まる</div>
-<div id="bar">
-  <button id="bTheme"></button>
-  <button id="bArms"></button>
-  <button id="bSound"></button>
-  <button id="bTimbre"></button>
-  <button id="bVib"></button>
-  <button id="bBass"></button>
-  <button id="bTilt"></button>
-  <button id="bFx"></button>
-  <button id="bStop">止める</button>
+<button id="gear" aria-label="設定" aria-expanded="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+<div id="scrim"></div>
+<div id="sheet" role="dialog" aria-label="設定">
+  <div class="grab"></div>
+  <h3>見た目</h3>
+  <div class="rows">
+    <button id="bTheme" class="row"></button>
+    <button id="bArms" class="row"></button>
+    <button id="bFx" class="row"></button>
+  </div>
+  <h3>音</h3>
+  <div class="rows">
+    <button id="bSound" class="row"></button>
+    <button id="bTimbre" class="row"></button>
+    <button id="bBass" class="row"></button>
+  </div>
+  <h3>体感</h3>
+  <div class="rows">
+    <button id="bVib" class="row"></button>
+    <button id="bTilt" class="row"></button>
+  </div>
 </div>
 <script>
 (() => {
@@ -147,7 +169,9 @@ const bVib = document.getElementById('bVib');
 const bBass = document.getElementById('bBass');
 const bTilt = document.getElementById('bTilt');
 const bFx = document.getElementById('bFx');
-const bStop = document.getElementById('bStop');
+const gear = document.getElementById('gear');
+const sheet = document.getElementById('sheet');
+const scrim = document.getElementById('scrim');
 
 let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, R = 100;
 function resize() {
@@ -156,7 +180,7 @@ function resize() {
   canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   R = Math.min(W, H) * 0.38;
-  cx = W / 2; cy = H * 0.45;
+  cx = W / 2; cy = H * 0.5;
 }
 window.addEventListener('resize', resize);
 resize();
@@ -1164,24 +1188,35 @@ function frame(now) {
 }
 
 /* ---------- UI ---------- */
+const setRow = (btn, label, value, on) => {
+  btn.innerHTML = `<span>${label}</span><b>${value}</b>`;
+  if (on !== undefined) btn.setAttribute('aria-pressed', on);
+};
 function refreshUI() {
   const P = THEME[settings.theme];
   document.documentElement.style.setProperty('--accent', P.accent);
-  bTheme.textContent = `テーマ：${THEME_NAME[settings.theme]}`;
-  bArms.textContent = `${settings.arms}本`;
-  bSound.textContent = `音：${settings.sound ? 'ON' : 'OFF'}`;
-  bSound.setAttribute('aria-pressed', settings.sound);
-  bTimbre.textContent = `音色：${TIMBRE_NAME[settings.timbre]}`;
-  bVib.textContent = canHaptic ? `振動：${settings.vib ? 'ON' : 'OFF'}` : '振動（非対応）';
+  setRow(bTheme, 'テーマ', `<i class="dot" style="background:${P.accent}"></i>${THEME_NAME[settings.theme]}`);
+  setRow(bArms, 'アームの数', `${settings.arms}本`);
+  setRow(bFx, '演出', FX_NAME[settings.fx]);
+  setRow(bSound, '音', settings.sound ? 'ON' : 'OFF', settings.sound);
+  setRow(bTimbre, '音色', TIMBRE_NAME[settings.timbre]);
+  setRow(bBass, '音で振動（低音）', settings.bass ? 'ON' : 'OFF', settings.bass);
+  setRow(bVib, '振動', canHaptic ? (settings.vib ? 'ON' : 'OFF') : '非対応', settings.vib && canHaptic);
   bVib.disabled = !canHaptic;
-  bVib.setAttribute('aria-pressed', settings.vib && canHaptic);
-  bBass.textContent = `音で振動：${settings.bass ? 'ON' : 'OFF'}`;
-  bBass.setAttribute('aria-pressed', settings.bass);
-  bTilt.textContent = `傾き・動き：${settings.tilt ? 'ON' : 'OFF'}${settings.tilt && S.tiltReq && !S.tiltSeen && !S.motionSeen ? '（未検出）' : ''}`;
-  bFx.textContent = `演出：${FX_NAME[settings.fx]}`;
-  bTilt.setAttribute('aria-pressed', settings.tilt);
+  setRow(bTilt, '傾き・動き', `${settings.tilt ? 'ON' : 'OFF'}${settings.tilt && S.tiltReq && !S.tiltSeen && !S.motionSeen ? '（未検出）' : ''}`, settings.tilt);
   if (ac && master) master.gain.setTargetAtTime(settings.sound ? 0.9 : 0, ac.currentTime, 0.05);
 }
+
+// 設定パネルの開け閉め
+function setSheet(open) {
+  sheet.classList.toggle('open', open);
+  scrim.classList.toggle('open', open);
+  gear.setAttribute('aria-expanded', open);
+  if (open) { initAudio(); enableTilt(); }                // 歯車のタップもユーザー操作（iPhoneの許可に使える）
+}
+gear.addEventListener('click', () => setSheet(!sheet.classList.contains('open')));
+scrim.addEventListener('click', () => setSheet(false));
+window.addEventListener('keydown', e => { if (e.key === 'Escape') setSheet(false); });
 
 function cycle(list, cur) { return list[(list.indexOf(cur) + 1) % list.length]; }
 
@@ -1201,7 +1236,6 @@ bFx.addEventListener('click', () => {
   settings.fx = settings.fx === 1 ? 0 : 1;                           // 控えめ ⇄ 最小
   saveSettings(); refreshUI();
 });
-bStop.addEventListener('click', () => { initAudio(); S.omega = 0; });
 
 // 別タブに行った時は音を止める
 document.addEventListener('visibilitychange', () => {
