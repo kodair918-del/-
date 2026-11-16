@@ -1850,7 +1850,7 @@ function statsRaw(d) {
 }
 // タイプ（じゃんけん）：攻撃型 > 持久型 > 防御型 > 攻撃型。総合的な強さの差は小さくして、「何が得意か」で勝ち負けが決まるようにする
 // 環境の調整：シミュレーションで全デザインを戦わせ、強すぎる／弱すぎる部品を補正した倍率（1＝補正なし）
-const PW = { material: { metal: 1, gold: 1, copper: 1, titan: 1, black: 1, neon: 1, rainbow: 1, wood: 1, matte: 1, ice: 1 }, shape: { round: 1, slim: 1, fat: 1, long: 1, pointy: 1, leaf: 1 }, hole: { round: 1, big: 1, small: 1, weight: 1 }, arms: { 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 }, type: { atk: 1, def: 1, sta: 1, bal: 1 } };
+const PW = { material: { metal: 0.958, gold: 0.965, copper: 0.962, titan: 1.088, black: 0.878, neon: 0.987, rainbow: 1.029, wood: 1.128, matte: 0.906, ice: 1.213 }, shape: { round: 0.985, slim: 1.092, fat: 0.956, long: 1.024, pointy: 1.012, leaf: 0.979 }, hole: { round: 1.019, big: 1.065, small: 1.004, weight: 0.943 }, arms: { 2: 1.161, 3: 1.02, 4: 0.968, 5: 0.95, 6: 0.951 }, type: { atk: 1.029, def: 0.924, sta: 1.019, bal: 1.027 } };
 const TYPE_NAME = { atk: '攻撃型', def: '防御型', sta: '持久型', bal: 'バランス型' };
 function statsOf(d) {
   const st = statsRaw(d), r = ranges();
