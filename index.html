@@ -1768,8 +1768,8 @@ bFx.addEventListener('click', () => {
 
 /* ================= バトル ================= */
 let MODE = 'free';                                         // 'free'(ふつうに回す) | 'spin'(5秒間回す) | 'battle'
-const BS = 0.36;                                            // R=1 のスピナーの半径（アリーナ半径=1 に対する比）
-const PHYS = { JMAX: 1.0, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.4, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 1.3, DASH: 1.6, DASH_CD: 1.4, TIME: 75 };   // シミュレーションで調整した値
+let BS = 0.22, Q = BS / 0.36;                                // R=1 のスピナーの半径（アリーナ半径=1 に対する比）。小さいほどフィールドが広い。Q＝旧サイズ(0.36)との比で、速さ・力を合わせる                                            // R=1 のスピナーの半径（アリーナ半径=1 に対する比）
+const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.1, DASH: 1.6, DASH_CD: 1.4, TIME: 75 };   // シミュレーションで調整した値
 const $b = id => document.getElementById(id);
 
 // 材質：dens=重さ hard=硬さ bear=軸の滑らかさ grip=グリップ（相手へ寄っていく強さ）
@@ -1856,8 +1856,9 @@ function makeFighter(d, rpm, name, side) {
   return { d, name, side, st: statsOf(d), circles: hitCircles(d), x: 0, y: 0, vx: 0, vy: 0, th: Math.random() * TAU, dir: Math.random() < 0.5 ? 1 : -1,
     w, w0: w, lk: 0.85 + Math.random() * 0.3, dashCd: 0, dashReq: false, pairCd: 0, out: false, fin: false, outT: 0, hits: 0, taken: 0, maxHit: 0, dashed: 0, aiT: 0, rpm: Math.round(r) };
 }
+let START = 0.5;
 function makeBattle(a, b) {
-  a.x = 0; a.y = 0.55; a.vy = -0.2; b.x = 0; b.y = -0.55; b.vy = 0.2;
+  a.x = 0; a.y = START; a.vy = -0.2 * Q; b.x = 0; b.y = -START; b.vy = 0.2 * Q;
   return { A: a, B: b, t: 0, over: false, winner: null, reason: '', ev: [] };
 }
 function worldCircles(f) {
@@ -1873,10 +1874,10 @@ function stepFighter(f, o, dt) {
   let ax = -PHYS.BOWL * f.x, ay = -PHYS.BOWL * f.y;                                   // すり鉢の中心へ
   const dx = o.x - f.x, dy = o.y - f.y, dist = Math.hypot(dx, dy) || 1e-6;
   const att = PHYS.ATT * wn * f.st.grip / Math.sqrt(f.st.mass);                         // 回転が速いほど相手へ寄っていく
-  ax += dx / dist * att; ay += dy / dist * att;
+  ax += dx / dist * att * Q; ay += dy / dist * att * Q;
   const rr = Math.hypot(f.x, f.y) || 1e-6;
-  ax += -f.y / rr * PHYS.ORBIT * wn * f.dir; ay += f.x / rr * PHYS.ORBIT * wn * f.dir; // 回転の向きに沿って周回
-  if (f.w < 70) { const j = (1 - f.w / 70) * 6; ax += (Math.random() - 0.5) * j; ay += (Math.random() - 0.5) * j; }   // 回転が落ちるとふらつく
+  ax += -f.y / rr * PHYS.ORBIT * Q * wn * f.dir; ay += f.x / rr * PHYS.ORBIT * Q * wn * f.dir; // 回転の向きに沿って周回
+  if (f.w < 70) { const j = (1 - f.w / 70) * 6 * Q; ax += (Math.random() - 0.5) * j; ay += (Math.random() - 0.5) * j; }   // 回転が落ちるとふらつく
   f.vx += ax * dt; f.vy += ay * dt;
   const dr = Math.exp(-PHYS.DRAG * dt); f.vx *= dr; f.vy *= dr;
   f.x += f.vx * dt; f.y += f.vy * dt;
@@ -1886,7 +1887,7 @@ function applyDash(f, o) {
   if (!f.dashReq) return;
   f.dashReq = false;
   if (f.dashCd > 0 || f.out || f.fin) return;
-  const dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy) || 1e-6, k = PHYS.DASH / Math.sqrt(f.st.mass);
+  const dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy) || 1e-6, k = PHYS.DASH * Q / Math.sqrt(f.st.mass);
   f.vx += dx / d * k; f.vy += dy / d * k; f.w *= 0.94; f.dashCd = PHYS.DASH_CD; f.dashed++;
 }
 const KIND_ATK = { tip: 1, mid: 0.55, hub: 0.4 }, KIND_DEF = { tip: 0.8, mid: 1, hub: 1.1 };
@@ -1905,9 +1906,9 @@ function collide(Bt, A, B) {
   const vax = A.vx - PHYS.SPIN * wa * A.dir * ray, vay = A.vy + PHYS.SPIN * wa * A.dir * rax;     // 接触点の速度（回転ぶんも含む）
   const vbx = B.vx - PHYS.SPIN * wb * B.dir * rby, vby = B.vy + PHYS.SPIN * wb * B.dir * rbx;
   const vn = (vbx - vax) * nx + (vby - vay) * ny;
-  if (A.pairCd > 0 || vn > -PHYS.MINV) return;             // かすっただけの接触はヒットにしない
-  const J = -(1 + PHYS.E) * vn / (1 / mA + 1 / mB);
-  const Jk = Math.min(J, PHYS.JMAX);                        // はじき飛ばす力には上限（ダメージは大きくなっても、1発で場外にならないように）
+  if (A.pairCd > 0 || vn > -PHYS.MINV * Q) return;             // かすっただけの接触はヒットにしない
+  const J = -(1 + PHYS.E) * vn / (1 / mA + 1 / mB) / Q;     // 旧サイズ換算の強さ
+  const Jk = Math.min(J, PHYS.JMAX) * Q;                        // はじき飛ばす力には上限（ダメージは大きくなっても、1発で場外にならないように）
   A.vx -= Jk / mA * nx * PHYS.KNOCK; A.vy -= Jk / mA * ny * PHYS.KNOCK; B.vx += Jk / mB * nx * PHYS.KNOCK; B.vy += Jk / mB * ny * PHYS.KNOCK;
   const rnd = () => 0.75 + Math.random() * 0.5;                               // ダメージには毎回少しばらつき
   const dB = PHYS.DMG * J * rnd() * A.lk * A.st.atkE * KIND_ATK[best.a.kind] / (B.st.defE * KIND_DEF[best.b.kind]);   // 相手が受ける回転ダメージ
@@ -1940,7 +1941,7 @@ function aiDash(f, o, diff, dt) {                           // CPUのダッシ�
   f.aiT -= dt;
   if (f.aiT > 0) return;
   f.aiT = [0.55, 0.32, 0.18][diff - 1] * (0.7 + Math.random() * 0.6);
-  if (f.dashCd <= 0 && !f.out && Math.hypot(o.x - f.x, o.y - f.y) < 0.85 && Math.random() < [0.2, 0.5, 0.85][diff - 1]) f.dashReq = true;
+  if (f.dashCd <= 0 && !f.out && Math.hypot(o.x - f.x, o.y - f.y) < 0.85 * Q * 1.4 && Math.random() < [0.2, 0.5, 0.85][diff - 1]) f.dashReq = true;
 }
 const cpuRpm = diff => Math.round([900, 2200, 4200][diff - 1] * (0.8 + Math.random() * 0.4));
 
@@ -1994,7 +1995,7 @@ function beginBattle() {
   BT.battle = makeBattle(a, b); enterBattleView();
 }
 function enterBattleView() {
-  MODE = 'battle'; BT.phase = 'count'; BT.count = 3.2; BT.sparks = []; BT.snapT = 0; BT.endT = 0;
+  MODE = 'battle'; camReset(); BT.phase = 'count'; BT.count = 3.2; BT.sparks = []; BT.snapT = 0; BT.endT = 0;
   document.body.classList.add('btmode', 'inbattle');
   hideOverlay();
   $b('dash1').style.display = 'block'; $b('dash2').style.display = BT.type === 'local' ? 'block' : 'none';
@@ -2029,9 +2030,10 @@ function showResult() {
 function btEvents(Bt) {
   for (const e of Bt.ev.splice(0)) {
     if (e.type === 'hit') {
-      for (let i = 0; i < 9; i++) { const a = Math.random() * TAU, v = 0.4 + Math.random() * 1.1; BT.sparks.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.35 + Math.random() * 0.25 }); }
+      CAM.shake = Math.min(1, CAM.shake + 0.25 + e.p * 0.35); CAM.punch = Math.min(1, CAM.punch + 0.5 + e.p * 0.3);
+      for (let i = 0; i < 9 + Math.min(10, e.p * 8 | 0); i++) { const a = Math.random() * TAU, v = 0.4 + Math.random() * 1.1; BT.sparks.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.35 + Math.random() * 0.25 }); }
       click(Math.min(1, 0.35 + e.p * 0.35)); if (e.p > 0.8) thump(Math.min(1, e.p * 0.35)); vib(Math.min(40, 12 + e.p * 14));
-    } else if (e.type === 'out') { whoosh(0.8); vib(40); } else if (e.type === 'fin') settle();
+    } else if (e.type === 'out') { whoosh(0.8); vib(40); CAM.shake = 1; CAM.punch = 1; } else if (e.type === 'fin') settle();
   }
 }
 function battleFrame(now, rawDt) {
@@ -2067,32 +2069,60 @@ function battleFrame(now, rawDt) {
   S.omega = me.out ? 0 : me.w; audioUpdate();               // 自分のスピナーの回転音を鳴らす
   drawBattle(dt, Bt);
 }
-function battleLayout() { return { AR: Math.max(110, Math.min(W * 0.46, (H - 250) / 2)), ax: W / 2, ay: H * 0.5 }; }
+const CAM = { x: 0, y: 0, z: 1, rot: 0, shake: 0, punch: 0, t: 0, init: false };
+function camReset() { CAM.x = CAM.y = 0; CAM.z = 1; CAM.rot = 0.5; CAM.shake = CAM.punch = CAM.t = 0; CAM.init = true; }
+function camUpdate(dt, Bt, L) {                              // カメラワーク：2人を追いかけてズーム、ヒットで揺れる、決着で勝者へ寄る
+  if (!CAM.init) camReset();
+  CAM.t += dt;
+  const A = Bt.A, B = Bt.B, k = 1 - Math.exp(-dt * 4.5);
+  let tx, ty, tz, tr = Math.sin(CAM.t * 0.45) * 0.05;
+  if (BT.phase === 'count') {                                // 入場：広い画面から、ぐるっと回り込んでスピナーへ寄る
+    const u = Math.min(1, Math.max(0, 1 - BT.count / 3.2));
+    tx = 0; ty = 0; tz = 1 + 0.9 * u * u; tr = (1 - u) * 0.5;
+  } else if (BT.phase === 'end' && (A.out || A.fin || B.out || B.fin)) {
+    const w = Bt.winner === 'A' ? A : B, lo = w === A ? B : A;
+    const f = lo.out ? lo : w;                               // 場外なら飛んでいく方を、止まったなら勝者を追う
+    tx = f.x * 0.9; ty = f.y * 0.9; tz = lo.out ? 1.5 : 2.6; tr = 0;
+  } else {
+    const sep = Math.hypot(A.x - B.x, A.y - B.y), mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+    const span = sep / 2 + BS * 2.1;                          // 2人が画面に収まる広さ
+    tz = Math.max(1, Math.min(2.7, (Math.min(W, H) * 0.42) / (L.AR * span)));
+    tx = mx; ty = my;
+    const speed = Math.hypot(A.vx - B.vx, A.vy - B.vy); tz *= 1 + Math.min(0.08, speed * 0.02);
+  }
+  CAM.x += (tx - CAM.x) * k; CAM.y += (ty - CAM.y) * k; CAM.z += (tz - CAM.z) * k; CAM.rot += (tr - CAM.rot) * (1 - Math.exp(-dt * 2.5));
+  CAM.shake *= Math.exp(-dt * 7); CAM.punch *= Math.exp(-dt * 6);
+}
+function battleLayout() { return { AR: Math.max(110, Math.min(W * 0.5, (H - 190) / 2)), ax: W / 2, ay: H * 0.5 }; }
 function drawBattle(dt, Bt) {
   const L = battleLayout(), sgn = BT.flip ? -1 : 1, P = THEME[settings.material];
   S.drawDt += dt; S.L = Math.log2(1 + Math.abs(S.omega) / 40);
   drawBackground(); S.drawDt = 0;
-  // すり鉢のアリーナ
+  camUpdate(dt, Bt, L);
+  const zz = CAM.z * (1 + CAM.punch * 0.06), shx = (Math.random() - 0.5) * CAM.shake * 9, shy = (Math.random() - 0.5) * CAM.shake * 9;
   ctx.save();
-  let g = ctx.createRadialGradient(L.ax, L.ay, L.AR * 0.1, L.ax, L.ay, L.AR * 1.1);
-  g.addColorStop(0, 'rgba(46,52,66,.95)'); g.addColorStop(0.75, 'rgba(18,21,28,.97)'); g.addColorStop(1, 'rgba(6,7,10,.98)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(L.ax, L.ay, L.AR * 1.07, 0, TAU); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
-  for (const r of [0.25, 0.5, 0.75]) { ctx.beginPath(); ctx.arc(L.ax, L.ay, L.AR * r, 0, TAU); ctx.stroke(); }
-  ctx.beginPath(); ctx.moveTo(L.ax - L.AR, L.ay); ctx.lineTo(L.ax + L.AR, L.ay); ctx.moveTo(L.ax, L.ay - L.AR); ctx.lineTo(L.ax, L.ay + L.AR); ctx.stroke();
-  g = ctx.createLinearGradient(L.ax - L.AR, L.ay - L.AR, L.ax + L.AR, L.ay + L.AR);
+  ctx.translate(L.ax + shx, L.ay + shy); ctx.rotate(CAM.rot); ctx.scale(zz, zz); ctx.translate(-sgn * CAM.x * L.AR, -sgn * CAM.y * L.AR);
+  const AR = L.AR, W0 = { ax: 0, ay: 0, AR };
+  // すり鉢のアリーナ（広い）
+  let g = ctx.createRadialGradient(0, 0, AR * 0.1, 0, 0, AR * 1.1);
+  g.addColorStop(0, 'rgba(50,57,72,.96)'); g.addColorStop(0.75, 'rgba(20,23,31,.97)'); g.addColorStop(1, 'rgba(6,7,10,.98)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, AR * 1.07, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1 / zz * 1.2;
+  ctx.beginPath(); for (let i = 1; i < 8; i++) { ctx.moveTo(AR * i / 8, 0); ctx.arc(0, 0, AR * i / 8, 0, TAU); }
+  for (let i = 0; i < 16; i++) { const a = i * TAU / 16; ctx.moveTo(Math.cos(a) * AR * 0.125, Math.sin(a) * AR * 0.125); ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); } ctx.stroke();
+  ctx.strokeStyle = P.accent; ctx.globalAlpha = 0.16; ctx.lineWidth = AR * 0.02; ctx.beginPath(); ctx.arc(0, 0, AR * 0.22, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
+  g = ctx.createLinearGradient(-AR, -AR, AR, AR);
   g.addColorStop(0, '#b4bdcc'); g.addColorStop(0.5, '#4a5160'); g.addColorStop(1, '#d3dbe8');
-  ctx.strokeStyle = g; ctx.lineWidth = L.AR * 0.07; ctx.beginPath(); ctx.arc(L.ax, L.ay, L.AR * 1.04, 0, TAU); ctx.stroke();
-  ctx.strokeStyle = P.accent; ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(L.ax, L.ay, L.AR * 1.0, 0, TAU); ctx.stroke();
-  ctx.restore();
-  for (const f of [Bt.A, Bt.B]) drawFighter(f, L, sgn);
+  ctx.strokeStyle = g; ctx.lineWidth = AR * 0.07; ctx.beginPath(); ctx.arc(0, 0, AR * 1.04, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = P.accent; ctx.globalAlpha = 0.55; ctx.lineWidth = 2 / zz * 1.5; ctx.beginPath(); ctx.arc(0, 0, AR * 1.0, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
+  for (const f of [Bt.A, Bt.B]) drawFighter(f, W0, sgn);
   // 火花
-  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  ctx.globalCompositeOperation = 'lighter';
   for (let i = BT.sparks.length - 1; i >= 0; i--) {
     const p = BT.sparks[i]; p.life -= dt; if (p.life <= 0) { BT.sparks.splice(i, 1); continue; }
     p.x += p.vx * dt; p.y += p.vy * dt;
     ctx.fillStyle = `rgba(${P.spark},${Math.min(1, p.life * 2.5)})`;
-    ctx.beginPath(); ctx.arc(L.ax + sgn * p.x * L.AR, L.ay + sgn * p.y * L.AR, 2.2, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(sgn * p.x * AR, sgn * p.y * AR, 2.6, 0, TAU); ctx.fill();
   }
   ctx.restore();
   drawBattleHud(Bt);
@@ -2114,7 +2144,7 @@ function drawBattle(dt, Bt) {
 function drawFighter(f, L, sgn) {
   const RB = BS * L.AR, fade = f.out ? Math.max(0, 1 - f.outT * 0.9) : 1;
   if (fade <= 0) return;
-  const sp = withDesign(f.d, RB, getSprite);
+  const sp = withDesign(f.d, Math.round(RB * 2.4), getSprite);
   const sx = L.ax + sgn * f.x * L.AR, sy = L.ay + sgn * f.y * L.AR, rot = f.th + (BT.flip ? Math.PI : 0);
   ctx.save(); ctx.translate(sx, sy); ctx.globalAlpha = fade;
   const sc = f.out ? 0.6 + 0.4 * fade : 1; ctx.scale(sc, sc);
@@ -2277,7 +2307,7 @@ const dashPress = who => e => {
   (who === 1 ? BT.battle.A : BT.battle.B).dashReq = true;
 };
 $b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventListener('pointerdown', dashPress(2));
-window.__bt = { statsOf, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign };
+window.__bt = { setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign };
 
 // 別タブに行った時は音を止める
 document.addEventListener('visibilitychange', () => {
