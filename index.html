@@ -82,22 +82,25 @@ body.inbattle #hud,body.inbattle #hint,body.inbattle #toast,body.inbattle #combo
 #btCount b{font-size:72px;font-weight:800;text-shadow:0 0 24px var(--accent),0 2px 12px rgba(0,0,0,.6)}
 #btCount div{font-size:14px;opacity:.9}
 .dash{position:fixed;left:50%;margin-left:-50px;width:100px;height:56px;touch-action:none;border-radius:28px;border:1px solid rgba(255,255,255,.22);background:var(--panel);color:var(--fg);font:inherit;font-size:16px;font-weight:700;overflow:hidden;z-index:9;display:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-#dash1{bottom:calc(env(safe-area-inset-bottom,0px) + 22px)}
-#dash2{top:calc(env(safe-area-inset-top,0px) + 22px);transform:rotate(180deg)}
-.skill{margin-left:-158px;font-size:13px;line-height:1.15}
-.guard{margin-left:58px}
-.guard i{background:#5db4ff;opacity:.5}
-#guard1{bottom:calc(env(safe-area-inset-bottom,0px) + 22px)}
-#guard2{top:calc(env(safe-area-inset-top,0px) + 22px);transform:rotate(180deg);margin-left:-158px}
-body.inbattle #fs{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 6px);right:8px;width:34px;height:34px}
-body.inbattle #rand{display:none}
-.skill i{background:#ffd24d;opacity:.5}
-#skill1{bottom:calc(env(safe-area-inset-bottom,0px) + 22px)}
-#skill2{top:calc(env(safe-area-inset-top,0px) + 22px);transform:rotate(180deg);margin-left:58px}
-.dash.rdy{border-color:#ffd24d;box-shadow:0 0 18px #ffd24daa;animation:rdy .8s ease-in-out infinite alternate}
-@keyframes rdy{to{box-shadow:0 0 6px #ffd24d55}}
 .dash i{position:absolute;left:0;bottom:0;height:100%;width:0;background:var(--accent);opacity:.4}
 .dash span{position:relative}
+.dash.round{width:84px;height:84px;margin-left:-42px;border-radius:50%}
+.dash.round i{width:100%;height:0}
+.knob{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:3px solid var(--fg);box-sizing:border-box;pointer-events:none}
+.dash.round span{position:absolute;left:0;right:0;bottom:8px;font-size:10px;font-weight:600;opacity:.85}
+.dodge{margin-left:-150px}
+.guard{margin-left:50px}
+.guard i{background:#5db4ff;opacity:.5}
+.skillb{width:104px;height:40px;margin-left:-52px;border-radius:20px;font-size:13px;line-height:1;border-color:#ffd24d;box-shadow:0 0 18px #ffd24daa;animation:rdy .8s ease-in-out infinite alternate}
+@keyframes rdy{to{box-shadow:0 0 6px #ffd24d55}}
+#dash1,#dodge1,#guard1{bottom:calc(env(safe-area-inset-bottom,0px) + 22px)}
+#skill1{bottom:calc(env(safe-area-inset-bottom,0px) + 114px)}
+#dash2,#dodge2,#guard2{top:calc(env(safe-area-inset-top,0px) + 22px);transform:rotate(180deg)}
+#skill2{top:calc(env(safe-area-inset-top,0px) + 114px);transform:rotate(180deg)}
+#dodge2{margin-left:50px}
+#guard2{margin-left:-150px}
+body.inbattle #fs{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 6px);right:8px;width:34px;height:34px}
+body.inbattle #rand{display:none}
 .codebox{width:100%;min-height:84px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--fg);font:11px/1.3 monospace;padding:8px;resize:vertical;user-select:text;-webkit-user-select:text}
 #olStatus{font-size:13px;min-height:1.2em;color:var(--accent)}
 </style>
@@ -109,16 +112,18 @@ body.inbattle #rand{display:none}
 <div id="hint">どこでもスワイプで回る ／ 指を置くと止まる</div>
 <button id="battleBtn">⚔ バトル</button>
 <div id="btCount"><b id="btCountB">10</b><div id="btCountT"></div></div>
-<button class="dash" id="dash1"><i></i><span>回避</span></button>
-<button class="dash" id="dash2"><i></i><span>回避</span></button>
-<button class="dash skill" id="skill1"><i></i><span>必殺技</span></button>
-<button class="dash skill" id="skill2"><i></i><span>必殺技</span></button>
+<button class="dash round" id="dash1"><i></i><b class="knob"></b><span>ダッシュ</span></button>
+<button class="dash round" id="dash2"><i></i><b class="knob"></b><span>ダッシュ</span></button>
+<button class="dash dodge" id="dodge1"><i></i><span>回避</span></button>
+<button class="dash dodge" id="dodge2"><i></i><span>回避</span></button>
+<button class="dash skillb" id="skill1"><span>必殺技！</span></button>
+<button class="dash skillb" id="skill2"><span>必殺技！</span></button>
 <button class="dash guard" id="guard1"><i></i><span>ガード</span></button>
 <button class="dash guard" id="guard2"><i></i><span>ガード</span></button>
 <div id="bt">
   <div class="btcard" id="sMenu">
     <h2>スピン・アリーナ</h2>
-    <p>10秒間回して、最後の回転数でバトル開始。場外に出されるか、回転が止まったら負け。バトル中は、回避ボタンで相手をすり抜け、近づいたらガードボタンでジャストガード、ゲージがたまったら必殺技！</p>
+    <p>10秒間回して、最後の回転数でバトル開始。場外に出されるか、回転が止まったら負け。バトル中は、丸でダッシュ、左の回避で相手をすり抜け、近づいたら右のガードでジャストガード、ゲージがたまったら必殺技！</p>
     <div class="mine">
       <canvas id="hbCv" width="224" height="224"></canvas>
       <div style="flex:1;min-width:0">
@@ -137,7 +142,7 @@ body.inbattle #rand{display:none}
     </div>
     <h3>アリーナ <span id="arenaDesc" style="font-weight:400;opacity:.7;font-size:12px"></span></h3>
     <div class="chips" id="arenaChips"></div>
-    <h3>回避ダッシュ <span style="font-weight:400;opacity:.7;font-size:12px">バトル中の「回避」ボタン</span></h3>
+    <h3>ダッシュ <span style="font-weight:400;opacity:.7;font-size:12px">バトル中の丸いボタン</span></h3>
     <div class="chips" id="dashChips"></div>
     <h3>バトルの種類</h3>
     <div class="btgrid">
@@ -1701,7 +1706,7 @@ function refreshUI() {
   setRow(bFx, '演出', FX_NAME[settings.fx]);
   setRow(bSound, '音', settings.sound ? 'ON' : 'OFF', settings.sound);
   setRow(bBass, '音で振動（低音）', settings.bass ? 'ON' : 'OFF', settings.bass);
-  setRow(bDashMode, '回避ダッシュ', settings.dashMode === 'manual' ? 'マニュアル（引っ張って離す）' : '自動（敵の方向）', settings.dashMode === 'manual');
+  setRow(bDashMode, 'ダッシュ（丸ボタン）', settings.dashMode === 'manual' ? 'マニュアル（引っ張って離す）' : '自動（敵の方向）', settings.dashMode === 'manual');
   setRow(bVib, '振動', canHaptic ? (settings.vib ? 'ON' : 'OFF') : '非対応', settings.vib && canHaptic);
   bVib.disabled = !canHaptic;
   setRow(bTilt, '傾き・動き', `${settings.tilt ? 'ON' : 'OFF'}${settings.tilt && S.tiltReq && !S.tiltSeen && !S.motionSeen ? '（未検出）' : ''}`, settings.tilt);
@@ -1817,7 +1822,7 @@ bFx.addEventListener('click', () => {
 /* ================= バトル ================= */
 let MODE = 'free';                                         // 'free'(ふつうに回す) | 'spin'(5秒間回す) | 'battle'
 let BS = 0.14, Q = BS / 0.36;                                // R=1 のスピナーの半径（アリーナ半径=1 に対する比）。小さいほどフィールドが広い。Q＝旧サイズ(0.36)との比で、速さ・力を合わせる                                            // R=1 のスピナーの半径（アリーナ半径=1 に対する比）
-const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5, DUR: 7.5, SDUR: 1, LAM: 0.4, MU: 0.8, PAD: 1.6, BUMP: 1.3, SPPASS: 1.2, JG_WIN: 0.3, JG_CD: 0.9, JG_DMG: 0.2, INV: 0.4, RUSH: 2.6, GUARD: 0.35, LUNGE: 2.8, PULSE: 2.2, TYPE_GAP: 0.12 };   // DUR=バーストの耐久、SDUR=回転の持久（どちらも倍率）   // シミュレーションで調整した値
+const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5, DUR: 7.5, SDUR: 1, LAM: 0.4, MU: 0.8, PAD: 1.6, BUMP: 1.3, SPPASS: 1.2, JG_WIN: 0.3, JG_CD: 0.9, JG_DMG: 0.2, INV: 0.4, DODGE_CD: 1.6, RUSH: 2.6, GUARD: 0.35, LUNGE: 2.8, PULSE: 2.2, TYPE_GAP: 0.12 };   // DUR=バーストの耐久、SDUR=回転の持久（どちらも倍率）   // シミュレーションで調整した値
 const $b = id => document.getElementById(id);
 
 // 材質：dens=重さ hard=硬さ bear=軸の滑らかさ grip=グリップ（相手へ寄っていく強さ）
@@ -1931,7 +1936,7 @@ function drawHitPreview(cv, d) {                            // スピナーに�
 function makeFighter(d, rpm, name, side) {
   d = cleanDesign(d);
   const r = Math.max(120, Math.min(rpm, 50000)), w = r * TAU / 60;
-  return { d, name, side, st: statsOf(d), circles: hitCircles(d), x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, bg: 0, burst: false, land: 0, sp: 0, spm: 1, jg: 0, jgCd: 0, inv: 0, jgReq: false, skReq: false, sk: { rush: 0, guard: 0, eco: 0 }, padCd: 0, bumpCd: 0, th: Math.random() * TAU, dir: Math.random() < 0.5 ? 1 : -1,
+  return { d, name, side, st: statsOf(d), circles: hitCircles(d), x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, bg: 0, burst: false, land: 0, sp: 0, spm: 1, jg: 0, jgCd: 0, inv: 0, dodgeCd: 0, dodgeReq: false, jgReq: false, skReq: false, sk: { rush: 0, guard: 0, eco: 0 }, padCd: 0, bumpCd: 0, th: Math.random() * TAU, dir: Math.random() < 0.5 ? 1 : -1,
     w, w0: w, lk: 0.85 + Math.random() * 0.3, dashCd: 0, dashReq: false, pairCd: 0, out: false, fin: false, outT: 0, hits: 0, taken: 0, maxHit: 0, dashed: 0, aiT: 0, rpm: Math.round(r) };
 }
 let START = 0.6;
@@ -1983,7 +1988,7 @@ function stepFighter(f, o, dt) {
   if (f.burst) { f.outT += dt; return; }
   if (f.out) { f.outT += dt; f.x += f.vx * dt * 1.5; f.y += f.vy * dt * 1.5; f.th += f.w * f.dir * dt; f.vz -= PHYS.G * dt; f.z = Math.max(-0.5, f.z + f.vz * dt); return; }
   f.dashCd = Math.max(0, f.dashCd - dt); f.pairCd = Math.max(0, f.pairCd - dt);
-  f.sp = Math.min(100, f.sp + PHYS.SPPASS * f.spm * dt); f.jg = Math.max(0, f.jg - dt); f.jgCd = Math.max(0, f.jgCd - dt); f.inv = Math.max(0, f.inv - dt); for (const k of ['rush', 'guard', 'eco']) f.sk[k] = Math.max(0, f.sk[k] - dt);
+  f.sp = Math.min(100, f.sp + PHYS.SPPASS * f.spm * dt); f.jg = Math.max(0, f.jg - dt); f.jgCd = Math.max(0, f.jgCd - dt); f.dodgeCd = Math.max(0, f.dodgeCd - dt); f.inv = Math.max(0, f.inv - dt); for (const k of ['rush', 'guard', 'eco']) f.sk[k] = Math.max(0, f.sk[k] - dt);
   const w = f.w, wn = Math.min(1, w / 250);
   f.w = Math.max(0, w - (PHYS.C0 + PHYS.C1 * w) * dt / (Math.pow(f.st.staE, 0.7) * Math.sqrt(f.st.pw) * f.lk * PHYS.SDUR * (f.sk.eco > 0 ? 2.5 : 1)));     // lk=そのバトルの調子（運）
   const r0 = Math.hypot(f.x, f.y), gnd = f.z - fh(r0) < 0.004 && f.vz <= 0.05;
@@ -2020,7 +2025,14 @@ function applyDash(f, o, Bt) {
   let dx = o.x - f.x, dy = o.y - f.y;                                    // 自動：敵の方向 ／ マニュアル：指定された方向
   if (f.dashDir) { dx = f.dashDir[0]; dy = f.dashDir[1]; f.dashDir = null; }
   const d = Math.hypot(dx, dy) || 1e-6, k = PHYS.DASH * Q / Math.sqrt(f.st.mass);
-  f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dashCd = PHYS.DASH_CD; f.dashed++; f.inv = PHYS.INV; if (Bt) Bt.ev.push({ type: 'dash', who: f.side, x: f.x, y: f.y, z: f.z, dx: dx / d, dy: dy / d });
+  f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dashCd = PHYS.DASH_CD; f.dashed++; if (Bt) Bt.ev.push({ type: 'dash', who: f.side, x: f.x, y: f.y, z: f.z, dx: dx / d, dy: dy / d });
+}
+function applyDodge(f, o, Bt) {                              // 回避：敵の方向だけ。すり抜けられる（当たらない）
+  if (!f.dodgeReq) return; f.dodgeReq = false;
+  if (f.dodgeCd > 0 || f.out || f.fin) return;
+  const dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy) || 1e-6, k = PHYS.DASH * Q / Math.sqrt(f.st.mass);
+  f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dodgeCd = PHYS.DODGE_CD; f.dashed++; f.inv = PHYS.INV;
+  if (Bt) Bt.ev.push({ type: 'dash', who: f.side, x: f.x, y: f.y, z: f.z, dx: dx / d, dy: dy / d, dodge: true });
 }
 const SKILLS = { atk: ['疾風ラッシュ', '255,107,107'], def: ['鉄壁パルス', '93,180,255'], sta: ['リバイブ', '107,220,139'], bal: ['ツインブースト', '240,194,77'] };
 function useSkill(f, o, Bt) {                                // 必殺技：ゲージが満タンで発動。タイプごとに効果が違う
@@ -2080,7 +2092,7 @@ function stepBattle(Bt, dt) {
   if (Bt.over) return;
   const A = Bt.A, B = Bt.B;
   Bt.t += dt;
-  applyDash(A, B, Bt); applyDash(B, A, Bt); useSkill(A, B, Bt); useSkill(B, A, Bt);
+  applyDash(A, B, Bt); applyDash(B, A, Bt); applyDodge(A, B, Bt); applyDodge(B, A, Bt); useSkill(A, B, Bt); useSkill(B, A, Bt);
   for (const f of [A, B]) if (f.jgReq) { f.jgReq = false; if (f.jgCd <= 0 && !f.out && !f.burst) { f.jg = PHYS.JG_WIN; f.jgCd = PHYS.JG_CD; Bt.ev.push({ type: 'guard', who: f.side, x: f.x, y: f.y, z: f.z }); } }
   const sA = { x: A.x, y: A.y }, sB = { x: B.x, y: B.y };      // 2人を同時に動かす（先に動く側が有利にならないように）
   stepFighter(A, sB, dt); stepFighter(B, sA, dt);
@@ -2111,6 +2123,7 @@ function aiSkill(f, o, diff, dt, boss) {                   // CPUの必殺技
 function aiGuard(f, o, diff, dt, boss) {                   // CPUのジャストガード：近づいた時に、たまに成功させる
   f.aiG = (f.aiG || 0) - dt; if (f.aiG > 0) return; f.aiG = 0.12;
   if (f.jgCd <= 0 && !f.out && !f.burst && Math.hypot(o.x - f.x, o.y - f.y) < BS * 3.2 && Math.random() < [0.12, 0.22, 0.35][diff - 1] * (boss ? 1.4 : 1)) f.jgReq = true;
+  else if (f.dodgeCd <= 0 && !f.out && !f.burst && Math.hypot(o.x - f.x, o.y - f.y) < BS * 3.0 && Math.random() < [0.05, 0.09, 0.15][diff - 1] * (boss ? 1.4 : 1)) f.dodgeReq = true;   // 回避もたまに使う
 }
 function aiDash(f, o, diff, dt) {                           // CPUのダッシュ：近づいた時に、つよいほど頻繁に使う
   f.aiT -= dt;
@@ -2216,12 +2229,12 @@ function enterBattleView() {
   MODE = 'battle'; camReset(); BT.phase = 'count'; BT.count = 3.2; BT.sparks = []; BT.snapT = 0; BT.endT = 0;
   document.body.classList.add('btmode', 'inbattle');
   hideOverlay();
-  $b('dash1').style.display = $b('skill1').style.display = $b('guard1').style.display = 'block'; $b('dash2').style.display = $b('skill2').style.display = $b('guard2').style.display = BT.type === 'local' ? 'block' : 'none';
-  { const bt = BT.battle, mine = BT.flip ? bt.B : bt.A; $b('skill1').lastChild.textContent = SKILLS[mine.st.type][0]; $b('skill2').lastChild.textContent = SKILLS[bt.B.st.type][0]; }
+  $b('dash1').style.display = $b('dodge1').style.display = $b('guard1').style.display = 'block'; $b('skill1').style.display = 'none'; $b('dash2').style.display = $b('dodge2').style.display = $b('guard2').style.display = BT.type === 'local' ? 'block' : 'none'; $b('skill2').style.display = 'none';
+  { const bt = BT.battle, mine = BT.flip ? bt.B : bt.A; $b('skill1').lastChild.textContent = SKILLS[mine.st.type][0] + '！'; $b('skill2').lastChild.textContent = SKILLS[bt.B.st.type][0] + '！'; }
 }
 function endBattle(toMenu) {
   MODE = 'free'; BT.phase = 'idle'; BT.lock = false; BT.battle = null; droneStop();
-  $b('dash1').style.display = $b('dash2').style.display = $b('skill1').style.display = $b('skill2').style.display = $b('guard1').style.display = $b('guard2').style.display = 'none'; $b('btCount').style.display = 'none';
+  $b('dash1').style.display = $b('dash2').style.display = $b('skill1').style.display = $b('skill2').style.display = $b('guard1').style.display = $b('guard2').style.display = $b('dodge1').style.display = $b('dodge2').style.display = 'none'; $b('btCount').style.display = 'none';
   document.body.classList.remove('inbattle');
   if (BT.saved) { applyDesign(BT.saved); saveSettings(); BT.saved = null; }
   netClose(); S.omega = 0;
@@ -2446,7 +2459,7 @@ function battleFrame(now, rawDt) {
   } else if (isGuest && BT.phase === 'fight') {
     for (const f of [Bt.A, Bt.B]) {                          // ホストから届いた位置へなめらかに寄せる
       if (f.tx !== undefined) { f.x += (f.tx - f.x) * 0.4; f.y += (f.ty - f.y) * 0.4; if (!f.out) f.z += (f.tz - f.z) * 0.4; f.w += (f.tw - f.w) * 0.4; }
-      f.th += f.w * f.dir * dt; f.dashCd = Math.max(0, f.dashCd - dt);
+      f.th += f.w * f.dir * dt; f.dashCd = Math.max(0, f.dashCd - dt); f.dodgeCd = Math.max(0, f.dodgeCd - dt);
       if (f.out) { f.outT += dt; f.vz -= PHYS.G * dt * 1.5; f.z = Math.max(-0.5, f.z + f.vz * dt); }
     }
     btEvents(Bt); tensionTick(Bt, dt);
@@ -2603,7 +2616,7 @@ function drawBattle(dt, Bt) {
     const fr = BT.count - Math.floor(BT.count), pop = n > 0 ? 1 + 0.35 * fr : 1.25;
     ctx.font = `800 ${(n > 0 ? 84 : 96) * pop | 0}px system-ui, sans-serif`; ctx.fillText(n > 0 ? String(n) : 'FIGHT!', W / 2, H * 0.4);
     ctx.font = '700 15px system-ui, sans-serif'; ctx.fillText('ARENA：' + ARENAS[Bt.arena][0] + (Bt.arena === 'normal' ? '' : '　' + ARENAS[Bt.arena][1]), W / 2, H * 0.52);
-    ctx.font = '600 13px system-ui, sans-serif'; ctx.fillText('ガード＝ジャストガード　／　回避＝すり抜けダッシュ', W / 2, H * 0.8); ctx.font = '700 15px system-ui, sans-serif';
+    ctx.font = '600 13px system-ui, sans-serif'; ctx.fillText('丸＝ダッシュ　／　左＝回避（すり抜け）　／　右＝ガード', W / 2, H * 0.8); ctx.font = '700 15px system-ui, sans-serif';
     if (BT.streak) { ctx.font = '800 18px system-ui, sans-serif'; ctx.fillText(`STAGE ${BT.stage}「${BT.stageTitle}」`, W / 2, H * 0.56); ctx.font = '700 15px system-ui, sans-serif'; }
     const mF = BT.flip ? Bt.B : Bt.A, oF = BT.flip ? Bt.A : Bt.B, sl = Math.min(1, (3.2 - BT.count) * 2.2);          // 入場：両者の名前と回転数がスライドインする
     ctx.shadowBlur = 12; ctx.font = '700 17px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(mF.name, 24 - (1 - sl) * 200, H * 0.62); ctx.textAlign = 'right'; ctx.fillText(oF.name, W - 24 + (1 - sl) * 200, H * 0.2);
@@ -2622,11 +2635,11 @@ function drawBattle(dt, Bt) {
   }
   // ダッシュのボタンの充電表示
   const mine = BT.flip ? Bt.B : Bt.A;
-  $b('dash1').firstChild.style.width = ((1 - mine.dashCd / PHYS.DASH_CD) * 100) + '%';
-  if (BT.type === 'local') $b('dash2').firstChild.style.width = ((1 - Bt.B.dashCd / PHYS.DASH_CD) * 100) + '%';
+  $b('dash1').firstChild.style.height = ((1 - mine.dashCd / PHYS.DASH_CD) * 100) + '%'; $b('dodge1').firstChild.style.width = ((1 - mine.dodgeCd / PHYS.DODGE_CD) * 100) + '%';
+  if (BT.type === 'local') { $b('dash2').firstChild.style.height = ((1 - Bt.B.dashCd / PHYS.DASH_CD) * 100) + '%'; $b('dodge2').firstChild.style.width = ((1 - Bt.B.dodgeCd / PHYS.DODGE_CD) * 100) + '%'; }
   $b('guard1').firstChild.style.width = ((1 - mine.jgCd / PHYS.JG_CD) * 100) + '%'; if (BT.type === 'local') $b('guard2').firstChild.style.width = ((1 - Bt.B.jgCd / PHYS.JG_CD) * 100) + '%';
-  $b('skill1').firstChild.style.width = mine.sp + '%'; $b('skill1').classList.toggle('rdy', mine.sp >= 100);
-  if (BT.type === 'local') { $b('skill2').firstChild.style.width = Bt.B.sp + '%'; $b('skill2').classList.toggle('rdy', Bt.B.sp >= 100); }
+  $b('skill1').style.display = mine.sp >= 100 && BT.phase === 'fight' ? 'block' : 'none';          // ゲージがたまったときだけ出る
+  if (BT.type === 'local') $b('skill2').style.display = Bt.B.sp >= 100 && BT.phase === 'fight' ? 'block' : 'none';
 }
 function drawFighter(f) {
   if (f.burst) return;
@@ -2692,8 +2705,8 @@ function drawDebris(dt) {
 }
 function drawBattleHud(Bt) {
   const me = BT.flip ? Bt.B : Bt.A, op = BT.flip ? Bt.A : Bt.B;
-  hudRow(op, BT.type === 'local' ? 104 : 60, BT.type === 'local');
-  hudRow(me, H - 100, false);
+  hudRow(op, BT.type === 'local' ? 182 : 60, BT.type === 'local');
+  hudRow(me, H - 182, false);
 }
 function hudRow(f, y, upside) {
   const bw = Math.min(W * 0.8, 360), x0 = (W - bw) / 2;
@@ -2705,6 +2718,7 @@ function hudRow(f, y, upside) {
   ctx.textAlign = 'right'; ctx.fillText(Math.round(f.w * 60 / TAU).toLocaleString('en-US') + ' rpm', x0 + bw, y - 9);
   ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.roundRect(x0, y, bw, 8, 4); ctx.fill();
   ctx.fillStyle = accentOf(f.d); ctx.beginPath(); ctx.roundRect(x0, y, Math.max(8, bw * Math.min(1, f.w / f.w0)), 8, 4); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.beginPath(); ctx.roundRect(x0, y + 21, bw, 4, 2); ctx.fill(); ctx.fillStyle = f.sp >= 100 ? '#ffd24d' : 'rgba(255,210,77,.6)'; ctx.beginPath(); ctx.roundRect(x0, y + 21, Math.max(3, bw * Math.min(1, f.sp / 100)), 4, 2); ctx.fill();   // 必殺技ゲージ
   const bgr = Math.min(1, f.bg / 100);                      // バーストゲージ（満タンで壊れる）
   ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.roundRect(x0, y + 13, bw, 4, 2); ctx.fill();
   if (bgr > 0.01) { ctx.fillStyle = bgr > 0.75 ? '#ff4d4d' : '#ff9a4d'; ctx.beginPath(); ctx.roundRect(x0, y + 13, Math.max(4, bw * bgr), 4, 2); ctx.fill(); }
@@ -2747,7 +2761,7 @@ function netSend(o) { if (Net.dc && Net.dc.readyState === 'open') Net.dc.send(JS
 function netLost() {
   if (BT.type !== 'online' || BT.phase === 'end') return;
   if (MODE === 'free' && btEl.classList.contains('show')) { olStatus('接続が切れました'); return; }
-  MODE = 'free'; BT.phase = 'idle'; BT.lock = false; droneStop(); $b('dash1').style.display = $b('skill1').style.display = $b('guard1').style.display = 'none'; BT.drag = null; $b('btCount').style.display = 'none';
+  MODE = 'free'; BT.phase = 'idle'; BT.lock = false; droneStop(); $b('dash1').style.display = $b('skill1').style.display = $b('guard1').style.display = $b('dodge1').style.display = 'none'; BT.drag = null; $b('btCount').style.display = 'none';
   document.body.classList.remove('inbattle');
   showScreen('sOnline'); $b('olStep0').hidden = true; olStatus('接続が切れました。「もどる」からやり直してください');
 }
@@ -2861,7 +2875,7 @@ function maybeBeginOnline() {
   netSend({ t: 'start', arena: BT.battle.arena, A: { d: a.d, rpm: a.rpm, dir: a.dir }, B: { d: b.d, rpm: b.rpm, dir: b.dir } });
   enterBattleView();
 }
-const snapOf = Bt => ({ t: 'snap', tm: Bt.t, a: [Bt.A.x, Bt.A.y, Bt.A.w, +Bt.A.out, +Bt.A.fin, Bt.A.dashCd, Bt.A.z, +Bt.A.burst, Bt.A.bg, Math.round(Bt.A.sp), +(Bt.A.sk.rush > 0), +(Bt.A.sk.guard > 0), +(Bt.A.sk.eco > 0), +(Bt.A.inv > 0)], b: [Bt.B.x, Bt.B.y, Bt.B.w, +Bt.B.out, +Bt.B.fin, Bt.B.dashCd, Bt.B.z, +Bt.B.burst, Bt.B.bg, Math.round(Bt.B.sp), +(Bt.B.sk.rush > 0), +(Bt.B.sk.guard > 0), +(Bt.B.sk.eco > 0), +(Bt.B.inv > 0)],
+const snapOf = Bt => ({ t: 'snap', tm: Bt.t, a: [Bt.A.x, Bt.A.y, Bt.A.w, +Bt.A.out, +Bt.A.fin, Bt.A.dashCd, Bt.A.z, +Bt.A.burst, Bt.A.bg, Math.round(Bt.A.sp), +(Bt.A.sk.rush > 0), +(Bt.A.sk.guard > 0), +(Bt.A.sk.eco > 0), +(Bt.A.inv > 0), Bt.A.dodgeCd], b: [Bt.B.x, Bt.B.y, Bt.B.w, +Bt.B.out, +Bt.B.fin, Bt.B.dashCd, Bt.B.z, +Bt.B.burst, Bt.B.bg, Math.round(Bt.B.sp), +(Bt.B.sk.rush > 0), +(Bt.B.sk.guard > 0), +(Bt.B.sk.eco > 0), +(Bt.B.inv > 0), Bt.B.dodgeCd],
   ev: Bt.ev.map(e => ({ ...e })), over: Bt.over, draw: !!Bt.draw, win: Bt.winner, why: Bt.reason, ha: [Bt.A.hits, Bt.A.maxHit, Bt.A.dashed], hb: [Bt.B.hits, Bt.B.maxHit, Bt.B.dashed] });
 function handleNet(m) {
   if (m.t === 'hello') { BT.peer = m; maybeStartOnlineSpin(); }
@@ -2874,7 +2888,7 @@ function handleNet(m) {
   } else if (m.t === 'snap' && BT.role === 'guest' && BT.battle) {
     const Bt = BT.battle;
     for (const [f, s2, h] of [[Bt.A, m.a, m.ha], [Bt.B, m.b, m.hb]]) {
-      f.tx = s2[0]; f.ty = s2[1]; f.tw = s2[2]; f.out = !!s2[3]; f.fin = !!s2[4]; f.dashCd = s2[5]; f.tz = s2[6]; f.burst = !!s2[7]; f.bg = s2[8]; f.sp = s2[9]; f.sk = { rush: s2[10], guard: s2[11], eco: s2[12] }; f.inv = s2[13] ? 0.1 : 0;
+      f.tx = s2[0]; f.ty = s2[1]; f.tw = s2[2]; f.out = !!s2[3]; f.fin = !!s2[4]; f.dashCd = s2[5]; f.tz = s2[6]; f.burst = !!s2[7]; f.bg = s2[8]; f.sp = s2[9]; f.sk = { rush: s2[10], guard: s2[11], eco: s2[12] }; f.inv = s2[13] ? 0.1 : 0; f.dodgeCd = s2[14] || 0;
       if (f.x === 0 && f.y === 0 || f.out) { f.x = s2[0]; f.y = s2[1]; f.z = s2[6]; }
       f.hits = h[0]; f.maxHit = h[1]; f.dashed = h[2];
     }
@@ -2884,6 +2898,7 @@ function handleNet(m) {
   } else if (m.t === 'dash' && BT.role === 'host' && BT.battle) { BT.battle.B.dashReq = true; BT.battle.B.dashDir = Array.isArray(m.dir) && m.dir.length === 2 && m.dir.every(Number.isFinite) ? [m.dir[0], m.dir[1]] : null; }
   else if (m.t === 'skill' && BT.role === 'host' && BT.battle) BT.battle.B.skReq = true;
   else if (m.t === 'guard' && BT.role === 'host' && BT.battle) BT.battle.B.jgReq = true;
+  else if (m.t === 'dodge' && BT.role === 'host' && BT.battle) BT.battle.B.dodgeReq = true;
 }
 
 /* ---------- ボタンの接続 ---------- */
@@ -2927,16 +2942,26 @@ function fireDash(who, dir) {
   if (BT.role === 'guest') { netSend({ t: 'dash', dir }); return; }
   const f = who === 1 ? BT.battle.A : BT.battle.B; f.dashReq = true; f.dashDir = dir || null;
 }
-const dashPress = who => e => {                                    // 回避ボタン：自動＝押すだけ／マニュアル＝引っ張って離した向きに
+const dodgePress = who => e => {                                   // 回避ボタン：敵の方向のみ
+  e.preventDefault();
+  if (MODE !== 'battle' || BT.phase !== 'fight' || !BT.battle) return;
+  if (BT.role === 'guest') { netSend({ t: 'dodge' }); return; }
+  (who === 1 ? BT.battle.A : BT.battle.B).dodgeReq = true;
+};
+const dashPress = who => e => {                                    // 丸ボタン（ダッシュ）：自動＝押すだけ／マニュアル＝スティックのように引っ張って離した向きに
   e.preventDefault();
   if (MODE !== 'battle' || BT.phase !== 'fight' || !BT.battle) return;
   if (settings.dashMode !== 'manual') { fireDash(who, null); return; }
   BT.drag = { who, id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY };
   try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
 };
-const dashMove = e => { if (BT.drag && BT.drag.id === e.pointerId) { BT.drag.x = e.clientX; BT.drag.y = e.clientY; } };
+const dashMove = e => {
+  const d = BT.drag; if (!d || d.id !== e.pointerId) return; d.x = e.clientX; d.y = e.clientY;
+  const dx = d.x - d.x0, dy = d.y - d.y0, l = Math.hypot(dx, dy), k = l > 28 ? 28 / l : 1, kn = e.currentTarget.querySelector('.knob'); if (kn) kn.style.transform = `translate(${dx * k}px,${dy * k}px)`;   // つまみが指に合わせて動く
+};
 const dashRelease = e => {
   const d = BT.drag; if (!d || d.id !== e.pointerId) return; BT.drag = null;
+  const kn = e.currentTarget.querySelector('.knob'); if (kn) kn.style.transform = '';
   if (e.type === 'pointercancel') return;
   const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
   fireDash(d.who, Math.hypot(dx, dy) < 18 ? null : screenToWorld(dx, dy, BT.type === 'local' && d.who === 2));   // ほとんど引かなかったら、敵の方向
@@ -2956,6 +2981,7 @@ const skillPress = who => e => {
 $b('skill1').addEventListener('pointerdown', skillPress(1)); $b('skill2').addEventListener('pointerdown', skillPress(2));
 $b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventListener('pointerdown', dashPress(2));
 for (const id of ['dash1', 'dash2']) { $b(id).addEventListener('pointermove', dashMove); $b(id).addEventListener('pointerup', dashRelease); $b(id).addEventListener('pointercancel', dashRelease); }
+$b('dodge1').addEventListener('pointerdown', dodgePress(1)); $b('dodge2').addEventListener('pointerdown', dodgePress(2));
 $b('guard1').addEventListener('pointerdown', guardPress(1)); $b('guard2').addEventListener('pointerdown', guardPress(2));
 window.__bt = { PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
 
