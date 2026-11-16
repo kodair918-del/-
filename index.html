@@ -1967,6 +1967,7 @@ function stepBattle(Bt, dt) {
   if (aDown || bDown) {
     Bt.over = true;
     Bt.winner = aDown && bDown ? higherW(A, B) : aDown ? 'B' : 'A';
+    Bt.draw = aDown && bDown;                                 // 同時に倒れたら引き分け（相打ち）
     const L = Bt.winner === 'A' ? B : A;
     Bt.reason = L.burst ? 'burst' : L.out ? 'ringout' : 'stop';
   } else if (Bt.t > PHYS.TIME) { Bt.over = true; Bt.winner = higherW(A, B); Bt.reason = 'time'; }
@@ -2046,14 +2047,15 @@ function showResult() {
   const Bt = BT.battle, meSide = BT.flip ? 'B' : 'A', win = Bt.winner === meSide;
   const why = { burst: 'バースト！相手のスピナーを壊した！', ringout: '場外に押し出した！', stop: '回転を止めた！', time: 'タイムアップ（残りの回転数で判定）' }[Bt.reason];
   let title;
-  if (BT.type === 'local') title = (Bt.winner === 'A' ? '1P' : '2P') + ' の勝ち！';
+  if (Bt.draw) title = 'DRAW';
+  else if (BT.type === 'local') title = (Bt.winner === 'A' ? '1P' : '2P') + ' の勝ち！';
   else {
     title = win ? 'WIN!' : 'LOSE...';
     if (!BT.recorded) { BT.recorded = true; if (win) settings.wins++; else settings.losses++; saveSettings(); }
   }
   const me = BT.flip ? Bt.B : Bt.A, op = BT.flip ? Bt.A : Bt.B;
   $b('resTitle').textContent = title;
-  $b('resBody').innerHTML = `${win || BT.type === 'local' ? why : (Bt.reason === 'burst' ? 'スピナーが壊れた…' : Bt.reason === 'ringout' ? '場外に出された…' : Bt.reason === 'stop' ? '回転が止まった…' : why)}<br>
+  $b('resBody').innerHTML = `${Bt.draw ? '相打ち！ 同時に倒れた' : win || BT.type === 'local' ? why : (Bt.reason === 'burst' ? 'スピナーが壊れた…' : Bt.reason === 'ringout' ? '場外に出された…' : Bt.reason === 'stop' ? '回転が止まった…' : why)}<br>
     ${Bt.t.toFixed(1)}秒 ／ ヒット ${me.hits}回 ／ 最大ダメージ ${Math.round(me.maxHit)} ／ ダッシュ ${me.dashed}回<br>
     あなた ${me.rpm.toLocaleString('en-US')}rpm（${designLabel(me.d)}）<br>相手 ${op.rpm.toLocaleString('en-US')}rpm（${designLabel(op.d)}）`;
   $b('resAgain').disabled = BT.type === 'online';
@@ -2266,7 +2268,7 @@ function drawBattle(dt, Bt) {
   } else if (BT.phase === 'end') {
     ctx.font = '800 44px system-ui, sans-serif';
     const me = BT.flip ? 'B' : 'A';
-    ctx.fillText(Bt.reason === 'burst' ? 'BURST!!' : BT.type === 'local' ? 'FINISH!' : (Bt.winner === me ? 'WIN!' : 'LOSE...'), W / 2, H * 0.3);
+    ctx.fillText(Bt.draw ? 'DRAW' : Bt.reason === 'burst' ? 'BURST!!' : BT.type === 'local' ? 'FINISH!' : (Bt.winner === me ? 'WIN!' : 'LOSE...'), W / 2, H * 0.3);
   }
   ctx.restore();
   // ダッシュのボタンの充電表示
@@ -2414,7 +2416,7 @@ function maybeBeginOnline() {
   enterBattleView();
 }
 const snapOf = Bt => ({ t: 'snap', tm: Bt.t, a: [Bt.A.x, Bt.A.y, Bt.A.w, +Bt.A.out, +Bt.A.fin, Bt.A.dashCd, Bt.A.z, +Bt.A.burst, Bt.A.bg], b: [Bt.B.x, Bt.B.y, Bt.B.w, +Bt.B.out, +Bt.B.fin, Bt.B.dashCd, Bt.B.z, +Bt.B.burst, Bt.B.bg],
-  ev: Bt.ev.map(e => ({ ...e })), over: Bt.over, win: Bt.winner, why: Bt.reason, ha: [Bt.A.hits, Bt.A.maxHit, Bt.A.dashed], hb: [Bt.B.hits, Bt.B.maxHit, Bt.B.dashed] });
+  ev: Bt.ev.map(e => ({ ...e })), over: Bt.over, draw: !!Bt.draw, win: Bt.winner, why: Bt.reason, ha: [Bt.A.hits, Bt.A.maxHit, Bt.A.dashed], hb: [Bt.B.hits, Bt.B.maxHit, Bt.B.dashed] });
 function handleNet(m) {
   if (m.t === 'hello') { BT.peer = m; maybeStartOnlineSpin(); }
   else if (m.t === 'spun') { BT.rpm2 = m.rpm; BT.peerSpun = true; maybeBeginOnline(); }
@@ -2432,7 +2434,7 @@ function handleNet(m) {
     }
     for (const e of m.ev) Bt.ev.push(e);
     Bt.t = m.tm;
-    if (m.over && !Bt.over) { Bt.over = true; Bt.winner = m.win; Bt.reason = m.why; }
+    if (m.over && !Bt.over) { Bt.over = true; Bt.winner = m.win; Bt.draw = !!m.draw; Bt.reason = m.why; }
   } else if (m.t === 'dash' && BT.role === 'host' && BT.battle) BT.battle.B.dashReq = true;
 }
 
