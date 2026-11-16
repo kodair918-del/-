@@ -21,7 +21,22 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 #toast.show{animation:pop 1.4s ease-out}
 #toast.lite{font-size:18px;font-weight:600;letter-spacing:.08em;text-shadow:0 1px 8px rgba(0,0,0,.6);opacity:.75}
 @keyframes pop{0%{opacity:0;transform:scale(.6)}14%{opacity:1;transform:scale(1.18)}28%{transform:scale(1)}78%{opacity:1}100%{opacity:0;transform:translateY(-16px)}}
-#gear{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 18px);width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:var(--panel);color:var(--fg);display:grid;place-items:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:.6;cursor:pointer;transition:opacity .2s}
+#gear,#rand,#fs{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:var(--panel);color:var(--fg);display:grid;place-items:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:.6;cursor:pointer;transition:opacity .2s}
+#gear{left:50%;margin-left:-24px}
+#rand{left:max(16px,env(safe-area-inset-left,0px))}
+#fs{right:max(16px,env(safe-area-inset-right,0px))}
+#fs[hidden]{display:none}
+#rand:active,#fs:active{opacity:1}
+#rand.roll svg{animation:roll .55s ease-out}
+@keyframes roll{0%{transform:rotate(0)}100%{transform:rotate(540deg)}}
+#combo{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 80px);text-align:center;font-size:12px;letter-spacing:.04em;opacity:0;transition:opacity .5s;pointer-events:none;text-shadow:0 1px 8px rgba(0,0,0,.7)}
+#combo.show{opacity:.9}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:2px 2px 4px}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:var(--fg);font:inherit;font-size:14px;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.1)}
+.chip:active{transform:scale(.97)}
+.chip .dot{margin:0;width:9px;height:9px}
+#comboHead{font-size:13px;opacity:.7;text-align:center;margin:4px 0 0}
 #gear:active,#gear[aria-expanded="true"]{opacity:1}
 #scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s}
 #scrim.open{opacity:1;pointer-events:auto}
@@ -44,14 +59,21 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 <div id="hud"><div id="rpm"><span id="rpmv">0</span><small>rpm</small></div><div id="stats"></div></div>
 <div id="toast"></div>
 <div id="hint">どこでもスワイプで回る ／ 指を置くと止まる</div>
+<button id="rand" aria-label="ランダム"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="12" cy="12" r="1.1" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.1" fill="currentColor"/></svg></button>
+<button id="fs" aria-label="フルスクリーン"><svg id="fsIcon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg></button>
+<div id="combo"></div>
 <button id="gear" aria-label="設定" aria-expanded="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 <div id="scrim"></div>
 <div id="sheet" role="dialog" aria-label="設定">
   <div class="grab"></div>
-  <h3>見た目</h3>
+  <div id="comboHead"></div>
+  <h3>材質</h3><div class="chips" id="chMat"></div>
+  <h3>形</h3><div class="chips" id="chShape"></div>
+  <h3>アームの数</h3><div class="chips" id="chArms"></div>
+  <h3>穴</h3><div class="chips" id="chHole"></div>
+  <h3>背景</h3><div class="chips" id="chBg"></div>
+  <h3>演出</h3>
   <div class="rows">
-    <button id="bTheme" class="row"></button>
-    <button id="bArms" class="row"></button>
     <button id="bFx" class="row"></button>
   </div>
   <h3>音</h3>
@@ -73,23 +95,55 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 /* ---------- 定数・設定 ---------- */
 const TAU = Math.PI * 2;
 // 回転速度に決め打ちの上限はない（空気抵抗で自然に頭打ちになるだけ）
-const ARMS = [3, 2, 4, 5];
-const THEMES = ['metal', 'neon', 'rainbow', 'wood', 'matte'];
-const THEME_NAME = { metal: 'メタル', neon: 'ネオン', rainbow: 'レインボー', wood: 'ウッド', matte: 'マット' };
+const ARMS = [2, 3, 4, 5, 6];
+const MATS = ['metal', 'gold', 'copper', 'titan', 'black', 'neon', 'rainbow', 'wood', 'matte', 'ice'];
+const MAT_NAME = { metal: 'シルバー', gold: 'ゴールド', copper: 'カッパー', titan: 'チタン', black: 'ブラック', neon: 'ネオン', rainbow: 'レインボー', wood: 'ウッド', matte: 'マット', ice: 'アイス' };
+const DYN = new Set(['neon', 'rainbow']);                                   // 色が動く材質
+const BRUSHED = new Set(['metal', 'gold', 'copper', 'titan', 'black', 'matte']);   // ヘアライン仕上げ
+// 腕の形：tipD=先端までの距離, tipR=先端の丸み, w0=付け根の幅, hd/hr=穴の位置と大きさ（すべて R に対する比）
+const SHAPES = {
+  round:  { name: '標準',   type: 'round',  tipD: 0.66, tipR: 0.24, w0: 0.20, hd: 0.66, hr: 0.12 },
+  slim:   { name: '細身',   type: 'round',  tipD: 0.72, tipR: 0.17, w0: 0.13, hd: 0.72, hr: 0.085 },
+  fat:    { name: '太め',   type: 'round',  tipD: 0.60, tipR: 0.29, w0: 0.26, hd: 0.60, hr: 0.145 },
+  long:   { name: 'ロング', type: 'round',  tipD: 0.79, tipR: 0.19, w0: 0.15, hd: 0.79, hr: 0.095 },
+  pointy: { name: 'とがり', type: 'pointy', tipD: 0.70, tipR: 0.22, w0: 0.19, hd: 0.50, hr: 0.085 },
+  leaf:   { name: '葉っぱ', type: 'leaf',   tipD: 0.66, tipR: 0.27, w0: 0.14, hd: 0.60, hr: 0.10 }
+};
+const SHAPE_IDS = Object.keys(SHAPES);
+const HOLES = {
+  round:  { name: '標準',     k: 1 },
+  big:    { name: '大きい',   k: 1.4 },
+  small:  { name: '小さい',   k: 0.6 },
+  weight: { name: '重り付き', k: 1.05, weight: true }
+};
+const HOLE_IDS = Object.keys(HOLES);
+const BG_NAME = { plate: '金属板', wood: '木の机', mat: 'ゴムマット', city: '夜の街', space: '宇宙' };
+const BG_IDS = Object.keys(BG_NAME);
+const COMBOS = MATS.length * SHAPE_IDS.length * ARMS.length * HOLE_IDS.length * BG_IDS.length;   // 6,000通り
 const TIMBRES = ['metal', 'wood', 'plastic'];
 const TIMBRE_NAME = { metal: '金属', wood: '木', plastic: 'プラ' };
 const KEY = 'fidget-spinner-v1';
-const DEF = { theme: 'metal', timbre: 'metal', arms: 3, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0 };
+const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0 };
 
 function loadSettings() {
-  try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); }
-  catch (e) { return Object.assign({}, DEF); }
+  let raw = {};
+  try { raw = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { raw = {}; }
+  if (raw.theme && !raw.material) {                         // 前のバージョンの保存データを引き継ぐ
+    const m = { metal: ['metal', 'plate'], neon: ['neon', 'city'], rainbow: ['rainbow', 'space'], wood: ['wood', 'wood'], matte: ['matte', 'mat'] }[raw.theme];
+    if (m) { raw.material = m[0]; raw.bg = m[1]; }
+  }
+  return Object.assign({}, DEF, raw);
 }
 function saveSettings() {
   try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch (e) { /* 保存できなくても動く */ }
 }
 const settings = loadSettings();
-if (![0, 1].includes(settings.fx)) settings.fx = 1;             // 演出：0=最小 1=控えめ
+if (![0, 1].includes(settings.fx)) settings.fx = 1;             // 演出：0=リアル 1=控えめ
+if (!MATS.includes(settings.material)) settings.material = DEF.material;
+if (!SHAPES[settings.shape]) settings.shape = DEF.shape;
+if (!ARMS.includes(settings.arms)) settings.arms = DEF.arms;
+if (!HOLES[settings.hole]) settings.hole = DEF.hole;
+if (!BG_NAME[settings.bg]) settings.bg = DEF.bg;
 const FXM = [0, 0.45];                                           // 演出の強さ（光のにじみ・尾）
 const FX_NAME = ['リアル', '控えめ'];
 const canVib = 'vibrate' in navigator;
@@ -135,8 +189,43 @@ const THEME = {
     hub: [[0, '#7a8090'], [1, '#17191f']],
     hole: '#0b0c0f', ring: '#ff5d8f', edge: 'rgba(255,255,255,.12)', shadow: 'rgba(0,0,0,.6)',
     spark: '255,93,143', accent: '#ff5d8f', side: [28, 30, 38], shade: '0,0,6'
+  },
+  gold: {
+    arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#6b4a12'], [0.42, '#ffe7a0'], [0.6, '#c99a2e'], [1, '#5a3d0c']], ang),
+    hub: [[0, '#fff6d6'], [0.5, '#d9aa3a'], [1, '#5c400d']],
+    hole: '#1b1307', ring: '#ffe9a8', edge: 'rgba(255,240,190,.45)', shadow: 'rgba(0,0,0,.55)',
+    spark: '255,215,120', accent: '#f0c24d', side: [128, 92, 24], shade: '20,10,0'
+  },
+  copper: {
+    arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#5a2a1a'], [0.42, '#ffc9a8'], [0.6, '#c9704a'], [1, '#4a2012']], ang),
+    hub: [[0, '#ffe3d2'], [0.5, '#c97a55'], [1, '#512314']],
+    hole: '#190c08', ring: '#ffd2b8', edge: 'rgba(255,215,190,.4)', shadow: 'rgba(0,0,0,.55)',
+    spark: '255,170,130', accent: '#e08a60', side: [122, 58, 36], shade: '25,6,0'
+  },
+  titan: {
+    arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#3b3f55'], [0.35, '#a9b6d8'], [0.55, '#7c6fa6'], [0.8, '#4a7fa8'], [1, '#2b3047']], ang),
+    hub: [[0, '#e2e8ff'], [0.5, '#7f8db8'], [1, '#2e3350']],
+    hole: '#0e1018', ring: '#c9d4ff', edge: 'rgba(210,220,255,.35)', shadow: 'rgba(0,0,0,.55)',
+    spark: '190,200,255', accent: '#9fb0ff', side: [58, 64, 92], shade: '0,0,16'
+  },
+  black: {
+    arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#14161b'], [0.42, '#4a4f5a'], [0.6, '#262a31'], [1, '#0e1013']], ang),
+    hub: [[0, '#6a707c'], [0.5, '#22252b'], [1, '#0b0c0f']],
+    hole: '#050607', ring: '#8b93a1', edge: 'rgba(255,255,255,.22)', shadow: 'rgba(0,0,0,.6)',
+    spark: '200,210,230', accent: '#8b93a1', side: [20, 22, 27], shade: '0,0,0'
+  },
+  ice: {
+    arm: (c, w, k, n, hue, ang) => grad(c, w, [[0, '#5d8fb8'], [0.42, '#f2fbff'], [0.6, '#9fd0ea'], [1, '#3f6f96']], ang),
+    hub: [[0, '#ffffff'], [0.5, '#a8d6ee'], [1, '#3d6a8e']],
+    hole: '#0a1620', ring: '#e6f6ff', edge: 'rgba(235,250,255,.55)', shadow: 'rgba(0,0,0,.5)',
+    spark: '200,240,255', accent: '#7fd0ff', side: [70, 110, 150], shade: '0,10,30'
   }
 };
+// 今の形の寸法（R に合わせた実寸）
+function geom() {
+  const g = SHAPES[settings.shape] || SHAPES.round;
+  return { type: g.type, tipD: R * g.tipD, tipR: R * g.tipR, w0: R * g.w0, hd: R * g.hd, hr: R * g.hr };
+}
 
 // 音色（ティック音のパラメータ）
 const TIMBRE = {
@@ -161,8 +250,6 @@ const rpmEl = document.getElementById('rpmv');
 const statsEl = document.getElementById('stats');
 const hintEl = document.getElementById('hint');
 const toastEl = document.getElementById('toast');
-const bTheme = document.getElementById('bTheme');
-const bArms = document.getElementById('bArms');
 const bSound = document.getElementById('bSound');
 const bTimbre = document.getElementById('bTimbre');
 const bVib = document.getElementById('bVib');
@@ -547,19 +634,30 @@ window.addEventListener('keydown', e => {
 });
 
 /* ---------- 描画 ---------- */
-function armPath(c) {
-  const tipD = R * 0.66, tipR = R * 0.24, w0 = R * 0.2;
+function armPath(c, G) {
+  G = G || geom();
+  const { tipD, tipR, w0 } = G;
   c.beginPath();
-  c.moveTo(0, -w0);
-  c.quadraticCurveTo(tipD * 0.5, -w0 * 0.9, tipD, -tipR);
-  c.arc(tipD, 0, tipR, -Math.PI / 2, Math.PI / 2, false);
-  c.quadraticCurveTo(tipD * 0.5, w0 * 0.9, 0, w0);
+  if (G.type === 'pointy') {                                // 先がとがった腕
+    c.moveTo(0, -w0);
+    c.quadraticCurveTo(tipD * 0.5, -w0 * 0.95, tipD + tipR, 0);
+    c.quadraticCurveTo(tipD * 0.5, w0 * 0.95, 0, w0);
+  } else if (G.type === 'leaf') {                           // 真ん中がふくらんだ葉の形
+    c.moveTo(0, -w0);
+    c.bezierCurveTo(tipD * 0.35, -tipR * 1.25, tipD * 0.75, -tipR * 1.15, tipD + tipR * 0.9, 0);
+    c.bezierCurveTo(tipD * 0.75, tipR * 1.15, tipD * 0.35, tipR * 1.25, 0, w0);
+  } else {                                                  // 先が丸い腕
+    c.moveTo(0, -w0);
+    c.quadraticCurveTo(tipD * 0.5, -w0 * 0.9, tipD, -tipR);
+    c.arc(tipD, 0, tipR, -Math.PI / 2, Math.PI / 2, false);
+    c.quadraticCurveTo(tipD * 0.5, w0 * 0.9, 0, w0);
+  }
   c.closePath();
 }
 
 function drawSpinner(th, full, target, ox, oy) {
-  const c = target || ctx, name = settings.theme, P = THEME[name], n = settings.arms, step = TAU / n;
-  const tipD = R * 0.66, tipR = R * 0.24, hubR = R * 0.2;
+  const c = target || ctx, name = settings.material, P = THEME[name], n = settings.arms, step = TAU / n;
+  const G = geom(), tipD = G.tipD, tipR = G.tipR, hubR = Math.max(R * 0.2, G.w0 * 0.9);
   const neonCol = hsl(S.hue, 100, 62);
   const edge = P.edge || neonCol;
   const ring = P.ring || neonCol;
@@ -572,7 +670,7 @@ function drawSpinner(th, full, target, ox, oy) {
   // 厚み：少しずつずらして重ねた側面。傾けるほど側面が見える
   const ext = full && !target;
   if (ext) {
-    const T = R * 0.05, N = 6;
+    const T = R * 0.05, N = n > 4 ? 3 : 6;                     // 腕が多いほど層を減らす
     const ex = S.vtx * T * 1.2, ey = S.vty * T * 1.2 + T * 0.55;                  // 画面上のずれ
     const lx = ex * Math.cos(th) + ey * Math.sin(th), ly = -ex * Math.sin(th) + ey * Math.cos(th);   // 回転後の座標に直す
     const sc = P.side;
@@ -608,16 +706,16 @@ function drawSpinner(th, full, target, ox, oy) {
       const gl = Math.pow(Math.max(0, Math.cos(th + k * step + 0.8 + S.tx * 1.0 - S.ty * 0.7)), 10);
       if (gl > 0.02) {
         c.save(); armPath(c); c.clip();
-        const gg = c.createLinearGradient(0, -tipR, 0, tipR);
+        const gg = c.createLinearGradient(0, -R * 0.32, 0, R * 0.32);
         gg.addColorStop(0, 'rgba(255,255,255,0)');
         gg.addColorStop(0.5, `rgba(255,255,255,${0.75 * gl})`);
         gg.addColorStop(1, 'rgba(255,255,255,0)');
-        c.fillStyle = gg; c.fillRect(0, -tipR, tipD + tipR, tipR * 2);
+        c.fillStyle = gg; c.fillRect(0, -R * 0.32, R, R * 0.64);
         c.restore();
       }
     }
 
-    if (full && (name === 'metal' || name === 'matte')) {   // 腕の長さ方向のヘアライン
+    if (full && BRUSHED.has(name)) {                          // 腕の長さ方向のヘアライン
       c.save(); armPath(c); c.clip();
       c.strokeStyle = 'rgba(255,255,255,.05)'; c.lineWidth = 0.7;
       c.beginPath();
@@ -649,16 +747,22 @@ function drawSpinner(th, full, target, ox, oy) {
     }
     c.stroke();
 
-    // ベアリング穴（先端）
-    c.beginPath(); c.arc(tipD, 0, tipR * 0.5, 0, TAU);
-    c.fillStyle = P.hole; c.fill();
-    {                                                          // 穴の内側：光源側の壁は影、反対側の壁は明るい
-      const hr = tipR * 0.5;
-      const hgr = c.createLinearGradient(tipD + ldx * hr, ldy * hr, tipD - ldx * hr, -ldy * hr);
+    // ベアリング穴
+    const HS = HOLES[settings.hole] || HOLES.round, hd = G.hd, hr = G.hr * HS.k;
+    c.beginPath(); c.arc(hd, 0, hr, 0, TAU);
+    if (HS.weight) {                                           // 重り付き：穴の中に金属の重りが入っている
+      const wg = c.createRadialGradient(hd + ldx * hr * 0.35, ldy * hr * 0.35, hr * 0.1, hd, 0, hr);
+      for (const [o, col] of P.hub) wg.addColorStop(o, col);
+      c.fillStyle = wg; c.fill();
+      c.strokeStyle = ring; c.lineWidth = R * 0.014; c.stroke();
+      c.beginPath(); c.arc(hd, 0, hr * 0.22, 0, TAU); c.fillStyle = P.hole; c.fill();      // 中央のくぼみ
+    } else {
+      c.fillStyle = P.hole; c.fill();
+      const hgr = c.createLinearGradient(hd + ldx * hr, ldy * hr, hd - ldx * hr, -ldy * hr);   // 穴の内側：光源側の壁は影、反対側は明るい
       hgr.addColorStop(0, 'rgba(0,0,0,.55)'); hgr.addColorStop(0.5, 'rgba(0,0,0,0)'); hgr.addColorStop(1, 'rgba(255,255,255,.28)');
       c.fillStyle = hgr; c.fill();
+      c.strokeStyle = ring; c.lineWidth = R * 0.012; c.stroke();
     }
-    c.strokeStyle = ring; c.lineWidth = R * 0.012; c.stroke();
     c.restore();
   }
 
@@ -744,8 +848,8 @@ const DUST = Array.from({ length: 44 }, () => ({
 }));
 
 function glowColor(alpha) {
-  const n = settings.theme;
-  if (n === 'neon' || n === 'rainbow') return `hsla(${S.hue},100%,60%,${alpha})`;
+  const n = settings.material;
+  if (DYN.has(n)) return `hsla(${S.hue},100%,60%,${alpha})`;
   return `rgba(${THEME[n].spark},${alpha})`;
 }
 function addRing(strength) { S.rings.push({ r: R * 0.3, life: 0.7, max: 0.7, s: Math.max(0.35, strength) }); }
@@ -787,11 +891,11 @@ function updateFx(dt) {
 
 /* ---------- 背景（テーマごとの世界） ---------- */
 const BG = {
-  metal:   { c0: [34, 40, 56], c1: [6, 7, 10],  aurora: ['130,175,255', '205,220,240'], bokeh: '210,225,255' },
-  neon:    { c0: [38, 18, 84], c1: [4, 3, 14],  aurora: ['255,60,200', '60,220,255'],   bokeh: '255,120,230' },
-  rainbow: { c0: [44, 30, 78], c1: [5, 4, 12],  aurora: null,                            bokeh: '255,255,255' },
-  wood:    { c0: [64, 41, 25], c1: [11, 7, 5],  aurora: null,                            bokeh: '255,200,140' },
-  matte:   { c0: [36, 31, 42], c1: [6, 6, 9],   aurora: ['255,93,143', '130,110,210'],  bokeh: '255,140,180' }
+  plate: { c0: [34, 40, 56], c1: [6, 7, 10], aurora: ['130,175,255', '205,220,240'], bokeh: '210,225,255' },
+  wood:  { c0: [64, 41, 25], c1: [11, 7, 5], aurora: null,                           bokeh: '255,200,140' },
+  mat:   { c0: [36, 31, 42], c1: [6, 6, 9],  aurora: ['255,93,143', '130,110,210'], bokeh: '255,140,180' },
+  city:  { c0: [38, 18, 84], c1: [4, 3, 14], aurora: ['255,60,200', '60,220,255'],   bokeh: '255,120,230' },
+  space: { c0: [24, 20, 56], c1: [3, 3, 10], aurora: ['120,90,255', '60,230,200'],   bokeh: '255,255,255' }
 };
 const BOKEH = Array.from({ length: 64 }, () => ({
   x: Math.random(), y: Math.random(), z: 0.25 + Math.random() * 0.75,
@@ -803,8 +907,8 @@ function rng(seed) { let x = seed >>> 0; return () => (x = (x * 1664525 + 101390
 // 動かない質感（テーマごとに1回だけ描いて使い回す）
 function paintTexture(c, theme0, w, h, pad, real) {
   const rnd = rng(7);
-  const theme = real && (theme0 === 'neon' || theme0 === 'rainbow') ? 'matte' : theme0;   // リアルでは光る床や虹色の床はやめる
-  if (theme === 'metal') {                         // ヘアライン加工の金属板
+  const theme = real && (theme0 === 'city' || theme0 === 'space') ? 'mat' : theme0;   // リアルでは光る床や宇宙の床はやめる
+  if (theme === 'plate') {                         // ヘアライン加工の金属板
     for (let i = 0; i < 1400; i++) {
       const x = rnd() * w, y = rnd() * h, len = 60 + rnd() * 320;
       c.strokeStyle = `rgba(255,255,255,${0.012 + rnd() * 0.035})`; c.lineWidth = 1;
@@ -828,10 +932,15 @@ function paintTexture(c, theme0, w, h, pad, real) {
       }
       c.fillStyle = 'rgba(0,0,0,0.38)'; c.fillRect(k * pw - 1, 0, 2, h);   // 板の継ぎ目
     }
-  } else if (theme === 'matte') {                  // レコード盤のような同心円の溝
+  } else if (theme === 'mat') {                    // レコード盤のような同心円の溝
     c.strokeStyle = 'rgba(255,255,255,0.04)'; c.lineWidth = 1;
     for (let r = 40; r < Math.hypot(w, h); r += 14) { c.beginPath(); c.arc(cx + pad, cy + pad, r, 0, TAU); c.stroke(); }
-  } else if (theme === 'neon') {                   // 地平線に向かう格子の縦線
+  } else if (theme === 'space') {                  // 星
+    for (let i = 0; i < 170; i++) {
+      c.fillStyle = `rgba(255,255,255,${0.15 + rnd() * 0.5})`;
+      const r = 0.4 + rnd() * 1.2; c.beginPath(); c.arc(rnd() * w, rnd() * h, r, 0, TAU); c.fill();
+    }
+  } else if (theme === 'city') {                   // 地平線に向かう格子の縦線
     const yH = cy + R * 1.25 + pad;
     c.strokeStyle = 'rgba(120,220,255,0.16)'; c.lineWidth = 1;
     for (let i = -14; i <= 14; i++) { c.beginPath(); c.moveTo(w / 2 + i * w * 0.012, yH); c.lineTo(w / 2 + i * w * 0.17, h); c.stroke(); }
@@ -841,7 +950,7 @@ function paintTexture(c, theme0, w, h, pad, real) {
 
 // リアル用の細かい質感：傷、年輪、節、ゴムの粒
 function paintRealExtras(c, theme, w, h, rnd) {
-  if (theme === 'metal') {
+  if (theme === 'plate') {
     for (let i = 0; i < 1800; i++) {                       // ヘアライン（明暗）
       const x = rnd() * w, y = rnd() * h, len = 40 + rnd() * 260;
       c.strokeStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '0,0,0'},${0.012 + rnd() * 0.03})`; c.lineWidth = 1;
@@ -866,7 +975,7 @@ function paintRealExtras(c, theme, w, h, rnd) {
       g.addColorStop(0, 'rgba(30,14,4,.55)'); g.addColorStop(0.6, 'rgba(50,26,10,.25)'); g.addColorStop(1, 'rgba(50,26,10,0)');
       c.fillStyle = g; c.beginPath(); c.ellipse(x, y, 18, 30, 0, 0, TAU); c.fill();
     }
-  } else if (theme === 'matte') {
+  } else if (theme === 'mat') {
     for (let i = 0; i < 6000; i++) {                       // ゴムマットの細かい粒
       c.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '0,0,0'},${0.02 + rnd() * 0.05})`;
       c.fillRect(rnd() * w, rnd() * h, 1.2, 1.2);
@@ -876,14 +985,14 @@ function paintRealExtras(c, theme, w, h, rnd) {
 
 let bgCache = null, dotSprite = null;
 function getBgStatic() {
-  const key = [settings.theme, settings.fx === 0 ? 'real' : 'std', W, H, dpr, Math.round(cx), Math.round(cy), Math.round(R)].join('|');
+  const key = [settings.bg, settings.fx === 0 ? 'real' : 'std', W, H, dpr, Math.round(cx), Math.round(cy), Math.round(R)].join('|');
   if (bgCache && bgCache.key === key) return bgCache;
   const pad = Math.round(Math.max(W, H) * 0.08);
   const cv = bgCache ? bgCache.canvas : document.createElement('canvas');
   cv.width = Math.ceil((W + pad * 2) * dpr); cv.height = Math.ceil((H + pad * 2) * dpr);
   const c = cv.getContext('2d');
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
-  paintTexture(c, settings.theme, W + pad * 2, H + pad * 2, pad, settings.fx === 0);
+  paintTexture(c, settings.bg, W + pad * 2, H + pad * 2, pad, settings.fx === 0);
   bgCache = { key, canvas: cv, pad };
   return bgCache;
 }
@@ -957,7 +1066,7 @@ function drawBlobs() {
   for (let k = 0; k < 3; k++) {
     const x = W * (0.5 + 0.35 * Math.sin(S.auT * 0.5 + k * 2.1) + S.tx * 0.2);
     const y = H * (0.38 + 0.2 * Math.cos(S.auT * 0.4 + k * 1.7) + S.ty * 0.08);
-    const rr = Math.max(W, H) * 0.45;
+    const rr = Math.max(W, H) * 0.36;
     const g = ctx.createRadialGradient(x, y, 0, x, y, rr);
     g.addColorStop(0, `hsla(${(S.hue + k * 120) % 360},90%,60%,0.14)`); g.addColorStop(1, `hsla(${(S.hue + k * 120) % 360},90%,60%,0)`);
     ctx.fillStyle = g; ctx.fillRect(x - rr, y - rr, rr * 2, rr * 2);
@@ -966,15 +1075,15 @@ function drawBlobs() {
 }
 
 const BGR = {   // リアル用：彩度を抑えた、現実の机や板の色
-  metal:   { c0: [58, 61, 68], c1: [10, 11, 13] },
-  neon:    { c0: [38, 38, 44], c1: [8, 8, 10] },
-  rainbow: { c0: [62, 60, 64], c1: [10, 10, 12] },
-  wood:    { c0: [92, 61, 38], c1: [17, 11, 7] },
-  matte:   { c0: [50, 50, 55], c1: [9, 9, 11] }
+  plate: { c0: [58, 61, 68], c1: [10, 11, 13] },
+  wood:  { c0: [92, 61, 38], c1: [17, 11, 7] },
+  mat:   { c0: [50, 50, 55], c1: [9, 9, 11] },
+  city:  { c0: [38, 38, 44], c1: [8, 8, 10] },
+  space: { c0: [34, 34, 42], c1: [6, 6, 9] }
 };
 function drawBackground() {
   const real = settings.fx === 0;
-  const B = real ? BGR[settings.theme] : BG[settings.theme];
+  const B = real ? BGR[settings.bg] : BG[settings.bg];
   const tk = real ? 0.12 : 1;                               // 傾きによる色づきの強さ
   const glow = (1 - Math.exp(-S.L / 3.2)) * (settings.fx > 0 ? 0.7 : 0);
   S.auT += S.drawDt * (0.25 + 0.12 * S.L);
@@ -994,9 +1103,9 @@ function drawBackground() {
   // 動く層（演出「控えめ」のときだけ）
   if (settings.fx > 0) {
     if (B.aurora) drawAurora(B.aurora);
-    if (settings.theme === 'neon') drawGrid();
-    if (settings.theme === 'rainbow') drawBlobs();
-    drawBokeh(B.bokeh, settings.theme === 'wood' ? 12 : 24);
+    if (settings.bg === 'city') drawGrid();
+    if (settings.bg === 'space') drawBlobs();
+    drawBokeh(B.bokeh, settings.bg === 'wood' ? 12 : 24);
   }
 
   // 傾けた側にたまる光
@@ -1096,8 +1205,8 @@ function mipChain(src, prev) {
 // アームの画像を1枚作っておき、残像と影に使い回す（毎コマ描き直さない）
 let sprite = null;
 function getSprite() {
-  const dyn = settings.theme === 'neon' || settings.theme === 'rainbow';
-  const key = [settings.theme, settings.arms, Math.round(R), dpr, dyn ? Math.round(S.hue / 30) : 0].join('|');
+  const dyn = DYN.has(settings.material);
+  const key = [settings.material, settings.shape, settings.hole, settings.arms, Math.round(R), dpr, dyn ? Math.round(S.hue / 30) : 0].join('|');
   if (sprite && sprite.key === key) return sprite;
   const size = Math.ceil(2 * R * dpr);
   const arm = sprite ? sprite.arm : document.createElement('canvas');
@@ -1164,7 +1273,7 @@ function castShadow(i, mips, theta, ox, oy, down, alpha, scale, rgb, halfK) {
 
 // 2層の影：接地に近い所は濃くくっきり、離れた所は薄くぼやける
 function drawShadows() {
-  const spr = getSprite(), P = THEME[settings.theme];
+  const spr = getSprite(), P = THEME[settings.material];
   const L = lightAng();
   const lx = -Math.cos(L), ly = -Math.sin(L);                         // 影が伸びる向き（光の反対）
   const layers = [                                                    // [浮いている高さ, 縮小率(小さいほどぼける), 濃さ, 拡大, 範囲]
@@ -1178,7 +1287,7 @@ function drawShadows() {
 }
 
 function draw(a) {
-  const P = THEME[settings.theme];
+  const P = THEME[settings.material];
   // 仮想の傾き：スマホの傾きに、ゆっくりした揺れを足す（センサーがなくても立体感が出る）
   {
     const t3 = performance.now() / 1000, sway = S.tiltSeen ? 0.3 : 1;
@@ -1358,10 +1467,10 @@ const setRow = (btn, label, value, on) => {
   if (on !== undefined) btn.setAttribute('aria-pressed', on);
 };
 function refreshUI() {
-  const P = THEME[settings.theme];
+  const P = THEME[settings.material];
   document.documentElement.style.setProperty('--accent', P.accent);
-  setRow(bTheme, 'テーマ', `<i class="dot" style="background:${P.accent}"></i>${THEME_NAME[settings.theme]}`);
-  setRow(bArms, 'アームの数', `${settings.arms}本`);
+  for (const g of chipGroups) for (const b of g.btns) b.setAttribute('aria-pressed', String(String(g.get()) === b.dataset.id));
+  comboHead.textContent = `組み合わせ No.${comboNo().toLocaleString('en-US')} / ${COMBOS.toLocaleString('en-US')} 通り`;
   setRow(bFx, '演出', FX_NAME[settings.fx]);
   setRow(bSound, '音', settings.sound ? 'ON' : 'OFF', settings.sound);
   setRow(bTimbre, '音色', TIMBRE_NAME[settings.timbre]);
@@ -1383,10 +1492,78 @@ gear.addEventListener('click', () => setSheet(!sheet.classList.contains('open'))
 scrim.addEventListener('click', () => setSheet(false));
 window.addEventListener('keydown', e => { if (e.key === 'Escape') setSheet(false); });
 
+/* ---------- 種類の選択（チップ）・ランダム・フルスクリーン ---------- */
+const comboHead = document.getElementById('comboHead');
+const comboEl = document.getElementById('combo');
+const randBtn = document.getElementById('rand');
+const fsBtn = document.getElementById('fs');
+const chipGroups = [];
+function addChips(id, items, key, after) {
+  const el = document.getElementById(id), btns = [];
+  for (const it of items) {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.id = String(it.id);
+    b.innerHTML = (it.dot ? `<i class="dot" style="background:${it.dot}"></i>` : '') + it.label;
+    b.addEventListener('click', () => {
+      settings[key] = it.id; if (after) after();
+      saveSettings(); refreshUI(); showCombo();
+    });
+    el.appendChild(b); btns.push(b);
+  }
+  chipGroups.push({ btns, get: () => settings[key] });
+}
+addChips('chMat', MATS.map(id => ({ id, label: MAT_NAME[id], dot: THEME[id].accent })), 'material', () => { S.hue = 200; });
+addChips('chShape', SHAPE_IDS.map(id => ({ id, label: SHAPES[id].name })), 'shape');
+addChips('chArms', ARMS.map(n => ({ id: n, label: `${n}本` })), 'arms', () => { S.tickIdx = null; });
+addChips('chHole', HOLE_IDS.map(id => ({ id, label: HOLES[id].name })), 'hole');
+addChips('chBg', BG_IDS.map(id => ({ id, label: BG_NAME[id] })), 'bg');
+
+// 組み合わせの番号（1〜6,000）
+function comboNo() {
+  const m = MATS.indexOf(settings.material), s2 = SHAPE_IDS.indexOf(settings.shape), a = ARMS.indexOf(settings.arms), h = HOLE_IDS.indexOf(settings.hole), b = BG_IDS.indexOf(settings.bg);
+  return (((m * SHAPE_IDS.length + s2) * ARMS.length + a) * HOLE_IDS.length + h) * BG_IDS.length + b + 1;
+}
+let comboTimer = 0;
+function showCombo(msg) {                                  // 画面の下に、今の組み合わせを数秒だけ表示
+  comboEl.textContent = msg || `No.${comboNo().toLocaleString('en-US')} / ${COMBOS.toLocaleString('en-US')}　${MAT_NAME[settings.material]}・${SHAPES[settings.shape].name}・${settings.arms}本・穴${HOLES[settings.hole].name}・${BG_NAME[settings.bg]}`;
+  comboEl.classList.add('show');
+  clearTimeout(comboTimer); comboTimer = setTimeout(() => comboEl.classList.remove('show'), 3200);
+}
+function randomize() {
+  const pick = list => list[Math.floor(Math.random() * list.length)];
+  const before = comboNo();
+  do {
+    settings.material = pick(MATS); settings.shape = pick(SHAPE_IDS); settings.arms = pick(ARMS);
+    settings.hole = pick(HOLE_IDS); settings.bg = pick(BG_IDS);
+  } while (comboNo() === before);
+  S.hue = 200; S.tickIdx = null;
+  saveSettings(); refreshUI(); showCombo();
+  randBtn.classList.remove('roll'); void randBtn.offsetWidth; randBtn.classList.add('roll');
+  initAudio(); click(0.9); vib(12);
+}
+randBtn.addEventListener('click', randomize);
+
+// フルスクリーン（iPhoneのSafariなど、対応していない端末ではボタンを隠す）
+const fsRoot = document.documentElement;
+const fsRequest = fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen;
+const fsExit = document.exitFullscreen || document.webkitExitFullscreen;
+const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const ICON_EXPAND = '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
+const ICON_COMPRESS = '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>';
+function updateFsIcon() { document.getElementById('fsIcon').innerHTML = isFs() ? ICON_COMPRESS : ICON_EXPAND; }
+if (!fsRequest) fsBtn.hidden = true;
+fsBtn.addEventListener('click', () => {
+  try {
+    const r = isFs() ? fsExit.call(document) : fsRequest.call(fsRoot);
+    if (r && r.catch) r.catch(() => showCombo('このページではフルスクリーンにできません'));
+  } catch (e) { showCombo('このページではフルスクリーンにできません'); }
+});
+document.addEventListener('fullscreenchange', updateFsIcon);
+document.addEventListener('webkitfullscreenchange', updateFsIcon);
+updateFsIcon();
+
 function cycle(list, cur) { return list[(list.indexOf(cur) + 1) % list.length]; }
 
-bTheme.addEventListener('click', () => { settings.theme = cycle(THEMES, settings.theme); S.hue = 200; saveSettings(); refreshUI(); });
-bArms.addEventListener('click', () => { settings.arms = cycle(ARMS, settings.arms); S.tickIdx = null; saveSettings(); refreshUI(); });
 bSound.addEventListener('click', () => { initAudio(); settings.sound = !settings.sound; saveSettings(); refreshUI(); });
 bTimbre.addEventListener('click', () => { settings.timbre = cycle(TIMBRES, settings.timbre); saveSettings(); refreshUI(); });
 bVib.addEventListener('click', () => { settings.vib = !settings.vib; saveSettings(); refreshUI(); vib(10); });
