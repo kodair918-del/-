@@ -110,7 +110,7 @@ body.inbattle #hud,body.inbattle #hint,body.inbattle #toast,body.inbattle #combo
 <div id="bt">
   <div class="btcard" id="sMenu">
     <h2>スピン・アリーナ</h2>
-    <p>10秒間回して、最後の回転数でバトル開始。場外に出されるか、回転が止まったら負け。バトル中は画面のボタンでダッシュ！</p>
+    <p>10秒間回して、最後の回転数でバトル開始。場外に出されるか、回転が止まったら負け。バトル中は、ダッシュで相手をすり抜け、近づいたら画面タップでジャストガード、ゲージがたまったら必殺技！</p>
     <div class="mine">
       <canvas id="hbCv" width="224" height="224"></canvas>
       <div style="flex:1;min-width:0">
@@ -1800,7 +1800,7 @@ bFx.addEventListener('click', () => {
 /* ================= バトル ================= */
 let MODE = 'free';                                         // 'free'(ふつうに回す) | 'spin'(5秒間回す) | 'battle'
 let BS = 0.14, Q = BS / 0.36;                                // R=1 のスピナーの半径（アリーナ半径=1 に対する比）。小さいほどフィールドが広い。Q＝旧サイズ(0.36)との比で、速さ・力を合わせる                                            // R=1 のスピナーの半径（アリーナ半径=1 に対する比）
-const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5, DUR: 7.5, SDUR: 1, LAM: 0.4, MU: 0.8, PAD: 1.6, BUMP: 1.3, SPPASS: 1.2, RUSH: 2.6, GUARD: 0.35, LUNGE: 2.8, PULSE: 2.2, TYPE_GAP: 0.12 };   // DUR=バーストの耐久、SDUR=回転の持久（どちらも倍率）   // シミュレーションで調整した値
+const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5, DUR: 7.5, SDUR: 1, LAM: 0.4, MU: 0.8, PAD: 1.6, BUMP: 1.3, SPPASS: 1.2, JG_WIN: 0.3, JG_CD: 0.9, JG_DMG: 0.2, INV: 0.4, RUSH: 2.6, GUARD: 0.35, LUNGE: 2.8, PULSE: 2.2, TYPE_GAP: 0.12 };   // DUR=バーストの耐久、SDUR=回転の持久（どちらも倍率）   // シミュレーションで調整した値
 const $b = id => document.getElementById(id);
 
 // 材質：dens=重さ hard=硬さ bear=軸の滑らかさ grip=グリップ（相手へ寄っていく強さ）
@@ -1914,7 +1914,7 @@ function drawHitPreview(cv, d) {                            // スピナーに�
 function makeFighter(d, rpm, name, side) {
   d = cleanDesign(d);
   const r = Math.max(120, Math.min(rpm, 50000)), w = r * TAU / 60;
-  return { d, name, side, st: statsOf(d), circles: hitCircles(d), x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, bg: 0, burst: false, land: 0, sp: 0, skReq: false, sk: { rush: 0, guard: 0, eco: 0 }, padCd: 0, bumpCd: 0, th: Math.random() * TAU, dir: Math.random() < 0.5 ? 1 : -1,
+  return { d, name, side, st: statsOf(d), circles: hitCircles(d), x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, bg: 0, burst: false, land: 0, sp: 0, spm: 1, jg: 0, jgCd: 0, inv: 0, jgReq: false, skReq: false, sk: { rush: 0, guard: 0, eco: 0 }, padCd: 0, bumpCd: 0, th: Math.random() * TAU, dir: Math.random() < 0.5 ? 1 : -1,
     w, w0: w, lk: 0.85 + Math.random() * 0.3, dashCd: 0, dashReq: false, pairCd: 0, out: false, fin: false, outT: 0, hits: 0, taken: 0, maxHit: 0, dashed: 0, aiT: 0, rpm: Math.round(r) };
 }
 let START = 0.6;
@@ -1953,6 +1953,7 @@ function gimmick(Bt, f, o, dt) {
 }
 function makeBattle(a, b, arena) {
   a.x = 0; a.y = START; a.z = fh(START); a.vy = -0.2 * Q; b.x = 0; b.y = -START; b.z = fh(START); b.vy = 0.2 * Q;
+  a.spm = Math.min(3.5, Math.max(1, Math.pow(b.w0 / a.w0, 0.7))); b.spm = Math.min(3.5, Math.max(1, Math.pow(a.w0 / b.w0, 0.7)));   // 回転数で負けているほど、必殺技ゲージが早くたまる
   a.drk = b.drk = arena === 'ice' ? 0.6 : 1;                   // アイス：摩擦が小さい
   return { A: a, B: b, t: 0, over: false, winner: null, reason: '', ev: [], arena: arena || 'normal', obj: arenaObjs(arena || 'normal', 0) };
 }
@@ -1965,7 +1966,7 @@ function stepFighter(f, o, dt) {
   if (f.burst) { f.outT += dt; return; }
   if (f.out) { f.outT += dt; f.x += f.vx * dt * 1.5; f.y += f.vy * dt * 1.5; f.th += f.w * f.dir * dt; f.vz -= PHYS.G * dt; f.z = Math.max(-0.5, f.z + f.vz * dt); return; }
   f.dashCd = Math.max(0, f.dashCd - dt); f.pairCd = Math.max(0, f.pairCd - dt);
-  f.sp = Math.min(100, f.sp + PHYS.SPPASS * dt); for (const k of ['rush', 'guard', 'eco']) f.sk[k] = Math.max(0, f.sk[k] - dt);
+  f.sp = Math.min(100, f.sp + PHYS.SPPASS * f.spm * dt); f.jg = Math.max(0, f.jg - dt); f.jgCd = Math.max(0, f.jgCd - dt); f.inv = Math.max(0, f.inv - dt); for (const k of ['rush', 'guard', 'eco']) f.sk[k] = Math.max(0, f.sk[k] - dt);
   const w = f.w, wn = Math.min(1, w / 250);
   f.w = Math.max(0, w - (PHYS.C0 + PHYS.C1 * w) * dt / (Math.pow(f.st.staE, 0.7) * Math.sqrt(f.st.pw) * f.lk * PHYS.SDUR * (f.sk.eco > 0 ? 2.5 : 1)));     // lk=そのバトルの調子（運）
   const r0 = Math.hypot(f.x, f.y), gnd = f.z - fh(r0) < 0.004 && f.vz <= 0.05;
@@ -1999,7 +2000,7 @@ function applyDash(f, o, Bt) {
   f.dashReq = false;
   if (f.dashCd > 0 || f.out || f.fin) return;
   const dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy) || 1e-6, k = PHYS.DASH * Q / Math.sqrt(f.st.mass);
-  f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dashCd = PHYS.DASH_CD; f.dashed++; if (Bt) Bt.ev.push({ type: 'dash', who: f.side, x: f.x, y: f.y, z: f.z, dx: dx / d, dy: dy / d });
+  f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dashCd = PHYS.DASH_CD; f.dashed++; f.inv = PHYS.INV; if (Bt) Bt.ev.push({ type: 'dash', who: f.side, x: f.x, y: f.y, z: f.z, dx: dx / d, dy: dy / d });
 }
 const SKILLS = { atk: ['疾風ラッシュ', '255,107,107'], def: ['鉄壁パルス', '93,180,255'], sta: ['リバイブ', '107,220,139'], bal: ['ツインブースト', '240,194,77'] };
 function useSkill(f, o, Bt) {                                // 必殺技：ゲージが満タンで発動。タイプごとに効果が違う
@@ -2020,7 +2021,7 @@ function collide(Bt, A, B) {
     const dx = b.x - a.x, dy = b.y - a.y, rr = a.r + b.r, d2 = dx * dx + dy * dy;
     if (d2 < rr * rr) { const d = Math.sqrt(d2) || 1e-6, pen = rr - d; if (!best || pen > best.pen) best = { a, b, dx, dy, d, pen }; }
   }
-  if (!best || Math.abs(A.z - B.z) > BS * 1.4) return;                       // 高さが合わなければ当たらない（空中の相手は飛び越える）
+  if (!best || Math.abs(A.z - B.z) > BS * 1.4 || A.inv > 0 || B.inv > 0) return;   // ダッシュ中はすり抜ける                       // 高さが合わなければ当たらない（空中の相手は飛び越える）
   const nx = best.dx / best.d, ny = best.dy / best.d, gy = w => 1 + 0.35 * Math.log2(1 + w / 260), mA = A.st.mass * gy(A.w), mB = B.st.mass * gy(B.w), tot = mA + mB;   // 速く回るほど、はじかれにくい（ジャイロ効果）
   A.x -= nx * best.pen * mB / tot; A.y -= ny * best.pen * mB / tot; B.x += nx * best.pen * mA / tot; B.y += ny * best.pen * mA / tot;   // めり込みを戻す
   const rax = best.a.x - A.x, ray = best.a.y - A.y, rbx = best.b.x - B.x, rby = best.b.y - B.y;
@@ -2033,19 +2034,24 @@ function collide(Bt, A, B) {
   const Jk = Math.min(J, (A.sk.rush > 0 || B.sk.rush > 0) ? PHYS.JMAX * 1.5 : PHYS.JMAX) * Q;                        // はじき飛ばす力には上限（ダメージは大きくなっても、1発で場外にならないように）
   A.vx -= Jk / mA * nx * PHYS.KNOCK; A.vy -= Jk / mA * ny * PHYS.KNOCK; B.vx += Jk / mB * nx * PHYS.KNOCK; B.vy += Jk / mB * ny * PHYS.KNOCK;
   const rnd = () => 0.75 + Math.random() * 0.5;                               // ダメージには毎回少しばらつき
+  const jA = A.jg > 0, jB = B.jg > 0;                          // ジャストガード：当たる直前にタップできた
   const pwr = A.st.pw / B.st.pw;                              // 部品ごとの強さの補正
   const rA = A.sk.rush > 0 ? PHYS.RUSH : 1, rB = B.sk.rush > 0 ? PHYS.RUSH : 1, gA = A.sk.guard > 0 ? PHYS.GUARD : 1, gB = B.sk.guard > 0 ? PHYS.GUARD : 1;
-  const dB = pwr * rA * gB * PHYS.DMG * J * rnd() * A.lk * A.st.atkE * rps(A.st.type, B.st.type) * KIND_ATK[best.a.kind] / (B.st.defE * KIND_DEF[best.b.kind]);   // 相手が受ける回転ダメージ
-  const dA = rB * gA / pwr * PHYS.DMG * J * rnd() * B.lk * B.st.atkE * rps(B.st.type, A.st.type) * KIND_ATK[best.b.kind] / (A.st.defE * KIND_DEF[best.a.kind]);
+  const dB = (jB ? PHYS.JG_DMG : 1) * pwr * rA * gB * PHYS.DMG * J * rnd() * A.lk * A.st.atkE * rps(A.st.type, B.st.type) * KIND_ATK[best.a.kind] / (B.st.defE * KIND_DEF[best.b.kind]);   // 相手が受ける回転ダメージ
+  const dA = (jA ? PHYS.JG_DMG : 1) * rB * gA / pwr * PHYS.DMG * J * rnd() * B.lk * B.st.atkE * rps(B.st.type, A.st.type) * KIND_ATK[best.b.kind] / (A.st.defE * KIND_DEF[best.a.kind]);
   const up = () => 0.6 + Math.random() * 0.8;
   A.vz = Math.min(1.6, A.vz + Jk / mA * PHYS.LIFT * B.st.sharp * up()); B.vz = Math.min(1.6, B.vz + Jk / mB * PHYS.LIFT * A.st.sharp * up());   // ぶつかると浮く（とがった相手ほど高く）
   A.z += 0.002; B.z += 0.002;
   const stress = w => 0.6 + 0.4 * Math.min(4, Math.sqrt(w / 260));                  // 攻める側の回転が速いほど、相手が壊れやすい
-  A.bg += rB * gA / pwr * PHYS.BURST / PHYS.DUR * J * rnd() * B.st.atkE * KIND_ATK[best.b.kind] * stress(B.w) / (A.st.bres * KIND_DEF[best.a.kind]);   // バーストゲージ
-  B.bg += rA * gB * pwr * PHYS.BURST / PHYS.DUR * J * rnd() * A.st.atkE * KIND_ATK[best.a.kind] * stress(A.w) / (B.st.bres * KIND_DEF[best.b.kind]);
+  A.bg += (jA ? PHYS.JG_DMG : 1) * rB * gA / pwr * PHYS.BURST / PHYS.DUR * J * rnd() * B.st.atkE * KIND_ATK[best.b.kind] * stress(B.w) / (A.st.bres * KIND_DEF[best.a.kind]);   // バーストゲージ
+  B.bg += (jB ? PHYS.JG_DMG : 1) * rA * gB * pwr * PHYS.BURST / PHYS.DUR * J * rnd() * A.st.atkE * KIND_ATK[best.a.kind] * stress(A.w) / (B.st.bres * KIND_DEF[best.b.kind]);
   A.w = Math.max(0, A.w - dA); B.w = Math.max(0, B.w - dB);
-  A.sp = Math.min(100, A.sp + 12 + (dA > dB ? 6 : 0)); B.sp = Math.min(100, B.sp + 12 + (dB > dA ? 6 : 0));        // 当てても当てられてもゲージがたまる
+  A.sp = Math.min(100, A.sp + (12 + (dA > dB ? 6 : 0)) * A.spm); B.sp = Math.min(100, B.sp + (12 + (dB > dA ? 6 : 0)) * B.spm);        // 当てても当てられてもゲージがたまる
   if (A.sk.rush > 0) A.sk.rush = 0; if (B.sk.rush > 0) B.sk.rush = 0;
+  for (const [g, o, ox, oy] of [[A, B, nx, ny], [B, A, -nx, -ny]]) if (g.jg > 0) {   // 成功：相手がのけぞり、必殺技ゲージがたまる
+    g.jg = 0; g.sp = Math.min(100, g.sp + 30); o.vx += ox * 0.9 * Q; o.vy += oy * 0.9 * Q; o.vz = Math.max(o.vz, 0.5); o.z += 0.002;
+    Bt.ev.push({ type: 'jguard', who: g.side, x: g.x, y: g.y, z: g.z });
+  }
   A.pairCd = B.pairCd = PHYS.PAIR_CD; A.hits++; B.hits++; A.taken += dA; B.taken += dB; A.maxHit = Math.max(A.maxHit, dB); B.maxHit = Math.max(B.maxHit, dA);
   Bt.ev.push({ type: 'hit', x: (best.a.x + best.b.x) / 2, y: (best.a.y + best.b.y) / 2, z: (A.z + B.z) / 2, p: J, da: dA, db: dB });
 }
@@ -2055,6 +2061,7 @@ function stepBattle(Bt, dt) {
   const A = Bt.A, B = Bt.B;
   Bt.t += dt;
   applyDash(A, B, Bt); applyDash(B, A, Bt); useSkill(A, B, Bt); useSkill(B, A, Bt);
+  for (const f of [A, B]) if (f.jgReq) { f.jgReq = false; if (f.jgCd <= 0 && !f.out && !f.burst) { f.jg = PHYS.JG_WIN; f.jgCd = PHYS.JG_CD; Bt.ev.push({ type: 'guard', who: f.side, x: f.x, y: f.y, z: f.z }); } }
   const sA = { x: A.x, y: A.y }, sB = { x: B.x, y: B.y };      // 2人を同時に動かす（先に動く側が有利にならないように）
   stepFighter(A, sB, dt); stepFighter(B, sA, dt);
   Bt.obj = arenaObjs(Bt.arena, Bt.t); gimmick(Bt, A, B, dt); gimmick(Bt, B, A, dt);
@@ -2080,6 +2087,10 @@ function aiSkill(f, o, diff, dt, boss) {                   // CPUの必殺技
   const d = Math.hypot(o.x - f.x, o.y - f.y), t = f.st.type;
   const ok = t === 'def' ? d < 0.45 : t === 'sta' ? (f.w < 0.7 * f.w0 || f.bg > 40) : d < 0.9;
   if (ok && Math.random() < (boss ? 1 : [0.3, 0.6, 0.9][diff - 1])) f.skReq = true;
+}
+function aiGuard(f, o, diff, dt, boss) {                   // CPUのジャストガード：近づいた時に、たまに成功させる
+  f.aiG = (f.aiG || 0) - dt; if (f.aiG > 0) return; f.aiG = 0.12;
+  if (f.jgCd <= 0 && !f.out && !f.burst && Math.hypot(o.x - f.x, o.y - f.y) < BS * 3.2 && Math.random() < [0.12, 0.22, 0.35][diff - 1] * (boss ? 1.4 : 1)) f.jgReq = true;
 }
 function aiDash(f, o, diff, dt) {                           // CPUのダッシュ：近づいた時に、つよいほど頻繁に使う
   f.aiT -= dt;
@@ -2283,6 +2294,11 @@ function btEvents(Bt) {
       for (let i = 0; i < 16 + Math.min(22, e.p * 18 | 0); i++) { const a = Math.random() * TAU, v = 0.4 + Math.random() * (1.2 + big); BT.sparks.push({ x: e.x, y: e.y, z: (e.z || 0) + 0.02, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 0.5 + Math.random() * (1 + big), life: 0.4 + Math.random() * 0.4 }); }
       for (const f of [Bt.A, Bt.B]) { const dx = f.x - e.x, dy = f.y - e.y, d = Math.hypot(dx, dy) || 1, m = Math.min(0.5, 0.2 + e.p * 0.2); f.kx = (f.kx || 0) + dx / d * m; f.ky = (f.ky || 0) + dy / d * m; }
       click(Math.min(1, 0.4 + e.p * 0.4)); if (e.p > 0.5) thump(Math.min(1, 0.3 + e.p * 0.5)); vib(Math.min(50, 14 + e.p * 18));
+    } else if (e.type === 'guard') {
+      BT.rings.push({ x: e.x, y: e.y, z: Math.max(0, e.z || 0), t: 0, s: 0.22, d: 0.3, c: '93,180,255' }); click(0.5);
+    } else if (e.type === 'jguard') {
+      BT.banner = { t: 1.0, text: 'JUST GUARD', col: '93,180,255', who: e.who }; CAM.shake = Math.min(1, CAM.shake + 0.4); CAM.punch = 1; BT.stop = Math.max(BT.stop, 0.09); BT.flash = Math.max(BT.flash, 0.3); thump(0.9); chime(5); vib(50);
+      for (let k = 0; k < 2; k++) BT.rings.push({ x: e.x, y: e.y, z: Math.max(0, e.z || 0), t: -k * 0.08, s: 0.5 + k * 0.3, d: 0.45, c: '120,200,255' });
     } else if (e.type === 'skill') {
       const K = SKILLS[e.kind]; BT.banner = { t: 1.5, text: K[0], col: K[1], who: e.who }; boom(0.45); whoosh(0.8); vib(60); BT.flash = Math.max(BT.flash, 0.25); CAM.shake = Math.min(1, CAM.shake + 0.5); CAM.punch = 1;
       for (let k = 0; k < 3; k++) BT.rings.push({ x: e.x, y: e.y, z: Math.max(0, e.z || 0), t: -k * 0.12, s: 0.5 + k * 0.35, d: 0.6, c: K[1] });
@@ -2331,7 +2347,7 @@ function battleFrame(now, rawDt) {
     if (BT.count <= 0.2 && !BT.go) { BT.go = true; thump(1); boom(0.3); CAM.punch = 1; CAM.shake = 0.7; BT.flash = 0.35; }
     if (BT.count <= 0) BT.phase = 'fight';
   } else if (BT.phase === 'fight' && !isGuest) {
-    if (BT.type === 'cpu') { aiDash(Bt.B, Bt.A, BT.diff, sdt); aiSkill(Bt.B, Bt.A, BT.diff, sdt, BT.streak && BT.stage % 5 === 0); }
+    if (BT.type === 'cpu') { aiDash(Bt.B, Bt.A, BT.diff, sdt); const bs = BT.streak && BT.stage % 5 === 0; aiSkill(Bt.B, Bt.A, BT.diff, sdt, bs); aiGuard(Bt.B, Bt.A, BT.diff, sdt, bs); }
     const n = Math.max(1, Math.ceil(sdt / (1 / 120)));
     for (let i = 0; i < n; i++) stepBattle(Bt, sdt / n);
     if (BT.role === 'host') {
@@ -2489,6 +2505,7 @@ function drawBattle(dt, Bt) {
     const fr = BT.count - Math.floor(BT.count), pop = n > 0 ? 1 + 0.35 * fr : 1.25;
     ctx.font = `800 ${(n > 0 ? 84 : 96) * pop | 0}px system-ui, sans-serif`; ctx.fillText(n > 0 ? String(n) : 'FIGHT!', W / 2, H * 0.4);
     ctx.font = '700 15px system-ui, sans-serif'; ctx.fillText('ARENA：' + ARENAS[Bt.arena][0] + (Bt.arena === 'normal' ? '' : '　' + ARENAS[Bt.arena][1]), W / 2, H * 0.52);
+    ctx.font = '600 13px system-ui, sans-serif'; ctx.fillText('画面タップ＝ジャストガード　／　ダッシュ＝すり抜け', W / 2, H * 0.8); ctx.font = '700 15px system-ui, sans-serif';
     if (BT.streak) { ctx.font = '800 18px system-ui, sans-serif'; ctx.fillText(`STAGE ${BT.stage}「${BT.stageTitle}」`, W / 2, H * 0.56); ctx.font = '700 15px system-ui, sans-serif'; }
     const mF = BT.flip ? Bt.B : Bt.A, oF = BT.flip ? Bt.A : Bt.B, sl = Math.min(1, (3.2 - BT.count) * 2.2);          // 入場：両者の名前と回転数がスライドインする
     ctx.shadowBlur = 12; ctx.font = '700 17px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(mF.name, 24 - (1 - sl) * 200, H * 0.62); ctx.textAlign = 'right'; ctx.fillText(oF.name, W - 24 + (1 - sl) * 200, H * 0.2);
@@ -2517,7 +2534,7 @@ function drawFighter(f) {
   const fade = f.out ? Math.max(0, 1 - f.outT * 0.7) : 1;
   if (fade <= 0) return;
   const sp = withDesign(f.d, 72, getSprite), r = Math.hypot(f.x, f.y), gz = f.out ? Math.min(f.z, fh(r)) : fh(r), h = Math.max(0, f.z - gz);
-  ctx.save(); ctx.globalAlpha = fade;
+  ctx.save(); ctx.globalAlpha = fade * (f.inv > 0 ? 0.45 : 1);
   // 影（高く浮くほど薄く広がる）
   ctx.save(); aff(f.x, f.y, gz + 0.002, BS * (1 + h * 2));
   const sg = ctx.createRadialGradient(0.1, 0.12, 0.3, 0.1, 0.12, 1.2); sg.addColorStop(0, `rgba(0,0,0,${0.55 / (1 + h * 14)})`); sg.addColorStop(1, 'rgba(0,0,0,0)');
@@ -2533,6 +2550,10 @@ function drawFighter(f) {
   for (const [k, col] of [['rush', '255,107,107'], ['guard', '93,180,255'], ['eco', '107,220,139']]) if (f.sk && f.sk[k] > 0) {   // 必殺技が効いている間のオーラ
     ctx.save(); aff(f.x, f.y, f.z + 0.02, BS * 1.8); ctx.globalCompositeOperation = 'lighter'; const sg2 = ctx.createRadialGradient(0, 0, 0.3, 0, 0, 1); sg2.addColorStop(0, `rgba(${col},0)`); sg2.addColorStop(0.8, `rgba(${col},${0.3 + 0.15 * Math.sin(CAM.t * 14)})`); sg2.addColorStop(1, `rgba(${col},0)`);
     ctx.fillStyle = sg2; ctx.beginPath(); ctx.arc(0, 0, 1, 0, TAU); ctx.fill(); ctx.strokeStyle = `rgba(${col},.9)`; ctx.lineWidth = 0.06; ctx.beginPath(); ctx.arc(0, 0, 0.9, 0, TAU); ctx.stroke(); ctx.restore();
+  }
+  if (BT.phase === 'fight' && !f.out && f.jgCd <= 0) {                       // 相手が近づいたら「いまタップ！」の合図
+    const Bt2 = BT.battle, o2 = f === Bt2.A ? Bt2.B : Bt2.A;
+    if (!o2.out && !o2.burst && Math.hypot(o2.x - f.x, o2.y - f.y) < BS * 3.2) { ctx.save(); aff(f.x, f.y, gz + 0.006, BS * 1.5); ctx.strokeStyle = `rgba(93,180,255,${0.5 + 0.5 * Math.sin(CAM.t * 28)})`; ctx.lineWidth = 0.1; ctx.setLineDash([0.35, 0.25]); ctx.beginPath(); ctx.arc(0, 0, 1, 0, TAU); ctx.stroke(); ctx.restore(); }
   }
   // 本体：厚み（暗い断面を重ねる）と傾き（動く向き・ヒット・回転が落ちたときのふらつき）
   const k = Math.exp(-(CAM.dt || 0.016) * 5); f.kx = (f.kx || 0) * k; f.ky = (f.ky || 0) * k;
@@ -2741,7 +2762,7 @@ function maybeBeginOnline() {
   netSend({ t: 'start', arena: BT.battle.arena, A: { d: a.d, rpm: a.rpm, dir: a.dir }, B: { d: b.d, rpm: b.rpm, dir: b.dir } });
   enterBattleView();
 }
-const snapOf = Bt => ({ t: 'snap', tm: Bt.t, a: [Bt.A.x, Bt.A.y, Bt.A.w, +Bt.A.out, +Bt.A.fin, Bt.A.dashCd, Bt.A.z, +Bt.A.burst, Bt.A.bg, Math.round(Bt.A.sp), +(Bt.A.sk.rush > 0), +(Bt.A.sk.guard > 0), +(Bt.A.sk.eco > 0)], b: [Bt.B.x, Bt.B.y, Bt.B.w, +Bt.B.out, +Bt.B.fin, Bt.B.dashCd, Bt.B.z, +Bt.B.burst, Bt.B.bg, Math.round(Bt.B.sp), +(Bt.B.sk.rush > 0), +(Bt.B.sk.guard > 0), +(Bt.B.sk.eco > 0)],
+const snapOf = Bt => ({ t: 'snap', tm: Bt.t, a: [Bt.A.x, Bt.A.y, Bt.A.w, +Bt.A.out, +Bt.A.fin, Bt.A.dashCd, Bt.A.z, +Bt.A.burst, Bt.A.bg, Math.round(Bt.A.sp), +(Bt.A.sk.rush > 0), +(Bt.A.sk.guard > 0), +(Bt.A.sk.eco > 0), +(Bt.A.inv > 0)], b: [Bt.B.x, Bt.B.y, Bt.B.w, +Bt.B.out, +Bt.B.fin, Bt.B.dashCd, Bt.B.z, +Bt.B.burst, Bt.B.bg, Math.round(Bt.B.sp), +(Bt.B.sk.rush > 0), +(Bt.B.sk.guard > 0), +(Bt.B.sk.eco > 0), +(Bt.B.inv > 0)],
   ev: Bt.ev.map(e => ({ ...e })), over: Bt.over, draw: !!Bt.draw, win: Bt.winner, why: Bt.reason, ha: [Bt.A.hits, Bt.A.maxHit, Bt.A.dashed], hb: [Bt.B.hits, Bt.B.maxHit, Bt.B.dashed] });
 function handleNet(m) {
   if (m.t === 'hello') { BT.peer = m; maybeStartOnlineSpin(); }
@@ -2754,7 +2775,7 @@ function handleNet(m) {
   } else if (m.t === 'snap' && BT.role === 'guest' && BT.battle) {
     const Bt = BT.battle;
     for (const [f, s2, h] of [[Bt.A, m.a, m.ha], [Bt.B, m.b, m.hb]]) {
-      f.tx = s2[0]; f.ty = s2[1]; f.tw = s2[2]; f.out = !!s2[3]; f.fin = !!s2[4]; f.dashCd = s2[5]; f.tz = s2[6]; f.burst = !!s2[7]; f.bg = s2[8]; f.sp = s2[9]; f.sk = { rush: s2[10], guard: s2[11], eco: s2[12] };
+      f.tx = s2[0]; f.ty = s2[1]; f.tw = s2[2]; f.out = !!s2[3]; f.fin = !!s2[4]; f.dashCd = s2[5]; f.tz = s2[6]; f.burst = !!s2[7]; f.bg = s2[8]; f.sp = s2[9]; f.sk = { rush: s2[10], guard: s2[11], eco: s2[12] }; f.inv = s2[13] ? 0.1 : 0;
       if (f.x === 0 && f.y === 0 || f.out) { f.x = s2[0]; f.y = s2[1]; f.z = s2[6]; }
       f.hits = h[0]; f.maxHit = h[1]; f.dashed = h[2];
     }
@@ -2763,6 +2784,7 @@ function handleNet(m) {
     if (m.over && !Bt.over) { Bt.over = true; Bt.winner = m.win; Bt.draw = !!m.draw; Bt.reason = m.why; }
   } else if (m.t === 'dash' && BT.role === 'host' && BT.battle) BT.battle.B.dashReq = true;
   else if (m.t === 'skill' && BT.role === 'host' && BT.battle) BT.battle.B.skReq = true;
+  else if (m.t === 'guard' && BT.role === 'host' && BT.battle) BT.battle.B.jgReq = true;
 }
 
 /* ---------- ボタンの接続 ---------- */
@@ -2801,6 +2823,13 @@ const dashPress = who => e => {
   if (BT.role === 'guest') { netSend({ t: 'dash' }); return; }
   (who === 1 ? BT.battle.A : BT.battle.B).dashReq = true;
 };
+const guardPress = e => {                                       // 画面タップ＝ジャストガード（1台で2人のときは、下半分が1P・上半分が2P）
+  if (MODE !== 'battle' || BT.phase !== 'fight' || !BT.battle) return;
+  e.preventDefault();
+  if (BT.role === 'guest') { netSend({ t: 'guard' }); return; }
+  const Bt = BT.battle; (BT.type === 'local' ? (e.clientY > innerHeight / 2 ? Bt.A : Bt.B) : Bt.A).jgReq = true;
+};
+canvas.addEventListener('pointerdown', guardPress);
 const skillPress = who => e => {
   e.preventDefault();
   if (MODE !== 'battle' || BT.phase !== 'fight' || !BT.battle) return;
