@@ -34,6 +34,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <button id="bSound"></button>
   <button id="bTimbre"></button>
   <button id="bVib"></button>
+  <button id="bBass"></button>
   <button id="bStop">止める</button>
   <button id="bTest">振動テスト</button>
 </div>
@@ -50,7 +51,7 @@ const THEME_NAME = { metal: 'メタル', neon: 'ネオン', rainbow: 'レイン�
 const TIMBRES = ['metal', 'wood', 'plastic'];
 const TIMBRE_NAME = { metal: '金属', wood: '木', plastic: 'プラ' };
 const KEY = 'fidget-spinner-v1';
-const DEF = { theme: 'metal', timbre: 'metal', arms: 3, sound: true, vib: true, best: 0 };
+const DEF = { theme: 'metal', timbre: 'metal', arms: 3, sound: true, vib: true, bass: true, best: 0 };
 
 function loadSettings() {
   try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); }
@@ -130,6 +131,7 @@ const bArms = document.getElementById('bArms');
 const bSound = document.getElementById('bSound');
 const bTimbre = document.getElementById('bTimbre');
 const bVib = document.getElementById('bVib');
+const bBass = document.getElementById('bBass');
 const bStop = document.getElementById('bStop');
 
 let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, R = 100;
@@ -147,6 +149,7 @@ resize();
 /* ---------- オーディオ（Web Audio で合成） ---------- */
 let ac = null, master = null, noiseBuf = null;
 let whirrGain, whirrFilter, humOsc, humGain;
+let bassMaster, bassAmp, lfo, lfoGain, shaper, lastThump = 0;
 
 function initAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
@@ -172,6 +175,24 @@ function initAudio() {
     const humLP = ac.createBiquadFilter(); humLP.type = 'lowpass'; humLP.frequency.value = 900;
     humGain = ac.createGain(); humGain.gain.value = 0;
     humOsc.connect(humLP).connect(humGain).connect(master); humOsc.start();
+
+    // 「音で振動」：低音でスピーカーを震わせる（通常の音とは別の経路。音OFFでも鳴らせる）
+    bassMaster = ac.createGain(); bassMaster.gain.value = settings.bass ? 1 : 0;
+    // 少し歪ませて上の倍音を足す（小さいスピーカーは低音が出にくいので体感を稼ぐ）
+    shaper = ac.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(x * 2.2); }
+    shaper.curve = curve;
+    shaper.connect(bassMaster); bassMaster.connect(ac.destination);
+
+    // 回転中のゴロゴロ：低い音をブレードが通る速さで脈打たせる
+    const rumble = ac.createOscillator(); rumble.type = 'sine'; rumble.frequency.value = 80;
+    bassAmp = ac.createGain(); bassAmp.gain.value = 0;
+    lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 10;
+    lfoGain = ac.createGain(); lfoGain.gain.value = 0;
+    lfo.connect(lfoGain).connect(bassAmp.gain);
+    rumble.connect(bassAmp).connect(shaper);
+    rumble.start(); lfo.start();
   } catch (e) { ac = null; }
 }
 
@@ -198,9 +219,30 @@ function click(vol) {
   n.connect(f).connect(ng).connect(master); n.start(t, Math.random() * 0.5); n.stop(t + T.nd + 0.02);
 }
 
+// 低い「ドン」（キックドラム風）。vol は 0〜1
+function thump(vol) {
+  if (!ac || !settings.bass || vol <= 0.02) return;
+  const now = performance.now();
+  if (now - lastThump < 45) return;
+  lastThump = now;
+  const t = ac.currentTime;
+  const o = ac.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(120, t);
+  o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+  o.connect(g).connect(shaper); o.start(t); o.stop(t + 0.2);
+}
+
 function audioUpdate() {
   if (!ac) return;
   const a = Math.abs(S.omega), t = ac.currentTime;
+  bassMaster.gain.setTargetAtTime(settings.bass ? 1 : 0, t, 0.05);
+  const depth = settings.bass ? 0.5 * Math.min(1, a / 60) : 0;
+  bassAmp.gain.setTargetAtTime(depth * 0.5, t, 0.08);
+  lfoGain.gain.setTargetAtTime(depth * 0.5, t, 0.08);
+  lfo.frequency.setTargetAtTime(Math.min(45, Math.max(4, a * settings.arms / TAU)), t, 0.05);
   master.gain.setTargetAtTime(settings.sound ? 0.9 : 0, t, 0.05);
   whirrGain.gain.setTargetAtTime(0.2 * Math.min(1, a / 120), t, 0.08);
   whirrFilter.frequency.setTargetAtTime(280 + Math.min(a, 350) * 3.2, t, 0.06);
@@ -263,6 +305,7 @@ function onTick(a) {
     click(Math.min(1, 0.3 + a / 140) * (1 - a / 360));
   }
   if (a > 6) vib(Math.round(Math.min(30, Math.max(16, 14 + a / 20))));
+  if (a > 6 && a < 260) thump(Math.min(1, 0.45 + a / 220));
 }
 
 /* ---------- 指の操作 ---------- */
@@ -306,10 +349,11 @@ function endDrag(e) {
   if (isTap && drag.inside) {
     S.omega = drag.omega0 * 0.2;              // タップでブレーキ
     vib(25);
+    thump(0.9);
   } else {
     const quiet = now - drag.lastMove > 90;   // 止まってから離したら速度ゼロ
     S.omega = quiet ? 0 : Math.max(-MAX_W, Math.min(MAX_W, S.gripV));
-    if (Math.abs(S.omega) > 150) vib(30);     // はじいた時の「ビュッ」
+    if (Math.abs(S.omega) > 150) { vib(30); thump(1); }   // はじいた時の「ビュッ」
   }
   drag = null; S.dragging = false; S.gripV = 0;
 }
@@ -519,6 +563,8 @@ function refreshUI() {
   bVib.textContent = canHaptic ? `振動：${settings.vib ? 'ON' : 'OFF'}` : '振動（非対応）';
   bVib.disabled = !canHaptic;
   bVib.setAttribute('aria-pressed', settings.vib && canHaptic);
+  bBass.textContent = `音で振動：${settings.bass ? 'ON' : 'OFF'}`;
+  bBass.setAttribute('aria-pressed', settings.bass);
   if (ac && master) master.gain.setTargetAtTime(settings.sound ? 0.9 : 0, ac.currentTime, 0.05);
 }
 
@@ -529,6 +575,7 @@ bArms.addEventListener('click', () => { settings.arms = cycle(ARMS, settings.arm
 bSound.addEventListener('click', () => { initAudio(); settings.sound = !settings.sound; saveSettings(); refreshUI(); });
 bTimbre.addEventListener('click', () => { settings.timbre = cycle(TIMBRES, settings.timbre); saveSettings(); refreshUI(); });
 bVib.addEventListener('click', () => { settings.vib = !settings.vib; saveSettings(); refreshUI(); vib(10); });
+bBass.addEventListener('click', () => { initAudio(); settings.bass = !settings.bass; saveSettings(); refreshUI(); thump(1); });
 bStop.addEventListener('click', () => { initAudio(); S.omega = 0; });
 // 振動の仕組みそのものが動くかを確かめるボタン
 document.getElementById('bTest').addEventListener('click', e => {
