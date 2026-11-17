@@ -1842,7 +1842,7 @@ bFx.addEventListener('click', () => {
 /* ================= バトル ================= */
 let MODE = 'free';                                         // 'free'(ふつうに回す) | 'spin'(5秒間回す) | 'battle'
 let BS = 0.14, Q = BS / 0.36;                                // R=1 のスピナーの半径（アリーナ半径=1 に対する比）。小さいほどフィールドが広い。Q＝旧サイズ(0.36)との比で、速さ・力を合わせる                                            // R=1 のスピナーの半径（アリーナ半径=1 に対する比）
-const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5, DUR: 7.5, SDUR: 1, LAM: 0.4, MU: 0.8, PAD: 1.6, BUMP: 1.3, SPPASS: 1.2, JG_WIN: 0.3, JG_CD: 0.9, JG_DMG: 0.2, INV: 0.4, DODGE_CD: 1.6, RUSH: 2.6, GUARD: 0.35, LUNGE: 2.8, PULSE: 2.2, TYPE_GAP: 0.12 };   // DUR=バーストの耐久、SDUR=回転の持久（どちらも倍率）   // シミュレーションで調整した値
+const PHYS = { JMAX: 1.2, MINV: 0.4, PAIR_CD: 0.4, E: 0.75, BOWL: 1.0, DRAG: 0.9, ATT: 0.7, ORBIT: 0.5, C0: 2.2, C1: 0.028, SPIN: 0.024, DMG: 9, KNOCK: 2.6, DASH: 1.6, DASH_CD: 1.4, TIME: 75, DEPTH: 0.2, G: 2.5, LIFT: 1.4, BURST: 5.5, HOP: 0.5, DUR: 7.5, SDUR: 1, LAM: 0.4, MU: 0.8, PAD: 1.6, BUMP: 1.3, SWEEP: 0.9, TRAMP: 0.65, SPPASS: 1.2, JG_WIN: 0.3, JG_CD: 0.9, JG_DMG: 0.2, INV: 0.4, DODGE_CD: 1.6, RUSH: 2.6, GUARD: 0.35, LUNGE: 2.8, PULSE: 2.2, TYPE_GAP: 0.12 };   // DUR=バーストの耐久、SDUR=回転の持久（どちらも倍率）   // シミュレーションで調整した値
 const $b = id => document.getElementById(id);
 
 // 材質：dens=重さ hard=硬さ bear=軸の滑らかさ grip=グリップ（相手へ寄っていく強さ）
@@ -1969,17 +1969,20 @@ function makeFighter(d, rpm, name, side) {
     w, w0: w, lk: 0.85 + Math.random() * 0.3, dashCd: 0, dashReq: false, pairCd: 0, out: false, fin: false, outT: 0, hits: 0, taken: 0, maxHit: 0, dashed: 0, aiT: 0, rpm: Math.round(r) };
 }
 let START = 0.6;
-const ARENAS = { normal: ['ノーマル', 'シンプルなすり鉢'], turbo: ['ターボ', '加速パネルで一気に走る'], pinball: ['ピンボール', '動くバンパーではね返される'], drain: ['ドレイン', '暗いゾーンで回転が吸われる'], ice: ['アイス', 'すべる床。止まらずに流される'], shrink: ['シュリンク', 'リングがだんだん小さくなる'], chaos: ['カオス', 'ぜんぶ入り'] };
-const ARENA_IDS = Object.keys(ARENAS);
+const ARENAS = { normal: ['ノーマル', 'シンプルなすり鉢'], turbo: ['ターボ', '加速パネルで一気に走る'], pinball: ['ピンボール', '動くバンパーではね返される'], drain: ['ドレイン', '暗いゾーンで回転が吸われる'], ice: ['アイス', 'すべる床。止まらずに流される'], shrink: ['シュリンク', 'リングがだんだん小さくなる'], sweeper: ['スイーパー', '回転する腕に弾き飛ばされる'], trampoline: ['トランポリン', '踏むと高く跳ね上がる'], chaos: ['カオス', 'ぜんぶ入り'], inferno: ['インフェルノ', 'ボス専用：ぜんぶ入り＋縮む＋腕'] };
+const ARENA_IDS = Object.keys(ARENAS).filter(k => k !== 'inferno');
 function arenaObjs(kind, t) {                                // ギミックの位置（左右対称なので、どちら側も有利にならない）
-  const o = { pads: [], drains: [], bumps: [] }, ring = (arr, n, r, a0, rad) => { for (let k = 0; k < n; k++) { const a = a0 + k * TAU / n; arr.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, r: rad }); } };
+  const o = { pads: [], drains: [], bumps: [], tramps: [], sweeps: [] }, ring = (arr, n, r, a0, rad) => { for (let k = 0; k < n; k++) { const a = a0 + k * TAU / n; arr.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, r: rad }); } };
   if (kind === 'turbo') ring(o.pads, 4, 0.55, Math.PI / 4, 0.13);
   else if (kind === 'pinball') ring(o.bumps, 3, 0.48, t * 0.5, 0.07);
   else if (kind === 'drain') ring(o.drains, 2, 0.5, 0, 0.18);
+  else if (kind === 'trampoline') ring(o.tramps, 3, 0.55, Math.PI / 6, 0.13);
+  else if (kind === 'sweeper') { for (let k = 0; k < 2; k++) o.sweeps.push({ a: t * 0.7 + k * Math.PI, len: 0.7, w: 0.05 }); }   // 左右対称の2本
   else if (kind === 'chaos') { ring(o.pads, 2, 0.6, Math.PI / 2, 0.12); ring(o.drains, 2, 0.5, 0, 0.14); ring(o.bumps, 2, 0.3, -t * 0.6, 0.06); }
+  else if (kind === 'inferno') { ring(o.pads, 2, 0.62, Math.PI / 2, 0.12); ring(o.drains, 2, 0.5, 0, 0.13); ring(o.bumps, 2, 0.3, -t * 0.6, 0.06); for (let k = 0; k < 2; k++) o.sweeps.push({ a: t * 0.45 + k * Math.PI, len: 0.38, w: 0.04 }); }
   return o;
 }
-const ringLim = Bt => Bt.arena === 'shrink' ? Math.max(0.6, 1 - Bt.t * 0.013) : 1;   // シュリンク：リングが小さくなる（約30秒で6割）
+const ringLim = Bt => Bt.arena === 'shrink' ? Math.max(0.6, 1 - Bt.t * 0.013) : Bt.arena === 'inferno' ? Math.max(0.8, 1 - Bt.t * 0.008) : 1;   // シュリンク：リングが小さくなる（約30秒で6割）
 function gimmick(Bt, f, o, dt) {
   if (f.out || f.burst) return;
   f.padCd = Math.max(0, (f.padCd || 0) - dt); f.bumpCd = Math.max(0, (f.bumpCd || 0) - dt);
@@ -1988,6 +1991,20 @@ function gimmick(Bt, f, o, dt) {
     let dx = f.vx, dy = f.vy, d = Math.hypot(dx, dy);
     if (d < 0.3 * Q) { dx = o.x - f.x; dy = o.y - f.y; d = Math.hypot(dx, dy) || 1; }
     f.vx += dx / d * PHYS.PAD * Q; f.vy += dy / d * PHYS.PAD * Q; f.padCd = 0.8; Bt.ev.push({ type: 'pad', x: f.x, y: f.y, z: f.z }); break;
+  }
+  if (gnd && !f.padCd) for (const p of ob.tramps) if (Math.hypot(f.x - p.x, f.y - p.y) < p.r) {     // トランポリン：高く跳ね上がる
+    f.vz = PHYS.TRAMP; f.z += 0.003; f.padCd = 0.8; Bt.ev.push({ type: 'pad', x: f.x, y: f.y, z: f.z, up: true }); break;
+  }
+  if (f.z - fh(Math.hypot(f.x, f.y)) < 0.1) for (const sw of ob.sweeps) {                           // スイーパー：回る腕に弾かれる
+    const ca = Math.cos(sw.a), sa = Math.sin(sw.a), tt = Math.max(0, Math.min(sw.len, f.x * ca + f.y * sa)), cx = ca * tt, cy = sa * tt;
+    const dx = f.x - cx, dy = f.y - cy, d = Math.hypot(dx, dy) || 1e-6, rr = sw.w + BS * 0.75;
+    if (d < rr) {
+      const nx = dx / d, ny = dy / d; f.x = cx + nx * rr; f.y = cy + ny * rr;
+      if (!f.bumpCd) {
+        f.vx += -sa * PHYS.SWEEP * Q + nx * 0.4 * Q; f.vy += ca * PHYS.SWEEP * Q + ny * 0.4 * Q; f.w *= 0.97; f.vz = Math.max(f.vz, 0.35); f.z += 0.002; f.bumpCd = 0.5;
+        Bt.ev.push({ type: 'bump', x: cx + nx * sw.w, y: cy + ny * sw.w, z: f.z });
+      }
+    }
   }
   if (gnd) for (const p of ob.drains) if (Math.hypot(f.x - p.x, f.y - p.y) < p.r) { f.w = Math.max(0, f.w - (25 + 0.1 * f.w) * dt); f.drain = 0.15; break; }   // ドレイン：回転が吸われる
   if (f.z - fh(Math.hypot(f.x, f.y)) < 0.1) for (const b of ob.bumps) {                              // バンパー：はね返される
@@ -2214,9 +2231,10 @@ function openMenu() { if (MODE !== 'free') return; initAudio(); refreshMenu(); s
 function closeMenu() { hideOverlay(); document.body.classList.remove('btmode'); }
 
 const BOSSES = ['ガルム', 'ゼノ', 'クロノ', 'ラグナ', 'イクリプス', 'バルバトス'], LAST_STAGE = 30;
-const STAGE_LIST = [['はじまりの闘技場', 'normal'], ['ターボ・ロード', 'turbo'], ['ピンボール宮殿', 'pinball'], ['ドレイン・ピット', 'drain'], ['氷結の湖', 'ice'], ['縮みゆく円環', 'shrink'],
-  ['ターボ・ロード II', 'turbo'], ['ピンボール宮殿 II', 'pinball'], ['ドレイン・ピット II', 'drain'], ['氷結の湖 II', 'ice'], ['縮みゆく円環 II', 'shrink'], ['混沌のリング', 'chaos']];   // ボス戦(5の倍数)以外のステージ
-const isBoss = n => n % 5 === 0, bossName = n => BOSSES[(n / 5 - 1) % BOSSES.length], stageInfo = n => isBoss(n) ? ['ボス戦：' + bossName(n), 'chaos'] : STAGE_LIST[(n - Math.floor(n / 5) - 1) % STAGE_LIST.length], stageTitle = n => stageInfo(n)[0];
+const STAGE_LIST = [['はじまりの闘技場', 'normal'], ['ターボ・ロード', 'turbo'], ['ピンボール宮殿', 'pinball'], ['ドレイン・ピット', 'drain'], ['氷結の湖', 'ice'], ['縮みゆく円環', 'shrink'], ['回転する腕', 'sweeper'], ['空中庭園', 'trampoline'],
+  ['ターボ・ロード II', 'turbo'], ['ピンボール宮殿 II', 'pinball'], ['ドレイン・ピット II', 'drain'], ['氷結の湖 II', 'ice'], ['縮みゆく円環 II', 'shrink'], ['回転する腕 II', 'sweeper'], ['空中庭園 II', 'trampoline'], ['混沌のリング', 'chaos']];   // ボス戦(5の倍数)以外のステージ
+const BOSS_ARENA = ['chaos', 'sweeper', 'trampoline', 'shrink', 'inferno', 'inferno'];
+const isBoss = n => n % 5 === 0, bossName = n => BOSSES[(n / 5 - 1) % BOSSES.length], stageInfo = n => isBoss(n) ? ['ボス戦：' + bossName(n), BOSS_ARENA[(n / 5 - 1) % BOSS_ARENA.length]] : STAGE_LIST[(n - Math.floor(n / 5) - 1) % STAGE_LIST.length], stageTitle = n => stageInfo(n)[0];
 const ST = () => settings.stat || (settings.stat = { jg: 0, bw: 0, rw: 0, sk: 0 });
 const TITLES = [['new', '新人スピナー', '最初から', () => true], ['w1', '初勝利', '1勝する', () => settings.wins >= 1], ['tut', '練習おつかれさま', '練習モードをやる', () => !!settings.tutDone], ['w10', '10勝達成', '10勝する', () => settings.wins >= 10], ['w50', 'ベテラン', '50勝する', () => settings.wins >= 50],
   ['s5', '連勝の使い手', '連勝戦で5連勝', () => settings.sbest >= 5], ['s10', 'ステージ10突破', '連勝戦で10連勝', () => settings.sbest >= 10], ['s20', '歴戦の猛者', '連勝戦で20連勝', () => settings.sbest >= 20], ['clr', '闘技場の覇者', '連勝戦をALL CLEAR', () => settings.sbest >= LAST_STAGE],
@@ -2620,7 +2638,7 @@ function drawBattle(dt, Bt) {
       pj(Math.cos(a1) * r0, Math.sin(a1) * r0, DP * r0 * r0); ctx.lineTo(PX, PY); pj(Math.cos(a1) * r1, Math.sin(a1) * r1, DP * r1 * r1); ctx.lineTo(PX, PY); pj(Math.cos(a0) * r1, Math.sin(a0) * r1, DP * r1 * r1); ctx.lineTo(PX, PY); ctx.fill();
     }
   }
-  if (Bt.arena === 'shrink') {                                 // 縮むリング：外側は危険ゾーン
+  if (Bt.arena === 'shrink' || Bt.arena === 'inferno') {      // 縮むリング：外側は危険ゾーン
     const lm = ringLim(Bt);
     ctx.save(); ctx.fillStyle = 'rgba(180,20,30,.22)'; ctx.beginPath(); ringPath(1.0, DP, 96); ctx.moveTo(PX, PY); for (let i = 96; i >= 0; i--) { const a = i / 96 * TAU; pj(Math.cos(a) * lm, Math.sin(a) * lm, DP * lm * lm); i === 96 ? ctx.moveTo(PX, PY) : ctx.lineTo(PX, PY); } ctx.fill('evenodd');
     ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(255,70,70,${0.65 + 0.25 * Math.sin(CAM.t * 6)})`; ctx.lineWidth = 3; ctx.beginPath(); ringPath(lm, DP * lm * lm + 0.003, 96); ctx.stroke(); ctx.restore();
@@ -2634,12 +2652,19 @@ function drawBattle(dt, Bt) {
   ctx.globalAlpha = 0.7; ctx.lineWidth = 1.6; ctx.beginPath(); ringPath(0.99, DP * 0.98, 96); ctx.stroke(); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
   // ギミック：加速パネルとドレイン（床の上）
-  const OB = Bt.obj || { pads: [], drains: [], bumps: [] };
+  const OB = Bt.obj || { pads: [], drains: [], bumps: [], tramps: [], sweeps: [] };
   for (const pd of OB.pads) {
     ctx.save(); aff(pd.x, pd.y, fh(Math.hypot(pd.x, pd.y)) + 0.002, pd.r); ctx.globalCompositeOperation = 'lighter';
     const gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1.3); gg.addColorStop(0, 'rgba(70,220,255,.5)'); gg.addColorStop(0.7, 'rgba(70,160,255,.25)'); gg.addColorStop(1, 'rgba(70,160,255,0)');
     ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(0, 0, 1.3, 0, TAU); ctx.fill();
     ctx.lineWidth = 0.09; for (let i = 0; i < 3; i++) { const u = ((CAM.t * 0.9 + i / 3) % 1); ctx.strokeStyle = `rgba(160,240,255,${(1 - u) * 0.9})`; ctx.beginPath(); ctx.arc(0, 0, 1 - u * 0.9, 0, TAU); ctx.stroke(); }
+    ctx.restore();
+  }
+  for (const tp of OB.tramps) {                                              // トランポリン（緑の上向き矢印）
+    ctx.save(); aff(tp.x, tp.y, fh(Math.hypot(tp.x, tp.y)) + 0.002, tp.r); ctx.globalCompositeOperation = 'lighter';
+    const tg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1.3); tg.addColorStop(0, 'rgba(90,255,150,.5)'); tg.addColorStop(0.7, 'rgba(60,200,120,.25)'); tg.addColorStop(1, 'rgba(60,200,120,0)');
+    ctx.fillStyle = tg; ctx.beginPath(); ctx.arc(0, 0, 1.3, 0, TAU); ctx.fill(); ctx.strokeStyle = 'rgba(170,255,200,.9)'; ctx.lineWidth = 0.08; ctx.beginPath(); ctx.arc(0, 0, 1, 0, TAU); ctx.stroke();
+    for (let i = 0; i < 2; i++) { const u = ((CAM.t * 1.1 + i / 2) % 1); ctx.strokeStyle = `rgba(190,255,215,${(1 - u) * 0.9})`; ctx.lineWidth = 0.1; ctx.beginPath(); ctx.moveTo(-0.45, 0.2 - u * 0.5); ctx.lineTo(0, -0.25 - u * 0.5); ctx.lineTo(0.45, 0.2 - u * 0.5); ctx.stroke(); }
     ctx.restore();
   }
   for (const dr of OB.drains) {
@@ -2678,8 +2703,8 @@ function drawBattle(dt, Bt) {
     ctx.strokeStyle = `rgba(${q.c || P.spark},${(1 - u) * 0.85})`; ctx.lineWidth = 0.045 * (1 - u) * Math.max(0.5, qs); ctx.beginPath(); ctx.arc(0, 0, Math.max(0.001, u * qs), 0, TAU); ctx.stroke(); ctx.restore();
   }
   // 選手：奥から手前へ
-  const fs = [Bt.A, Bt.B].map(f => ({ f, dep: pj(f.x, f.y, f.z) })).concat(OB.bumps.map(b => ({ b, dep: pj(b.x, b.y, fh(Math.hypot(b.x, b.y))) }))).sort((a, b) => b.dep - a.dep);
-  for (const o of fs) o.f ? drawFighter(o.f) : drawBumper(o.b);
+  const fs = [Bt.A, Bt.B].map(f => ({ f, dep: pj(f.x, f.y, f.z) })).concat(OB.bumps.map(b => ({ b, dep: pj(b.x, b.y, fh(Math.hypot(b.x, b.y))) }))).concat(OB.sweeps.map(sw => ({ sw, dep: pj(Math.cos(sw.a) * sw.len * 0.5, Math.sin(sw.a) * sw.len * 0.5, 0.05) }))).sort((a, b) => b.dep - a.dep);
+  for (const o of fs) o.f ? drawFighter(o.f) : o.b ? drawBumper(o.b) : drawSweeper(o.sw);
   drawDebris(dt);
   // 速く動くスピナーは、床に火花を引きずる
   if (BT.phase === 'fight') for (const f of [Bt.A, Bt.B]) {
@@ -2793,6 +2818,15 @@ function drawFighter(f) {
   if (f.w > 25) { const off = Math.max(-1.2, Math.min(1.2, f.w * f.dir * 0.012)); for (let i = 2; i >= 1; i--) { ctx.save(); ctx.rotate(f.th - off * i); ctx.globalAlpha = fade * (i === 1 ? 0.18 : 0.08); ctx.drawImage(sp.arm, -1, -1, 2, 2); ctx.restore(); } }
   ctx.rotate(f.th); ctx.drawImage(sp.arm, -1, -1, 2, 2);
   ctx.restore(); ctx.restore();
+}
+function drawSweeper(sw) {                                   // 回る腕（円柱の中心から伸びる棒）
+  const ca = Math.cos(sw.a), sa = Math.sin(sw.a), h = 0.06, NL = 6, corner = (t, side, lift) => { const x = ca * t - sa * sw.w * side, y = sa * t + ca * sw.w * side; pj(x, y, fh(Math.hypot(x, y)) + lift); };
+  for (let i = 0; i <= NL; i++) {
+    const lift = h * i / NL; ctx.fillStyle = i === NL ? '#ff7a3d' : mixc([90, 24, 18], [200, 70, 40], i / NL); ctx.beginPath();
+    corner(0, -1, lift); ctx.moveTo(PX, PY); corner(sw.len, -1, lift); ctx.lineTo(PX, PY); corner(sw.len, 1, lift); ctx.lineTo(PX, PY); corner(0, 1, lift); ctx.lineTo(PX, PY); ctx.closePath(); ctx.fill();
+  }
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(255,200,120,.8)'; ctx.lineWidth = 2; ctx.beginPath(); corner(0, 0, h + 0.002); ctx.moveTo(PX, PY); corner(sw.len, 0, h + 0.002); ctx.lineTo(PX, PY); ctx.stroke(); ctx.restore();
+  drawBumper({ x: 0, y: 0, r: 0.075 });
 }
 function drawBumper(b) {                                     // 円柱のバンパー
   const fl = fh(Math.hypot(b.x, b.y)), h = 0.07;
