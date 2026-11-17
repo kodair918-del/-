@@ -205,6 +205,8 @@ html[data-ui="pop"] .dash i{opacity:.55}
     <div class="chips" id="dashChips"></div>
     <h3>ビッグモードの人数 <span style="font-weight:400;opacity:.7;font-size:12px">自分を含む</span></h3>
     <div class="chips" id="bigChips"></div>
+    <h3>ビッグモードの強さ <span style="font-weight:400;opacity:.7;font-size:12px">敵の回転数・動き・デザイン</span></h3>
+    <div class="chips" id="bigLvChips"></div>
     <h3>バトルの種類</h3>
     <div class="btgrid">
       <button class="btn" data-bt="cpu1">CPU かんたん</button>
@@ -373,7 +375,7 @@ const VOL_NAME = ['小', '中', '大'], VOL_GAIN = [0.35, 0.65, 1];
 const MIX_NAME = ['OFF', '小', '中', '大'], MIX_GAIN = [0, 0.5, 1, 1.5];
 function mixApply() { if (!ac || !sfxBus) return; const t = ac.currentTime; sfxBus.gain.setTargetAtTime(MIX_GAIN[settings.mixSfx === undefined ? 2 : settings.mixSfx], t, 0.05); ambBus.gain.setTargetAtTime(MIX_GAIN[settings.mixAmb === undefined ? 2 : settings.mixAmb], t, 0.05); }
 const KEY = 'fidget-spinner-v1';
-const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, ui: 'std', bigN: 12, bigWins: 0, codes: [], special: '', spBackup: null, ghosts: [], gstat: { w: 0, l: 0 }, ghostUp: true, supa: { url: '', key: '' }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
+const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, ui: 'std', bigLv: 1, bigN: 12, bigWins: 0, codes: [], special: '', spBackup: null, ghosts: [], gstat: { w: 0, l: 0 }, ghostUp: true, supa: { url: '', key: '' }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
 
 function loadSettings() {
   let raw = {};
@@ -2352,7 +2354,14 @@ function drawGrow() {                                        // 育成：レベ�
   }
   const r = document.createElement('button'); r.className = 'chip'; r.textContent = '振り直す'; r.addEventListener('click', () => { g.gb = { atk: 0, def: 0, sta: 0, bur: 0 }; g.pts = g.lv - 1; saveSettings(); click(0.7); refreshMenu(true); }); el.appendChild(r);
 }
+const BIG_LV = [                                              // 敵の強さ：回転数の倍率・CPUの賢さ・デザインの選び方
+  { name: '弱い', rpm: [0.3, 0.8], diff: [1, 1], pick: 1, boss: false },
+  { name: 'ふつう', rpm: [0.45, 1.15], diff: [1, 3], pick: 1, boss: false },
+  { name: '強い', rpm: [0.9, 1.7], diff: [2, 3], pick: 6, boss: false },
+  { name: '最強', rpm: [1.6, 2.6], diff: [3, 3], pick: 12, boss: true }];
 function drawBigChips() {
+  const lv = $b('bigLvChips'); lv.innerHTML = '';
+  BIG_LV.forEach((L, i) => { const b = document.createElement('button'); b.className = 'chip'; b.textContent = L.name; b.setAttribute('aria-pressed', (settings.bigLv === undefined ? 1 : settings.bigLv) === i); b.addEventListener('click', () => { settings.bigLv = i; saveSettings(); click(0.8); drawBigChips(); }); lv.appendChild(b); });
   const el = $b('bigChips'); el.innerHTML = '';
   for (const n of [6, 12, 20, 30]) { const b = document.createElement('button'); b.className = 'chip'; b.textContent = n + '体'; b.setAttribute('aria-pressed', (settings.bigN || 12) === n); b.addEventListener('click', () => { settings.bigN = n; saveSettings(); click(0.8); drawBigChips(); }); el.appendChild(b); }
 }
@@ -2450,12 +2459,18 @@ function stepBig(Bt, dt) {
   else if (Bt.t > BIG_TIME) { Bt.over = true; Bt.reason = 'time'; const rest = alive.filter(f => !f.out && !f.burst && !f.fin).sort((a, b) => b.w - a.w); rest.forEach((f, i) => { f.rank = i + 1; }); Bt.winner = rest[0] === Bt.A ? 'A' : null; }
 }
 function bigAI(Bt, dt) {                                      // CPUたち：それぞれ、いちばん近い相手に向かって、ダッシュ・ガード・必殺技
-  for (const f of Bt.F) { if (f === Bt.A || f.out || f.burst || f.fin || !f.tgt || f.tgt === f) continue; aiDash(f, f.tgt, f.diff, dt); aiSkill(f, f.tgt, f.diff, dt, false); aiGuard(f, f.tgt, f.diff, dt, false); }
+  for (const f of Bt.F) { if (f === Bt.A || f.out || f.burst || f.fin || !f.tgt || f.tgt === f) continue; aiDash(f, f.tgt, f.diff, dt); aiSkill(f, f.tgt, f.diff, dt, !!(Bt.lv && Bt.lv.boss)); aiGuard(f, f.tgt, f.diff, dt, !!(Bt.lv && Bt.lv.boss)); }
 }
 function beginBig(rpm) {                                      // 準備タイムのあと：敵をそろえて、バトルロイヤル開始
   const N = Math.max(3, Math.min(30, settings.bigN || 12)), me = makeFighter(BT.p1, rpm, BT.name1, 'A'), ens = [];
-  for (let i = 1; i < N; i++) { const d = randomDesign(), r = Math.max(800, Math.min(50000, Math.round(rpm * (0.45 + Math.random() * 0.7)))); ens.push(makeFighter(d, r, nameOf(d), 'E' + i)); }
-  BT.feed = []; BT.battle = makeBig(me, ens); enterBattleView();
+  const L = BIG_LV[settings.bigLv === undefined ? 1 : settings.bigLv] || BIG_LV[1];
+  const power = d => { const st = statsOf(d); return st.atkE * st.defE * st.staE * st.pw; };
+  for (let i = 1; i < N; i++) {
+    let d = randomDesign(); for (let k = 1; k < L.pick; k++) { const c = randomDesign(); if (power(c) > power(d)) d = c; }           // 強いほど、強いデザインが選ばれやすい
+    const r = Math.max(800, Math.min(50000, Math.round(rpm * (L.rpm[0] + Math.random() * (L.rpm[1] - L.rpm[0])))));
+    const f = makeFighter(d, r, nameOf(d), 'E' + i); ens.push(f);
+  }
+  BT.feed = []; BT.battle = makeBig(me, ens); BT.battle.lv = L; for (const f of ens) f.diff = L.diff[0] + (Math.random() * (L.diff[1] - L.diff[0] + 1) | 0); enterBattleView();
 }
 function bigHud(Bt) {                                         // 残り人数・KO・ミニマップ・脱落の知らせ
   const me = Bt.A, land = W > H * 1.15; hudRow(me, land ? H - 130 : H - 182, false);
@@ -2634,7 +2649,7 @@ function showResult() {
     const rank = Bt.A.rank || Bt.N, win = rank === 1, xp = win ? 60 + Bt.N * 2 : Math.max(10, Math.round((Bt.N - rank) * 2.5 + 10)), up = addXp(BT.p1, xp), g = GR(BT.p1);
     if (win) { settings.bigWins = (settings.bigWins | 0) + 1; settings.wins++; } else settings.losses++; const got2 = checkTitles(); saveSettings();
     $b('resTitle').textContent = win ? 'CHAMPION!!' : `${rank}位 / ${Bt.N}体`;
-    $b('resBody').innerHTML = `${win ? '最後の1体になった！' : Bt.reason === 'elim' ? 'そこで脱落…' : '時間切れ'}<br>KO ${Bt.A.kos}体 ／ 生き残った時間 ${Bt.t.toFixed(0)}秒 ／ ヒット ${Bt.A.hits}回<br>経験値 +${xp}（Lv.${g.lv}${up ? `　<b style="color:#ffd24d">レベルアップ！ 強化ポイント +${up}</b>` : ''}）${got2.length ? `<br><b>称号を獲得：「${got2.join('」「')}」</b>` : ''}`;
+    $b('resBody').innerHTML = `${win ? '最後の1体になった！' : Bt.reason === 'elim' ? 'そこで脱落…' : '時間切れ'}<br>強さ［${(Bt.lv || BIG_LV[1]).name}］ ／ KO ${Bt.A.kos}体 ／ 生き残った時間 ${Bt.t.toFixed(0)}秒 ／ ヒット ${Bt.A.hits}回<br>経験値 +${xp}（Lv.${g.lv}${up ? `　<b style="color:#ffd24d">レベルアップ！ 強化ポイント +${up}</b>` : ''}）${got2.length ? `<br><b>称号を獲得：「${got2.join('」「')}」</b>` : ''}`;
     $b('resAgain').disabled = false; $b('resAgain').textContent = 'もう一度（同じ人数）'; $b('resNew').style.display = 'none'; showScreen('sResult'); return;
   }
   if (BT.practice) {                                         // 練習はノーカウント
@@ -3095,7 +3110,7 @@ function drawBattle(dt, Bt) {
     ctx.font = '700 15px system-ui, sans-serif'; ctx.fillText('ARENA：' + ARENAS[Bt.arena][0] + (Bt.arena === 'normal' ? '' : '　' + ARENAS[Bt.arena][1]), W / 2, H * 0.52);
     ctx.font = '600 13px system-ui, sans-serif'; ctx.fillText('丸＝ダッシュ　／　左＝回避（すり抜け）　／　右＝ガード', W / 2, H * 0.8); ctx.font = '700 15px system-ui, sans-serif';
     if (BT.streak) { ctx.font = '800 18px system-ui, sans-serif'; ctx.fillText(`${BT.hard ? 'HARD ' : ''}STAGE ${BT.stage}「${BT.stageTitle}」`, W / 2, H * 0.56); ctx.font = '700 15px system-ui, sans-serif'; }
-    if (Bt.big) { ctx.font = '800 22px system-ui, sans-serif'; ctx.fillText(`BIG BATTLE　${Bt.N}体`, W / 2, H * 0.2); ctx.font = '600 14px system-ui, sans-serif'; ctx.fillText('最後の1体になれ！　リングはだんだん縮むよ', W / 2, H * 0.25); }
+    if (Bt.big) { ctx.font = '800 22px system-ui, sans-serif'; ctx.fillText(`BIG BATTLE　${Bt.N}体　［${(Bt.lv || BIG_LV[1]).name}］`, W / 2, H * 0.2); ctx.font = '600 14px system-ui, sans-serif'; ctx.fillText('最後の1体になれ！　リングはだんだん縮むよ', W / 2, H * 0.25); }
     const mF = BT.flip ? Bt.B : Bt.A, oF = BT.flip ? Bt.A : Bt.B, sl = Math.min(1, (3.2 - BT.count) * 2.2);          // 入場：両者の名前と回転数がスライドインする
     if (!Bt.big) {
     ctx.shadowBlur = 12; ctx.font = '700 17px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(mF.name, 24 - (1 - sl) * 200, H * 0.62); ctx.textAlign = 'right'; ctx.fillText(oF.name, W - 24 + (1 - sl) * 200, H * 0.2);
@@ -3548,7 +3563,7 @@ $b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventL
 for (const id of ['dash1', 'dash2']) { $b(id).addEventListener('pointermove', dashMove); $b(id).addEventListener('pointerup', dashRelease); $b(id).addEventListener('pointercancel', dashRelease); }
 $b('dodge1').addEventListener('pointerdown', dodgePress(1)); $b('dodge2').addEventListener('pointerdown', dodgePress(2));
 $b('guard1').addEventListener('pointerdown', guardPress(1)); $b('guard2').addEventListener('pointerdown', guardPress(2));
-window.__bt = { makeBig, stepBig, bigAI, beginBig, cleanGhost, ghostCode, readGhostCode, gsPick, addXp, PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
+window.__bt = { BIG_LV, makeBig, stepBig, bigAI, beginBig, cleanGhost, ghostCode, readGhostCode, gsPick, addXp, PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
 
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* Artifactなどでは使えない */ });   // ホーム画面に追加・オフライン起動用
 
