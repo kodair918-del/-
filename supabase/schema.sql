@@ -41,3 +41,39 @@ delete from public.ghosts where losses >= 3;
 
 -- （おすすめ）古いゴーストを消したいとき：30日より前のもの。必要なら SQL Editor で時々実行するか、Supabase の Scheduled Jobs に登録
 -- delete from public.ghosts where created_at < now() - interval '30 days' and wins < 3;
+
+-- ====================================================================
+-- ランキング（連勝戦・ハード・ビッグ優勝・ゴースト勝利・デイリーチャレンジ）
+-- ====================================================================
+create table if not exists public.scores (
+  board      text not null check (board ~ '^(stage|hard|bigwins|ghostwins|daily-[0-9]{4}-[0-9]{2}-[0-9]{2})$'),
+  uid        text not null check (char_length(uid) between 8 and 40),   -- 端末ごとのランダムID（みんなには見せない）
+  nick       text not null check (char_length(nick) <= 12),
+  score      integer not null check (score between 0 and 100000),
+  meta       jsonb check (pg_column_size(meta) < 400),
+  updated_at timestamptz not null default now(),
+  primary key (board, uid)
+);
+alter table public.scores enable row level security;
+drop policy if exists "scores_read" on public.scores;
+create policy "scores_read" on public.scores for select using (true);
+-- uid は読めないようにする（読めると、他人になりすまして書き換えられてしまうため）
+revoke all on public.scores from anon;
+grant select (board, nick, score, meta, updated_at) on public.scores to anon;
+
+-- スコアの送信（その人のその種目のベスト記録だけを残す）。直接の書き込みはできず、この関数だけ
+create or replace function public.submit_score(p_board text, p_uid text, p_nick text, p_score integer, p_meta jsonb default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare maxs integer;
+begin
+  maxs := case when p_board in ('stage', 'hard') then 31 when p_board = 'bigwins' then 5000 when p_board = 'ghostwins' then 100000 else 5000 end;
+  if p_score < 0 or p_score > maxs then raise exception 'bad score'; end if;
+  insert into public.scores (board, uid, nick, score, meta) values (p_board, p_uid, left(p_nick, 12), p_score, p_meta)
+  on conflict (board, uid) do update set
+    score = greatest(public.scores.score, excluded.score), nick = excluded.nick,
+    meta = case when excluded.score >= public.scores.score then excluded.meta else public.scores.meta end,
+    updated_at = case when excluded.score > public.scores.score then now() else public.scores.updated_at end;
+end;
+$$;
+revoke all on function public.submit_score(text, text, text, integer, jsonb) from public;
+grant execute on function public.submit_score(text, text, text, integer, jsonb) to anon;
