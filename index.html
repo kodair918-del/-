@@ -163,6 +163,7 @@ body.inbattle #rand{display:none}
       <button class="btn" data-bt="cpu3">CPU つよい</button>
       <button class="btn" data-bt="local">2人で対戦（1台）</button>
       <button class="btn wide" data-bt="practice" id="btPractice">れんしゅうモード（操作チュートリアル）</button>
+      <button class="btn wide main" data-bt="ghostmenu" style="background:#b48cff;color:#120a22">ゴースト対決（世界中のゴースト）</button>
       <button class="btn wide" data-bt="streak">CPU連勝戦（だんだん強くなる）</button>
       <button class="btn wide" data-bt="hard" id="btHard" style="display:none">CPU連勝戦 ハード（ALL CLEAR のごほうび）</button>
       <button class="btn main wide" data-bt="online">オンライン対戦</button>
@@ -209,6 +210,22 @@ body.inbattle #rand{display:none}
     </div>
     <div id="olStatus"></div>
     <button class="btn" id="olBack">もどる</button>
+  </div>
+  <div class="btcard" id="sGhost" hidden>
+    <h2>ゴースト対決</h2>
+    <p style="font-size:13px">だれかが戦ったときの「操作」を再現するゴーストと戦えるよ。CPU戦のたびに、あなたのゴーストも自動で生まれる。</p>
+    <div class="chips" id="gTabs"></div>
+    <div id="gList" class="col" style="gap:8px"></div>
+    <div id="gCodeBox" class="col" style="gap:6px" hidden><textarea class="codebox" id="gCodeIn" placeholder="ゴーストコード（SG1:…）を貼る"></textarea><button class="btn main" id="gCodeGo">このゴーストと戦う</button></div>
+    <div id="gStatus" style="font-size:13px;color:var(--accent);min-height:1.2em"></div>
+    <details id="gSetup"><summary style="font-size:13px;opacity:.8;cursor:pointer">サーバー設定（世界中のゴースト）</summary>
+      <div class="col" style="gap:6px;margin-top:8px">
+        <input id="gUrl" placeholder="Project URL（https://xxxx.supabase.co）" autocomplete="off" style="background:#1c1f27;color:#fff;border:1px solid #3a3f4b;border-radius:12px;padding:10px;font-size:14px">
+        <input id="gKey" placeholder="anon public key" autocomplete="off" style="background:#1c1f27;color:#fff;border:1px solid #3a3f4b;border-radius:12px;padding:10px;font-size:14px">
+        <div class="btgrid"><button class="btn" id="gSave">保存してつなぐ</button><button class="chip" id="gUp" style="justify-content:center"></button></div>
+      </div>
+    </details>
+    <button class="btn" id="gBack">もどる</button>
   </div>
   <div class="btcard" id="sResult" hidden>
     <h2 id="resTitle"></h2>
@@ -298,7 +315,7 @@ const VOL_NAME = ['小', '中', '大'], VOL_GAIN = [0.35, 0.65, 1];
 const MIX_NAME = ['OFF', '小', '中', '大'], MIX_GAIN = [0, 0.5, 1, 1.5];
 function mixApply() { if (!ac || !sfxBus) return; const t = ac.currentTime; sfxBus.gain.setTargetAtTime(MIX_GAIN[settings.mixSfx === undefined ? 2 : settings.mixSfx], t, 0.05); ambBus.gain.setTargetAtTime(MIX_GAIN[settings.mixAmb === undefined ? 2 : settings.mixAmb], t, 0.05); }
 const KEY = 'fidget-spinner-v1';
-const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
+const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, ghosts: [], gstat: { w: 0, l: 0 }, ghostUp: true, supa: { url: '', key: '' }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
 
 function loadSettings() {
   let raw = {};
@@ -2073,15 +2090,17 @@ function applyDash(f, o, Bt) {
   f.dashReq = false;
   if (f.dashCd > 0 && f.dashDir) f.dashDir = null;
   if (f.dashCd > 0 || f.out || f.fin) return;
-  let dx = o.x - f.x, dy = o.y - f.y;                                    // 自動：敵の方向 ／ マニュアル：指定された方向
+  let dx = o.x - f.x, dy = o.y - f.y; const man = !!f.dashDir;           // 自動：敵の方向 ／ マニュアル：指定された方向
   if (f.dashDir) { dx = f.dashDir[0]; dy = f.dashDir[1]; f.dashDir = null; }
   const d = Math.hypot(dx, dy) || 1e-6, k = PHYS.DASH * Q / Math.sqrt(f.st.mass);
+  if (Bt && Bt.rec && f === Bt.A) Bt.rec.push([+Bt.t.toFixed(2), 'd', man ? +(dx / d).toFixed(2) : 0, man ? +(dy / d).toFixed(2) : 0]);
   f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dashCd = PHYS.DASH_CD; f.dashed++; if (Bt) Bt.ev.push({ type: 'dash', who: f.side, x: f.x, y: f.y, z: f.z, dx: dx / d, dy: dy / d });
 }
 function applyDodge(f, o, Bt) {                              // 回避：敵の方向だけ。すり抜けられる（当たらない）
   if (!f.dodgeReq) return; f.dodgeReq = false;
   if (f.dodgeCd > 0 || f.out || f.fin) return;
   const dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy) || 1e-6, k = PHYS.DASH * Q / Math.sqrt(f.st.mass);
+  if (Bt && Bt.rec && f === Bt.A) Bt.rec.push([+Bt.t.toFixed(2), 'o', 0, 0]);
   f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dodgeCd = PHYS.DODGE_CD; f.dashed++; f.inv = PHYS.INV;
   if (Bt) Bt.ev.push({ type: 'dash', who: f.side, x: f.x, y: f.y, z: f.z, dx: dx / d, dy: dy / d, dodge: true });
 }
@@ -2089,6 +2108,7 @@ const SKILLS = { atk: ['疾風ラッシュ', '255,107,107'], def: ['鉄壁パル
 function useSkill(f, o, Bt) {                                // 必殺技：ゲージが満タンで発動。タイプごとに効果が違う
   if (!f.skReq) return; f.skReq = false;
   if (f.sp < 100 || f.out || f.burst || f.fin) return;
+  if (Bt.rec && f === Bt.A) Bt.rec.push([+Bt.t.toFixed(2), 'k', 0, 0]);
   f.sp = 0; const t = f.st.type, dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy) || 1e-6, nx = dx / d, ny = dy / d, ms = Math.sqrt(f.st.mass);
   if (t === 'atk') { f.vx += nx * PHYS.LUNGE * Q / ms; f.vy += ny * PHYS.LUNGE * Q / ms; f.sk.rush = 1.6; f.vz = Math.max(f.vz, 0.25); f.z += 0.002; }                      // 突進して、次の一撃が大ダメージ
   else if (t === 'def') { f.sk.guard = 3.2; const k = PHYS.PULSE * Q / (0.5 + d * 3) / Math.sqrt(o.st.mass); o.vx += nx * k; o.vy += ny * k; o.vz = Math.max(o.vz, 0.7); o.z += 0.002; o.w = Math.max(0, o.w - 0.04 * o.w0); }   // 衝撃波で弾き飛ばし、しばらく硬くなる
@@ -2144,7 +2164,7 @@ function stepBattle(Bt, dt) {
   const A = Bt.A, B = Bt.B;
   Bt.t += dt;
   applyDash(A, B, Bt); applyDash(B, A, Bt); applyDodge(A, B, Bt); applyDodge(B, A, Bt); useSkill(A, B, Bt); useSkill(B, A, Bt);
-  for (const f of [A, B]) if (f.jgReq) { f.jgReq = false; if (f.jgCd <= 0 && !f.out && !f.burst) { f.jg = PHYS.JG_WIN; f.jgCd = PHYS.JG_CD; Bt.ev.push({ type: 'guard', who: f.side, x: f.x, y: f.y, z: f.z }); } }
+  for (const f of [A, B]) if (f.jgReq) { f.jgReq = false; if (f.jgCd <= 0 && !f.out && !f.burst) { f.jg = PHYS.JG_WIN; f.jgCd = PHYS.JG_CD; if (Bt.rec && f === Bt.A) Bt.rec.push([+Bt.t.toFixed(2), 'g', 0, 0]); Bt.ev.push({ type: 'guard', who: f.side, x: f.x, y: f.y, z: f.z }); } }
   const sA = { x: A.x, y: A.y }, sB = { x: B.x, y: B.y };      // 2人を同時に動かす（先に動く側が有利にならないように）
   stepFighter(A, sB, dt); stepFighter(B, sA, dt);
   Bt.obj = arenaObjs(Bt.arena, Bt.t); gimmick(Bt, A, B, dt); gimmick(Bt, B, A, dt);
@@ -2185,9 +2205,9 @@ function aiDash(f, o, diff, dt) {                           // CPUのダッシ�
 const cpuRpm = diff => Math.round([10000, 18000, 26000][diff - 1] * (0.85 + Math.random() * 0.3));
 
 /* ---------- 画面の流れ ---------- */
-const btEl = $b('bt'), SCREENS = ['sMenu', 'sP2', 'sOnline', 'sResult'];
+const btEl = $b('bt'), SCREENS = ['sMenu', 'sP2', 'sOnline', 'sGhost', 'sResult'];
 const BT = { type: null, diff: 1, phase: 'idle', lock: false, role: 'local', flip: false, saved: null, p1: null, p2: null, name1: '', name2: '',
-  rand: false, hard: false, practice: false, tut: null, drag: null, stageTitle: '', banner: null, streak: false, stage: 1, streakCont: false, go: false, stop: 0, speed: 0, puffs: [], rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
+  rand: false, ghost: null, hard: false, practice: false, tut: null, drag: null, stageTitle: '', banner: null, streak: false, stage: 1, streakCont: false, go: false, stop: 0, speed: 0, puffs: [], rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
 function showScreen(id) { for (const s of SCREENS) $b(s).hidden = s !== id; btEl.classList.add('show'); document.body.classList.add('btmode'); }
 function hideOverlay() { btEl.classList.remove('show'); }
 const TYPE_COL = { atk: '#ff6b6b', def: '#5db4ff', sta: '#6bdc8b', bal: '#d0d0d0' };
@@ -2243,7 +2263,7 @@ const isBoss = n => n % 5 === 0, bossName = n => BOSSES[(n / 5 - 1) % BOSSES.len
 const ST = () => settings.stat || (settings.stat = { jg: 0, bw: 0, rw: 0, sk: 0 });
 const TITLES = [['new', '新人スピナー', '最初から', () => true], ['w1', '初勝利', '1勝する', () => settings.wins >= 1], ['tut', '練習おつかれさま', '練習モードをやる', () => !!settings.tutDone], ['w10', '10勝達成', '10勝する', () => settings.wins >= 10], ['w50', 'ベテラン', '50勝する', () => settings.wins >= 50],
   ['s5', '連勝の使い手', '連勝戦で5連勝', () => settings.sbest >= 5], ['s10', 'ステージ10突破', '連勝戦で10連勝', () => settings.sbest >= 10], ['s20', '歴戦の猛者', '連勝戦で20連勝', () => settings.sbest >= 20], ['clr', '闘技場の覇者', '連勝戦をALL CLEAR', () => settings.sbest >= LAST_STAGE],
-  ['jg10', '見切りの達人', 'ジャストガード10回', () => ST().jg >= 10], ['bw5', 'バーストハンター', 'バーストで5勝', () => ST().bw >= 5], ['rw5', '場外王', '場外で5勝', () => ST().rw >= 5], ['sk20', '必殺の使い手', '必殺技を20回', () => ST().sk >= 20], ['hard', '修羅の道', 'ハード連勝戦で10連勝', () => (settings.sbestH | 0) >= 10]];
+  ['jg10', '見切りの達人', 'ジャストガード10回', () => ST().jg >= 10], ['bw5', 'バーストハンター', 'バーストで5勝', () => ST().bw >= 5], ['rw5', '場外王', '場外で5勝', () => ST().rw >= 5], ['sk20', '必殺の使い手', '必殺技を20回', () => ST().sk >= 20], ['hard', '修羅の道', 'ハード連勝戦で10連勝', () => (settings.sbestH | 0) >= 10], ['gh', 'ゴーストハンター', 'ゴーストに5回勝つ', () => ((settings.gstat || {}).w | 0) >= 5]];
 const titleName = () => (TITLES.find(t => t[0] === settings.title) || TITLES[0])[1];
 function checkTitles() {                                     // 条件を満たした称号を増やす（新しく獲得した名前を返す）
   const have = settings.titles || (settings.titles = ['new']), got = [];
@@ -2267,9 +2287,80 @@ function cpuDesignFor(stage, me) {                           // 進むほど、�
   if (ctr && Math.random() < (isBoss(stage) ? 1 : Math.min(0.8, (stage - 3) * 0.15))) for (let i = 0; i < 60; i++) { const c = randomDesign(); if (statsOf(c).type === ctr) { d = c; break; } }
   return d;
 }
-function btStart(type, diff, keep) {
-  const practice = type === 'practice', hard = type === 'hard', streak = type === 'streak' || hard;
+/* ---------- ゴースト：操作を記録して、あとで再現する ---------- */
+const GHOST_MAX_LOCAL = 20, GHOST_MAX_INPUTS = 240, SUPA_DEFAULT = { url: '', key: '' };   // SUPA_DEFAULT：サーバー設定をコードに書いておきたい時の既定値
+const gsCfg = () => { const c = settings.supa || {}; return { url: String(c.url || SUPA_DEFAULT.url || '').trim().replace(/\/+$/, ''), key: String(c.key || SUPA_DEFAULT.key || '').trim() }; };
+const gsOn = () => { const c = gsCfg(); return /^(https:\/\/|http:\/\/localhost)/.test(c.url) && c.key.length > 8; };
+async function gsReq(path, opt) {
+  const c = gsCfg(), r = await fetch(`${c.url}/rest/v1/${path}`, { ...opt, headers: { apikey: c.key, Authorization: 'Bearer ' + c.key, 'Content-Type': 'application/json', ...((opt || {}).headers || {}) } });
+  if (!r.ok) throw new Error('HTTP ' + r.status); return r;
+}
+const savedNick = () => { try { return cleanNick(localStorage.getItem('spinNick')); } catch (e) { return ''; } };
+function cleanGhost(g) {                                    // 外から来たゴーストを、安全な値だけにする
+  if (!g || typeof g !== 'object' || !g.design) return null;
+  const d = cleanDesign(g.design); d.arms = d.arms | 0; d.bg = 'plate';
+  if (!MATS.includes(d.material) || !SHAPES[d.shape] || !ARMS.includes(d.arms) || !HOLES[d.hole]) return null;
+  const rpm = Math.max(300, Math.min(50000, +g.rpm || 0)); if (!(rpm >= 300)) return null;
+  const inputs = (Array.isArray(g.inputs) ? g.inputs : []).slice(0, GHOST_MAX_INPUTS).filter(a => Array.isArray(a) && Number.isFinite(+a[0]) && typeof a[1] === 'string' && 'dogk'.includes(a[1]) && a[1].length === 1)
+    .map(a => [Math.max(0, Math.min(90, +a[0])), a[1], Math.max(-1, Math.min(1, +a[2] || 0)), Math.max(-1, Math.min(1, +a[3] || 0))]).sort((a, b) => a[0] - b[0]);
+  return { id: typeof g.id === 'string' ? g.id.slice(0, 40) : null, nick: cleanNick(g.nick) || 'ななし', title: String(g.title || '').replace(/[\u0000-\u001f<>&"']/g, '').slice(0, 14), design: d, rpm, arena: ARENAS[g.arena] && g.arena !== 'inferno' ? g.arena : 'normal',
+    inputs, res: g.res && typeof g.res === 'object' ? { w: g.res.w ? 1 : 0, t: +g.res.t || 0, why: String(g.res.why || '').slice(0, 10) } : null, wins: g.wins | 0, losses: g.losses | 0 };
+}
+const ghostCode = g => 'SG1:' + btoa(unescape(encodeURIComponent(JSON.stringify({ nick: g.nick, title: g.title, design: g.design, rpm: Math.round(g.rpm), arena: g.arena, inputs: g.inputs, res: g.res }))));
+const readGhostCode = c => { try { return cleanGhost(JSON.parse(decodeURIComponent(escape(atob(String(c).trim().replace(/^SG1:/, '')))))); } catch (e) { return null; } };
+function makeGhost(Bt, win) {                               // いまの戦いのあなたの操作を、ゴーストにする
+  if (!Bt.rec) return null;
+  return cleanGhost({ nick: savedNick(), title: titleName(), design: BT.p1, rpm: BT.rpm1, arena: Bt.arena, inputs: Bt.rec, res: { w: win ? 1 : 0, t: +Bt.t.toFixed(1), why: Bt.reason } });
+}
+function saveGhostLocal(g) { const L = settings.ghosts || (settings.ghosts = []); L.unshift({ ...g, ts: Date.now() }); if (L.length > GHOST_MAX_LOCAL) L.length = GHOST_MAX_LOCAL; saveSettings(); }
+async function gsUpload(g) { if (!gsOn() || settings.ghostUp === false) return false; await gsReq('ghosts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ nick: g.nick, title: g.title, design: g.design, rpm: Math.round(g.rpm), arena: g.arena, inputs: g.inputs, res: g.res }) }); return true; }
+async function gsReport(id, ghostWon) { if (!gsOn() || !id) return; try { await gsReq('rpc/report_result', { method: 'POST', body: JSON.stringify({ gid: id, won: !!ghostWon }) }); } catch (e) { /* 無視 */ } }
+async function gsList(tab) {
+  const sel = 'id,nick,title,design,rpm,arena,inputs,res,wins,losses', center = Math.max(3000, settings.best || 0);
+  const q = tab === 'hall' ? `ghosts?select=${sel}&order=wins.desc,created_at.desc&limit=12` : `ghosts?select=${sel}&rpm=gte.${Math.round(center * 0.3)}&rpm=lte.${Math.round(center * 2.5)}&order=created_at.desc&limit=40`;
+  const rows = await (await gsReq(q)).json(); let list = rows.map(cleanGhost).filter(Boolean);
+  if (tab !== 'hall') { for (let i = list.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [list[i], list[j]] = [list[j], list[i]]; } list = list.slice(0, 8); }
+  return list;
+}
+let gTab = 'near';
+function openGhost() { initAudio(); showScreen('sGhost'); $b('gUrl').value = (settings.supa || {}).url || ''; $b('gKey').value = (settings.supa || {}).key || ''; drawGhostTabs(); loadGhosts(); }
+function drawGhostTabs() {
+  const el = $b('gTabs'); el.innerHTML = '';
+  for (const [id, name] of [['near', '世界（近い強さ）'], ['hall', '殿堂入り'], ['mine', '自分のゴースト'], ['code', 'コード']]) {
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = name; b.setAttribute('aria-pressed', gTab === id); b.addEventListener('click', () => { gTab = id; drawGhostTabs(); loadGhosts(); }); el.appendChild(b);
+  }
+  $b('gUp').textContent = '自分のゴーストを公開：' + (settings.ghostUp === false ? 'OFF' : 'ON'); $b('gUp').setAttribute('aria-pressed', settings.ghostUp !== false);
+}
+function ghostCard(g, mine) {
+  const card = document.createElement('div'); card.style.cssText = 'border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,.04)';
+  const l1 = document.createElement('div'); l1.style.fontSize = '14px'; const b1 = document.createElement('b'); b1.textContent = g.nick; l1.append(b1, document.createTextNode(g.title ? `「${g.title}」` : ''));
+  const l2 = document.createElement('div'); l2.style.cssText = 'font-size:12px;opacity:.8'; const st = statsOf(g.design); l2.textContent = `${nameOf(g.design)}・${TYPE_NAME[st.type]}・${Math.round(g.rpm).toLocaleString('en-US')}rpm・${ARENAS[g.arena][0]}${g.res ? '・' + (g.res.w ? '勝ち' : '負け') + 'の記録' : ''}${g.id || g.wins || g.losses ? `・ゴースト ${g.wins}勝 ${g.losses}敗` : ''}`;
+  const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px'; const go = document.createElement('button'); go.className = 'btn main'; go.style.flex = 1; go.textContent = 'たたかう'; go.addEventListener('click', () => startGhost(g)); row.appendChild(go);
+  const cp = document.createElement('button'); cp.className = 'btn'; cp.textContent = 'コードをコピー'; cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(ghostCode(g)); $b('gStatus').textContent = 'ゴーストコードをコピーした！友だちに送ろう'; } catch (e) { $b('gStatus').textContent = 'コピーできませんでした'; } }); row.appendChild(cp);
+  card.append(l1, l2, row); return card;
+}
+async function loadGhosts() {
+  const box = $b('gList'); box.innerHTML = ''; $b('gCodeBox').hidden = gTab !== 'code'; $b('gStatus').textContent = '';
+  if (gTab === 'code') return;
+  if (gTab === 'mine') { const L = (settings.ghosts || []).map(cleanGhost).filter(Boolean); if (!L.length) $b('gStatus').textContent = 'まだゴーストがないよ。CPU戦をやると、あなたのゴーストが自動で保存される'; for (const g of L) box.appendChild(ghostCard(g, true)); return; }
+  if (!gsOn()) { $b('gStatus').textContent = '世界中のゴーストを使うには、下の「サーバー設定」にURLとキーを入れてね（手順は SETUP_SUPABASE.md）'; $b('gSetup').open = true; return; }
+  $b('gStatus').textContent = 'ゴーストを探しています…';
+  try { const L = await gsList(gTab); $b('gStatus').textContent = L.length ? '' : 'まだゴーストがいないよ。CPU戦に勝つと、あなたのゴーストが公開される'; for (const g of L) box.appendChild(ghostCard(g, false)); }
+  catch (e) { $b('gStatus').textContent = 'サーバーにつなげませんでした（' + e.message + '）。URLとキー、テーブルの設定を確認してね'; }
+}
+function startGhost(g) { btStart('ghost', 0, false, g); }
+function ghostDrive(Bt) {                                    // ゴースト：記録された操作を、その時刻に再現する（向きは反対側から来るので反転）
+  const g = BT.ghost, B = Bt.B;
+  while (Bt.gi < g.inputs.length && g.inputs[Bt.gi][0] <= Bt.t) {
+    const [, k, dx, dy] = g.inputs[Bt.gi++];
+    if (k === 'd') { B.dashReq = true; B.dashDir = dx || dy ? [-dx, -dy] : null; } else if (k === 'o') B.dodgeReq = true; else if (k === 'g') B.jgReq = true; else if (k === 'k') B.skReq = true;
+  }
+}
+function btStart(type, diff, keep, extra) {
+  const practice = type === 'practice', hard = type === 'hard', streak = type === 'streak' || hard, ghostMode = type === 'ghost';
   if (practice) { type = 'cpu'; diff = 1; }
+  if (ghostMode) { type = 'cpu'; diff = 2; }
+  BT.ghost = ghostMode ? extra : null;
   if (streak) { type = 'cpu'; if (!keep) BT.stage = 1; diff = hard ? 3 : BT.stage < 8 ? 1 : BT.stage < 18 ? 2 : 3; }
   BT.streak = streak; BT.hard = hard; BT.practice = practice; BT.go = false; BT.tut = null;
   BT.type = type; BT.diff = diff || 1; BT.saved = designOf(); BT.p1 = designOf(); BT.recorded = false;
@@ -2278,12 +2369,12 @@ function btStart(type, diff, keep) {
   initAudio();
   if (type === 'online') { showScreen('sOnline'); olReset(); return; }
   const hp = hard ? 'HARD ' : '';
-  BT.name1 = type === 'cpu' ? titleName() : '1P'; BT.name2 = type === 'cpu' ? (practice ? 'ダミー' : streak ? (isBoss(BT.stage) ? 'BOSS ' + bossName(BT.stage) : hp + 'STAGE ' + BT.stage) : 'CPU') : '2P'; BT.stageTitle = streak ? stageTitle(BT.stage) : '';
-  if (type === 'cpu') BT.p2 = streak ? cpuDesignFor(BT.stage, BT.p1) : randomDesign();
+  BT.name1 = type === 'cpu' ? titleName() : '1P'; BT.name2 = type === 'cpu' ? (practice ? 'ダミー' : ghostMode ? 'ゴースト ' + extra.nick : streak ? (isBoss(BT.stage) ? 'BOSS ' + bossName(BT.stage) : hp + 'STAGE ' + BT.stage) : 'CPU') : '2P'; BT.stageTitle = streak ? stageTitle(BT.stage) : '';
+  if (type === 'cpu') BT.p2 = ghostMode ? extra.design : streak ? cpuDesignFor(BT.stage, BT.p1) : randomDesign();
   if (practice) { BT.rpm1 = 6000; BT.rpm2 = 4000; beginBattle(); return; }               // 練習：準備タイムなしで、すぐ始まる
-  startSpin(type === 'cpu' ? (streak ? `${hp}STAGE ${BT.stage}「${BT.stageTitle}」` : 'あなた') : '1P', rpm => {
+  startSpin(type === 'cpu' ? (streak ? `${hp}STAGE ${BT.stage}「${BT.stageTitle}」` : ghostMode ? 'ゴースト戦' : 'あなた') : '1P', rpm => {
     BT.rpm1 = rpm;
-    if (type === 'cpu') { BT.rpm2 = streak ? stageRpm(BT.stage) : cpuRpm(BT.diff); beginBattle(); } else { refreshP2(); showScreen('sP2'); }
+    if (type === 'cpu') { BT.rpm2 = ghostMode ? extra.rpm : streak ? stageRpm(BT.stage) : cpuRpm(BT.diff); beginBattle(); } else { refreshP2(); showScreen('sP2'); }
   });
 }
 const SPIN_SEC = 10;                                         // 準備タイム（回す時間）
@@ -2303,7 +2394,8 @@ function spinTick(now) {
   setTimeout(() => { $b('btCount').style.display = 'none'; const d = BT.spinDone; BT.spinDone = null; MODE = 'free'; if (d) d(rpm); }, 1500);
 }
 function pickArena() {
-  if (BT.practice) return 'normal';                           // 練習はノーマルのアリーナ
+  if (BT.practice) return 'normal';
+  if (BT.ghost) return BT.ghost.arena;                           // 練習はノーマルのアリーナ
   if (BT.streak) return stageInfo(BT.stage)[1];
   const a = settings.arena || 'normal'; return a === 'random' ? ARENA_IDS[Math.floor(Math.random() * ARENA_IDS.length)] : a;
 }
@@ -2312,7 +2404,7 @@ function beginBattle() {
   const b = makeFighter(BT.flip ? BT.p1 : BT.p2, BT.flip ? BT.rpm1 : BT.rpm2, BT.flip ? BT.name1 : BT.name2, 'B');
   if (BT.type === 'local' && BT.saved) applyDesign(BT.saved);
   if (BT.practice) { a.st = { ...a.st, pw: 1.2 }; b.st = { ...b.st, pw: 0.5 }; BT.tut = { step: 0, cnt: { dash: 0, dodge: 0, jg: 0, skill: 0 }, stepT: null, flash: 0 }; }   // 練習：こちらは強く、ダミーは弱く
-  BT.battle = makeBattle(a, b, pickArena()); enterBattleView();
+  BT.battle = makeBattle(a, b, pickArena()); BT.battle.rec = BT.type === 'cpu' && !BT.practice ? [] : null; BT.battle.gi = 0; enterBattleView();
 }
 function enterBattleView() {
   MODE = 'battle'; camReset(); BT.phase = 'count'; BT.count = 3.2; BT.sparks = []; BT.snapT = 0; BT.endT = 0;
@@ -2374,6 +2466,13 @@ function showResult() {
   if (BT.type === 'cpu' || BT.ghost) {                       // 経験値（育成）：対CPU・ゴースト戦のみ
     const xp = Bt.draw ? 15 : win ? 30 + (BT.streak ? Math.min(BT.stage, 30) * 2 : 0) + (BT.ghost ? 10 : 0) : 10, up = addXp(BT.p1, xp), g = GR(BT.p1);
     $b('resBody').innerHTML += `<br>経験値 +${xp}（Lv.${g.lv}${up ? `　<b style="color:#ffd24d">レベルアップ！ 強化ポイント +${up}</b>` : ''}）`;
+  }
+  if (BT.ghost && !Bt.draw) {                                // ゴースト戦の結果を、ゴーストの持ち主に知らせる
+    const gs = settings.gstat || (settings.gstat = { w: 0, l: 0 }); if (win) gs.w++; else gs.l++; gsReport(BT.ghost.id, !win);
+  }
+  if (Bt.rec && BT.type === 'cpu') {                          // あなたのゴーストを、自動で保存（勝ったものは世界にも公開）
+    const gh = makeGhost(Bt, win && !Bt.draw);
+    if (gh) { saveGhostLocal(gh); const up = win && !Bt.draw && gh.inputs.length >= 2 && gsOn() && settings.ghostUp !== false; $b('resBody').innerHTML += `<br><span style="opacity:.75">あなたのゴーストを保存しました${up ? '（世界に公開中…）' : ''}</span>`; if (up) gsUpload(gh).catch(() => {}); }
   }
   { const got = checkTitles(); if (got.length) $b('resBody').innerHTML += `<br><b>称号を獲得：「${got.join('」「')}」</b>`; saveSettings(); }
   showScreen('sResult');
@@ -2601,7 +2700,8 @@ function battleFrame(now, rawDt) {
     if (BT.count <= 0.2 && !BT.go) { BT.go = true; countSnd(0); droneStart(); CAM.punch = 1; CAM.shake = 0.7; BT.flash = 0.35; }
     if (BT.count <= 0) BT.phase = 'fight';
   } else if (BT.phase === 'fight' && !isGuest) {
-    if (BT.type === 'cpu' && !BT.practice) { aiDash(Bt.B, Bt.A, BT.diff, sdt); const bs = BT.hard || (BT.streak && BT.stage % 5 === 0); aiSkill(Bt.B, Bt.A, BT.diff, sdt, bs); aiGuard(Bt.B, Bt.A, BT.diff, sdt, bs); }
+    if (BT.ghost) ghostDrive(Bt);
+    else if (BT.type === 'cpu' && !BT.practice) { aiDash(Bt.B, Bt.A, BT.diff, sdt); const bs = BT.hard || (BT.streak && BT.stage % 5 === 0); aiSkill(Bt.B, Bt.A, BT.diff, sdt, bs); aiGuard(Bt.B, Bt.A, BT.diff, sdt, bs); }
     const n = Math.max(1, Math.ceil(sdt / (1 / 120)));
     for (let i = 0; i < n; i++) stepBattle(Bt, sdt / n);
     if (BT.role === 'host') {
@@ -3122,7 +3222,7 @@ $b('cHueOff').addEventListener('click', () => { settings.tint = settings.tint >=
 $b('btRand').addEventListener('click', () => { applyDesign(randomDesign()); saveSettings(); click(0.9); refreshMenu(); });
 for (const b of btEl.querySelectorAll('[data-bt]')) b.addEventListener('click', () => {
   const v = b.dataset.bt;
-  if (v.startsWith('cpu')) btStart('cpu', +v.slice(3)); else btStart(v);
+  if (v === 'ghostmenu') openGhost(); else if (v.startsWith('cpu')) btStart('cpu', +v.slice(3)); else btStart(v);
 });
 $b('p2Pick').addEventListener('click', () => setSheet(true));
 $b('p2Rand').addEventListener('click', () => { applyDesign(randomDesign()); click(0.9); refreshP2(); });
@@ -3141,8 +3241,16 @@ $b('resAgain').addEventListener('click', () => {
     if (!Net.open) return; BT.againSent = true; netSend({ t: 'again' }); $b('resAgain').disabled = true; $b('resAgain').textContent = '相手を待っています…';
     if (BT.peerAgain) startRematch(); return;
   }
-  const t = BT.type, d = BT.diff, rand = BT.rand, st = BT.streak, keep = BT.streakCont, pr = BT.practice, hd = BT.hard; endBattle(false); if (pr) btStart('practice'); else if (st) btStart(hd ? 'hard' : 'streak', 0, keep); else btStart(t, d); if (t === 'online' && rand) olRandom(); });
+  const t = BT.type, d = BT.diff, rand = BT.rand, st = BT.streak, keep = BT.streakCont, pr = BT.practice, hd = BT.hard, gh = BT.ghost; endBattle(false); if (gh) btStart('ghost', 0, false, gh); else if (pr) btStart('practice'); else if (st) btStart(hd ? 'hard' : 'streak', 0, keep); else btStart(t, d); if (t === 'online' && rand) olRandom(); });
 $b('resMenu').addEventListener('click', () => endBattle(true));
+$b('gBack').addEventListener('click', () => { showScreen('sMenu'); refreshMenu(); });
+$b('gCodeGo').addEventListener('click', () => { const g = readGhostCode($b('gCodeIn').value); if (!g) { $b('gStatus').textContent = 'ゴーストコードが正しくありません'; return; } startGhost(g); });
+$b('gUp').addEventListener('click', () => { settings.ghostUp = settings.ghostUp === false; saveSettings(); drawGhostTabs(); });
+$b('gSave').addEventListener('click', async () => {
+  settings.supa = { url: $b('gUrl').value.trim(), key: $b('gKey').value.trim() }; saveSettings(); $b('gStatus').textContent = 'つないでいます…';
+  if (!gsOn()) { $b('gStatus').textContent = 'URL（https://…）とキーを入れてください'; return; }
+  try { await gsReq('ghosts?select=id&limit=1'); $b('gStatus').textContent = 'つながった！'; gTab = 'near'; drawGhostTabs(); loadGhosts(); } catch (e) { $b('gStatus').textContent = 'つなげませんでした（' + e.message + '）。URL・キー・ghostsテーブルの設定を確認してね'; }
+});
 $b('resNew').addEventListener('click', () => { endBattle(false); btStart('online'); olRandom(); });
 $b('tutExit').addEventListener('click', () => endBattle(true));
 $b('olBack').addEventListener('click', () => { netClose(); BT.phase = 'idle'; endBattle(true); });
@@ -3208,7 +3316,7 @@ $b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventL
 for (const id of ['dash1', 'dash2']) { $b(id).addEventListener('pointermove', dashMove); $b(id).addEventListener('pointerup', dashRelease); $b(id).addEventListener('pointercancel', dashRelease); }
 $b('dodge1').addEventListener('pointerdown', dodgePress(1)); $b('dodge2').addEventListener('pointerdown', dodgePress(2));
 $b('guard1').addEventListener('pointerdown', guardPress(1)); $b('guard2').addEventListener('pointerdown', guardPress(2));
-window.__bt = { addXp, PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
+window.__bt = { cleanGhost, ghostCode, readGhostCode, gsList, addXp, PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
 
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* Artifactなどでは使えない */ });   // ホーム画面に追加・オフライン起動用
 
