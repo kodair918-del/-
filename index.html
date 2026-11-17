@@ -215,6 +215,7 @@ html[data-ui="pop"] .dash i{opacity:.55}
       <button class="btn" data-bt="local">2人で対戦（1台）</button>
       <button class="btn wide" data-bt="practice" id="btPractice">れんしゅうモード（操作チュートリアル）</button>
       <button class="btn wide main" data-bt="big" style="background:#ff7a3d;color:#1a0a00">ビッグモード（大きなアリーナで、最大30体のバトルロイヤル）</button>
+      <button class="btn wide" data-bt="dex">図鑑（特別なスピナー）</button>
       <button class="btn wide main" data-bt="ghostmenu" style="background:#b48cff;color:#120a22">ゴースト対決（世界中のゴースト）</button>
       <button class="btn wide" data-bt="streak">CPU連勝戦（だんだん強くなる）</button>
       <button class="btn wide" data-bt="hard" id="btHard" style="display:none">CPU連勝戦 ハード（ALL CLEAR のごほうび）</button>
@@ -282,6 +283,12 @@ html[data-ui="pop"] .dash i{opacity:.55}
       </div>
     </details>
     <button class="btn" id="gBack">もどる</button>
+  </div>
+  <div class="btcard" id="sDex" hidden>
+    <h2>図鑑：特別なスピナー</h2>
+    <p style="font-size:13px">条件を満たすか、コードを入れると手に入るよ。手に入れたら、装備できる。</p>
+    <div id="dexList" class="col" style="gap:8px"></div>
+    <button class="btn" id="dexBack">もどる</button>
   </div>
   <div class="btcard" id="sResult" hidden>
     <h2 id="resTitle"></h2>
@@ -1975,10 +1982,14 @@ function withDesign(d, r, fn) {                            // 一時的に別の
   try { return fn(); } finally { DSG = sD; R = sR; }
 }
 const SPECIALS = {                                            // コードで手に入る特別なスピナー（形はふつうの部品の組み合わせ、強さは特別）
-  windmill: { name: 'キ〇ガイ風車', look: { material: 'rainbow', shape: 'leaf', arms: 4, hole: 'big' }, atk: 2.6, def: 2.6, sta: 2.6, bur: 4, pw: 3, mass: 1.5, skill: ['認識された', '255,50,50'] }
+  comet: { name: '流星ブレード', look: { material: 'neon', shape: 'pointy', arms: 3, hole: 'small' }, tint: 190, atk: 2.4, def: 1, sta: 1.4, bur: 1.8, pw: 2, mass: 1, base: 'atk', aura: 190, hint: '連勝戦で10連勝', ach: () => (settings.sbest | 0) >= 10 },
+  fortress: { name: '鉄壁要塞', look: { material: 'titan', shape: 'fat', arms: 6, hole: 'weight' }, tint: -1, atk: 1.5, def: 3, sta: 1.5, bur: 5, pw: 2.2, mass: 1.6, base: 'def', aura: 215, hint: 'ビッグモードで優勝', ach: () => (settings.bigWins | 0) >= 1 },
+  marathon: { name: '永久機関', look: { material: 'ice', shape: 'round', arms: 2, hole: 'weight' }, tint: 140, atk: 1.4, def: 1.5, sta: 4, bur: 2, pw: 2, mass: 1.1, base: 'sta', aura: 140, hint: 'ゴーストに10回勝つ', ach: () => ((settings.gstat || {}).w | 0) >= 10 },
+  golden: { name: '黄金の王', look: { material: 'gold', shape: 'leaf', arms: 5, hole: 'weight' }, tint: -1, atk: 2, def: 2, sta: 2, bur: 2.5, pw: 2.5, mass: 1.3, base: 'bal', aura: 45, hint: '連勝戦をALL CLEAR', ach: () => (settings.sbest | 0) >= LAST_STAGE },
+  windmill: { base: 'wm', aura: 'rainbow', hint: 'コードで手に入る', name: 'キ〇ガイ風車', look: { material: 'rainbow', shape: 'leaf', arms: 4, hole: 'big' }, atk: 2.6, def: 2.6, sta: 2.6, bur: 4, pw: 3, mass: 1.5, skill: ['認識された', '255,50,50'] }
 };
 const codeHash = s => { let h = 0x811c9dc5; for (const ch of String(s).normalize('NFKC').toLowerCase().replace(/[\s\-_]/g, '')) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
-const CODES = { cdi1pj: 'windmill', '680d0h': 'windmill' };   // コードそのものは書かず、ハッシュだけ持つ
+const CODES = { cdi1pj: 'windmill', '680d0h': 'windmill', '1jrvbv6': 'comet', '1xzrssn': 'fortress', qy6564: 'marathon', '1raucd7': 'golden' };   // コードそのものは書かず、ハッシュだけ持つ
 const specialOn = () => { const id = settings.special, sp = id && SPECIALS[id], l = sp && sp.look; if (sp && l.material === settings.material && l.shape === settings.shape && l.arms === settings.arms && l.hole === settings.hole) return id; if (id) settings.special = ''; return ''; };
 const gkey = d => d.sp ? 'sp:' + d.sp : `${d.material}|${d.shape}|${d.arms}|${d.hole}`;
 const GR = d => { const g = settings.grow || (settings.grow = {}), k = gkey(d); return g[k] || (g[k] = { xp: 0, lv: 1, pts: 0, gb: { atk: 0, def: 0, sta: 0, bur: 0 } }); };   // スピナー（素材・形・アーム・穴ごと）の育成記録
@@ -2029,7 +2040,7 @@ function statsOf(d) {
   st.atkE = Math.pow(st.atk, 0.45 * PHYS.LAM) * Math.pow(sh.atk, PHYS.MU);
   st.defE = Math.pow(st.def, 0.45 * PHYS.LAM) * Math.pow(sh.def, PHYS.MU);
   st.staE = Math.pow(st.sta, PHYS.LAM) * Math.pow(sh.sta, PHYS.MU * 0.8);
-  if (d.sp && SPECIALS[d.sp]) { const k = SPECIALS[d.sp]; st.atkE *= k.atk; st.defE *= k.def; st.staE *= k.sta; st.bres *= k.bur; st.pw *= k.pw; st.mass *= k.mass; st.type = 'wm'; }   // 特別なスピナー
+  if (d.sp && SPECIALS[d.sp]) { const k = SPECIALS[d.sp]; st.atkE *= k.atk; st.defE *= k.def; st.staE *= k.sta; st.bres *= k.bur; st.pw *= k.pw; st.mass *= k.mass; st.type = k.base || 'wm'; st.sid = d.sp; }   // 特別なスピナー
   if (d.gb) { st.atkE *= 1 + 0.04 * (d.gb.atk | 0); st.defE *= 1 + 0.04 * (d.gb.def | 0); st.staE *= 1 + 0.05 * (d.gb.sta | 0); st.bres *= 1 + 0.05 * (d.gb.bur | 0); }   // 育成の強化
   return st;
 }
@@ -2304,13 +2315,17 @@ function aiDash(f, o, diff, dt) {                           // CPUのダッシ�
 const cpuRpm = diff => Math.round([10000, 18000, 26000][diff - 1] * (0.85 + Math.random() * 0.3));
 
 /* ---------- 画面の流れ ---------- */
-const btEl = $b('bt'), SCREENS = ['sMenu', 'sP2', 'sOnline', 'sGhost', 'sResult'];
-const BT = { type: null, diff: 1, phase: 'idle', lock: false, role: 'local', flip: false, saved: null, p1: null, p2: null, name1: '', name2: '',
+const btEl = $b('bt'), SCREENS = ['sMenu', 'sP2', 'sOnline', 'sGhost', 'sDex', 'sResult'];
+const BT = { spMsg: '', type: null, diff: 1, phase: 'idle', lock: false, role: 'local', flip: false, saved: null, p1: null, p2: null, name1: '', name2: '',
   rand: false, big: false, feed: [], ghost: null, ghostRand: false, hard: false, practice: false, tut: null, drag: null, stageTitle: '', banner: null, streak: false, stage: 1, streakCont: false, go: false, stop: 0, speed: 0, puffs: [], rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
-function showScreen(id) { for (const s of SCREENS) $b(s).hidden = s !== id; btEl.classList.add('show'); document.body.classList.add('btmode'); }
+function showScreen(id) {
+  for (const s of SCREENS) $b(s).hidden = s !== id; btEl.classList.add('show'); document.body.classList.add('btmode');
+  if (id === 'sResult' && BT.spMsg) { $b('resBody').innerHTML += BT.spMsg; BT.spMsg = ''; }
+}
 function hideOverlay() { btEl.classList.remove('show'); }
 const TYPE_COL = { atk: '#ff6b6b', def: '#5db4ff', sta: '#6bdc8b', bal: '#d0d0d0', wm: '#ff7bff' };
-const typeBadge = st => `<br><b style="color:${TYPE_COL[st.type]}">${TYPE_NAME[st.type]}</b> <span style="opacity:.65;font-size:11px">相性：攻撃→持久→防御→攻撃</span>`;
+const typeName = st => st.sid ? '特別型' : TYPE_NAME[st.type];
+const typeBadge = st => `<br><b style="color:${TYPE_COL[st.type]}">${typeName(st)}</b> <span style="opacity:.65;font-size:11px">相性：攻撃→持久→防御→攻撃</span>`;
 function drawArenaChips() {
   const el = $b('arenaChips'); el.innerHTML = '';
   for (const id of ['random', ...ARENA_IDS]) {
@@ -2324,10 +2339,25 @@ function syncCustom() {
   $b('cHueOff').setAttribute('aria-pressed', t < 0); if (t >= 0) $b('cHue').value = t;
   $b('cHue').style.background = 'linear-gradient(90deg,hsl(0,80%,52%),hsl(60,80%,52%),hsl(120,80%,52%),hsl(180,80%,52%),hsl(240,80%,52%),hsl(300,80%,52%),hsl(360,80%,52%))';
 }
+function openDex() {
+  showScreen('sDex'); const box = $b('dexList'); box.innerHTML = ''; const have = settings.codes || [], cur = specialOn();
+  for (const [id, k] of Object.entries(SPECIALS)) {
+    const own = have.includes(id), card = document.createElement('div'); card.style.cssText = 'display:flex;gap:12px;align-items:center;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:10px;background:rgba(255,255,255,.04)';
+    const cv = document.createElement('canvas'); cv.width = cv.height = 112; cv.style.cssText = 'position:static;width:72px;height:72px;flex:none;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.1),rgba(255,255,255,0) 70%)';
+    const d = { ...k.look, bg: 'plate', sname: k.name, tint: k.tint === undefined ? -1 : k.tint, sp: id }, c = cv.getContext('2d'), rp = 48; c.translate(56, 56);
+    const sp = withDesign(d, rp, getSprite); c.drawImage(sp.arm, -rp, -rp, 2 * rp, 2 * rp); if (!own) { c.globalCompositeOperation = 'source-atop'; c.fillStyle = 'rgba(0,0,0,.88)'; c.fillRect(-60, -60, 120, 120); }
+    const info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:4px';
+    const t1 = document.createElement('b'); t1.textContent = own ? k.name : '？？？'; t1.style.fontSize = '15px';
+    const t2 = document.createElement('div'); t2.style.cssText = 'font-size:12px;opacity:.75'; t2.textContent = own ? `攻撃×${k.atk}　防御×${k.def}　持久×${k.sta}　頑丈×${k.bur}` : `入手：${k.hint}${k.ach ? '（またはコード）' : ''}`;
+    info.append(t1, t2);
+    if (own) { const b = document.createElement('button'); b.className = 'chip'; b.textContent = cur === id ? 'はずす' : '装備する'; b.style.alignSelf = 'flex-start'; b.addEventListener('click', () => { equipSpecial(cur === id ? '' : id); click(0.9); openDex(); }); info.append(b); }
+    card.append(cv, info); box.appendChild(card);
+  }
+}
 function equipSpecial(id) {                                  // 特別なスピナーを装備（いまの組み合わせは保存しておいて、はずすと元に戻る）
   const cur = specialOn();
   if (!cur && id) settings.spBackup = { material: settings.material, shape: settings.shape, arms: settings.arms, hole: settings.hole, sname: settings.sname, tint: settings.tint };
-  if (id) { const l = SPECIALS[id].look; Object.assign(settings, l, { sname: SPECIALS[id].name, tint: -1, special: id }); }
+  if (id) { const l = SPECIALS[id].look; Object.assign(settings, l, { sname: SPECIALS[id].name, tint: SPECIALS[id].tint === undefined ? -1 : SPECIALS[id].tint, special: id }); }
   else if (cur) { Object.assign(settings, settings.spBackup || {}, { special: '' }); settings.spBackup = null; }
   saveSettings(); S.hue = 200; S.tickIdx = null; refreshUI();
 }
@@ -2395,7 +2425,14 @@ const TITLES = [['new', '新人スピナー', '最初から', () => true], ['w1'
   ['s5', '連勝の使い手', '連勝戦で5連勝', () => settings.sbest >= 5], ['s10', 'ステージ10突破', '連勝戦で10連勝', () => settings.sbest >= 10], ['s20', '歴戦の猛者', '連勝戦で20連勝', () => settings.sbest >= 20], ['clr', '闘技場の覇者', '連勝戦をALL CLEAR', () => settings.sbest >= LAST_STAGE],
   ['jg10', '見切りの達人', 'ジャストガード10回', () => ST().jg >= 10], ['bw5', 'バーストハンター', 'バーストで5勝', () => ST().bw >= 5], ['rw5', '場外王', '場外で5勝', () => ST().rw >= 5], ['sk20', '必殺の使い手', '必殺技を20回', () => ST().sk >= 20], ['hard', '修羅の道', 'ハード連勝戦で10連勝', () => (settings.sbestH | 0) >= 10], ['gh', 'ゴーストハンター', 'ゴーストに5回勝つ', () => ((settings.gstat || {}).w | 0) >= 5], ['big', 'ビッグチャンピオン', 'ビッグモードで優勝', () => (settings.bigWins | 0) >= 1]];
 const titleName = () => (TITLES.find(t => t[0] === settings.title) || TITLES[0])[1];
-function checkTitles() {                                     // 条件を満たした称号を増やす（新しく獲得した名前を返す）
+function checkSpecials() {                                   // 実績で手に入る特別なスピナー
+  const codes = settings.codes || (settings.codes = []), got = [];
+  for (const [id, k] of Object.entries(SPECIALS)) if (k.ach && !codes.includes(id) && k.ach()) { codes.push(id); got.push(k.name); }
+  if (got.length) { saveSettings(); BT.spMsg = `<br><b style="color:#ff7bff">特別なスピナーを手に入れた：「${got.join('」「')}」</b>（バトルメニュー or 図鑑で装備）`; }
+  return got;
+}
+function checkTitles() {
+  checkSpecials();                                     // 条件を満たした称号を増やす（新しく獲得した名前を返す）
   const have = settings.titles || (settings.titles = ['new']), got = [];
   for (const [id, name, , ok] of TITLES) if (!have.includes(id) && ok()) { have.push(id); got.push(name); }
   if (got.length) saveSettings(); return got;
@@ -2543,7 +2580,7 @@ function drawGhostTabs() {
 function ghostCard(g, mine) {
   const card = document.createElement('div'); card.style.cssText = 'border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,.04)';
   const l1 = document.createElement('div'); l1.style.fontSize = '14px'; const b1 = document.createElement('b'); b1.textContent = g.nick; l1.append(b1, document.createTextNode(g.title ? `「${g.title}」` : ''));
-  const l2 = document.createElement('div'); l2.style.cssText = 'font-size:12px;opacity:.8'; const st = statsOf(g.design); l2.textContent = `${nameOf(g.design)}・${TYPE_NAME[st.type]}・${Math.round(g.rpm).toLocaleString('en-US')}rpm・${ARENAS[g.arena][0]}${g.res ? '・' + (g.res.w ? '勝ち' : '負け') + 'の記録' : ''}`;
+  const l2 = document.createElement('div'); l2.style.cssText = 'font-size:12px;opacity:.8'; const st = statsOf(g.design); l2.textContent = `${nameOf(g.design)}・${typeName(st)}・${Math.round(g.rpm).toLocaleString('en-US')}rpm・${ARENAS[g.arena][0]}${g.res ? '・' + (g.res.w ? '勝ち' : '負け') + 'の記録' : ''}`;
   const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px'; const go = document.createElement('button'); go.className = 'btn main'; go.style.flex = 1; go.textContent = 'たたかう'; go.addEventListener('click', () => startGhost(g)); row.appendChild(go);
   const cp = document.createElement('button'); cp.className = 'btn'; cp.textContent = 'コードをコピー'; cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(ghostCode(g)); $b('gStatus').textContent = 'ゴーストコードをコピーした！友だちに送ろう'; } catch (e) { $b('gStatus').textContent = 'コピーできませんでした'; } }); row.appendChild(cp);
   card.append(l1, l2, row); return card;
@@ -3154,7 +3191,7 @@ function drawFighter(f) {
   }
   if (f.d.sp && !f.out && isMe) {                            // 特別なスピナー：虹色に回るオーラ
     ctx.save(); aff(f.x, f.y, gz + 0.004, BS * 2.2); ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 0.1;
-    for (let i = 0; i < 6; i++) { ctx.strokeStyle = `hsla(${(CAM.t * 160 + i * 60) % 360},95%,62%,.75)`; ctx.beginPath(); ctx.arc(0, 0, 0.9, CAM.t * 3 + i * 1.047, CAM.t * 3 + i * 1.047 + 0.8); ctx.stroke(); }
+    const au = SPECIALS[f.d.sp].aura; for (let i = 0; i < 6; i++) { ctx.strokeStyle = `hsla(${au === 'rainbow' ? (CAM.t * 160 + i * 60) % 360 : (au + i * 8 - 20)},95%,62%,.75)`; ctx.beginPath(); ctx.arc(0, 0, 0.9, CAM.t * 3 + i * 1.047, CAM.t * 3 + i * 1.047 + 0.8); ctx.stroke(); }
     ctx.restore();
   }
   if (!f.out && isMe) {                                      // 速く回るほど、足元が光る（オーラ）
@@ -3232,7 +3269,7 @@ function hudRow(f, y, upside) {
   if (upside) { ctx.translate(W / 2, y); ctx.rotate(Math.PI); ctx.translate(-W / 2, -y); }
   if ('letterSpacing' in ctx) ctx.letterSpacing = U.ls + 'px';
   ctx.font = F(U.fs); ctx.fillStyle = 'rgba(255,255,255,.92)'; if (U.glow) { ctx.shadowColor = '#3ef6ff'; ctx.shadowBlur = 8; }
-  const lab = f.name + '　' + nameOf(f.d) + '・' + TYPE_NAME[f.st.type]; let fz = U.fs; while (fz > 9 && ctx.measureText(lab).width > bw - 96) { fz--; ctx.font = F(fz); }
+  const lab = f.name + '　' + nameOf(f.d) + '・' + typeName(f.st); let fz = U.fs; while (fz > 9 && ctx.measureText(lab).width > bw - 96) { fz--; ctx.font = F(fz); }
   ctx.textAlign = 'left'; ctx.fillText(lab, x0, y - 9); ctx.font = F(U.fs);
   ctx.textAlign = 'right'; ctx.fillText(Math.round(f.w * 60 / TAU).toLocaleString('en-US') + ' rpm', x0 + bw, y - 9); ctx.shadowBlur = 0;
   bar(y, U.bh, Math.min(1, f.w / f.w0), accentOf(f.d), 8);
@@ -3467,7 +3504,7 @@ $b('cHueOff').addEventListener('click', () => { settings.tint = settings.tint >=
 $b('btRand').addEventListener('click', () => { applyDesign(randomDesign()); saveSettings(); click(0.9); refreshMenu(); });
 for (const b of btEl.querySelectorAll('[data-bt]')) b.addEventListener('click', () => {
   const v = b.dataset.bt;
-  if (v === 'ghostmenu') openGhost(); else if (v.startsWith('cpu')) btStart('cpu', +v.slice(3)); else btStart(v);
+  if (v === 'dex') openDex(); else if (v === 'ghostmenu') openGhost(); else if (v.startsWith('cpu')) btStart('cpu', +v.slice(3)); else btStart(v);
 });
 $b('p2Pick').addEventListener('click', () => setSheet(true));
 $b('p2Rand').addEventListener('click', () => { applyDesign(randomDesign()); click(0.9); refreshP2(); });
@@ -3490,6 +3527,7 @@ $b('resAgain').addEventListener('click', () => {
 $b('resMenu').addEventListener('click', () => endBattle(true));
 $b('codeGo').addEventListener('click', tryCode); $b('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') tryCode(); });
 $b('gRandom').addEventListener('click', () => btStart('ghost', 0, false, null));
+$b('dexBack').addEventListener('click', () => { showScreen('sMenu'); refreshMenu(); });
 $b('gBack').addEventListener('click', () => { showScreen('sMenu'); refreshMenu(); });
 $b('gCodeGo').addEventListener('click', () => { const g = readGhostCode($b('gCodeIn').value); if (!g) { $b('gStatus').textContent = 'ゴーストコードが正しくありません'; return; } startGhost(g); });
 $b('gUp').addEventListener('click', () => { settings.ghostUp = settings.ghostUp === false; saveSettings(); drawGhostTabs(); });
