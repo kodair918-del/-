@@ -146,6 +146,7 @@ body.inbattle #rand{display:none}
       <div class="bar" style="height:6px"><i id="grBar"></i></div>
       <div class="chips" id="grChips"></div>
     </div>
+    <div id="spBox" hidden><h3>特別なスピナー</h3><div class="chips" id="spChips"></div></div>
     <h3>称号 <span id="titleDesc" style="font-weight:400;opacity:.7;font-size:12px"></span></h3>
     <div class="chips" id="titleChips"></div>
     <div class="btgrid">
@@ -170,6 +171,9 @@ body.inbattle #rand{display:none}
     </div>
     <div id="btRecord" style="font-size:12px;opacity:.7;text-align:center"></div>
     <button class="btn" id="btClose">とじる</button>
+    <div class="col" style="gap:6px;margin-top:6px"><div style="font-size:12px;opacity:.7">コード入力</div>
+      <div style="display:flex;gap:8px"><input id="codeIn" placeholder="コードを入れる" autocomplete="off" autocapitalize="off" style="flex:1;min-width:0;background:#1c1f27;color:#fff;border:1px solid #3a3f4b;border-radius:12px;padding:10px;font-size:15px"><button class="btn" id="codeGo" style="flex:none;padding:0 16px">入力</button></div>
+      <div id="codeMsg" style="font-size:13px;min-height:1.2em;color:var(--accent)"></div></div>
   </div>
   <div class="btcard" id="sP2" hidden>
     <h2>2Pの番です</h2>
@@ -315,7 +319,7 @@ const VOL_NAME = ['小', '中', '大'], VOL_GAIN = [0.35, 0.65, 1];
 const MIX_NAME = ['OFF', '小', '中', '大'], MIX_GAIN = [0, 0.5, 1, 1.5];
 function mixApply() { if (!ac || !sfxBus) return; const t = ac.currentTime; sfxBus.gain.setTargetAtTime(MIX_GAIN[settings.mixSfx === undefined ? 2 : settings.mixSfx], t, 0.05); ambBus.gain.setTargetAtTime(MIX_GAIN[settings.mixAmb === undefined ? 2 : settings.mixAmb], t, 0.05); }
 const KEY = 'fidget-spinner-v1';
-const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, ghosts: [], gstat: { w: 0, l: 0 }, ghostUp: true, supa: { url: '', key: '' }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
+const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, codes: [], special: '', spBackup: null, ghosts: [], gstat: { w: 0, l: 0 }, ghostUp: true, supa: { url: '', key: '' }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
 
 function loadSettings() {
   let raw = {};
@@ -1886,7 +1890,13 @@ function withDesign(d, r, fn) {                            // 一時的に別の
   DSG = d; R = r;
   try { return fn(); } finally { DSG = sD; R = sR; }
 }
-const gkey = d => `${d.material}|${d.shape}|${d.arms}|${d.hole}`;
+const SPECIALS = {                                            // コードで手に入る特別なスピナー（形はふつうの部品の組み合わせ、強さは特別）
+  windmill: { name: '暴走風車', look: { material: 'rainbow', shape: 'leaf', arms: 4, hole: 'big' }, atk: 2.6, def: 2.6, sta: 2.6, bur: 4, pw: 3, mass: 1.5, skill: ['ハリケーン', '255,120,255'] }
+};
+const codeHash = s => { let h = 0x811c9dc5; for (const ch of String(s).normalize('NFKC').toLowerCase().replace(/[\s\-_]/g, '')) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
+const CODES = { cdi1pj: 'windmill', '680d0h': 'windmill' };   // コードそのものは書かず、ハッシュだけ持つ
+const specialOn = () => { const id = settings.special, sp = id && SPECIALS[id], l = sp && sp.look; if (sp && l.material === settings.material && l.shape === settings.shape && l.arms === settings.arms && l.hole === settings.hole) return id; if (id) settings.special = ''; return ''; };
+const gkey = d => d.sp ? 'sp:' + d.sp : `${d.material}|${d.shape}|${d.arms}|${d.hole}`;
 const GR = d => { const g = settings.grow || (settings.grow = {}), k = gkey(d); return g[k] || (g[k] = { xp: 0, lv: 1, pts: 0, gb: { atk: 0, def: 0, sta: 0, bur: 0 } }); };   // スピナー（素材・形・アーム・穴ごと）の育成記録
 const GR_MAX = 20, grNeed = lv => 40 + 25 * lv;
 function addXp(d, n) {                                       // 経験値を足して、レベルが上がった数を返す（上がるたびに強化ポイント+1）
@@ -1894,13 +1904,13 @@ function addXp(d, n) {                                       // 経験値を足�
   while (g.lv < GR_MAX && g.xp >= grNeed(g.lv)) { g.xp -= grNeed(g.lv); g.lv++; g.pts++; up++; }
   if (g.lv >= GR_MAX) g.xp = 0; saveSettings(); return up;
 }
-const designOf = () => ({ material: settings.material, shape: settings.shape, arms: settings.arms, hole: settings.hole, bg: settings.bg, sname: settings.sname || '', tint: settings.tint === undefined ? -1 : settings.tint, gb: { ...GR(settings).gb } });
+const designOf = () => ({ material: settings.material, shape: settings.shape, arms: settings.arms, hole: settings.hole, bg: settings.bg, sname: settings.sname || '', tint: settings.tint === undefined ? -1 : settings.tint, sp: specialOn() || undefined, gb: { ...GR(specialOn() ? { sp: specialOn() } : settings).gb } });
 function applyDesign(d) { settings.material = d.material; settings.shape = d.shape; settings.arms = d.arms; settings.hole = d.hole; settings.bg = d.bg; if ('sname' in d) settings.sname = d.sname || ''; if ('tint' in d) settings.tint = d.tint; S.hue = 200; S.tickIdx = null; refreshUI(); }
 function randomDesign() {
   const pick = a => a[Math.floor(Math.random() * a.length)];
   return { material: pick(MATS), shape: pick(SHAPE_IDS), arms: pick(ARMS), hole: pick(HOLE_IDS), bg: pick(BG_IDS) };
 }
-const cleanDesign = d => { const t = +d.tint, gb = d.gb ? Object.fromEntries(['atk', 'def', 'sta', 'bur'].map(k => [k, Math.max(0, Math.min(GR_MAX, d.gb[k] | 0))])) : undefined; return { ...d, gb, sname: String(d.sname || '').replace(/[\u0000-\u001f<>&"']/g, '').slice(0, 10), tint: Number.isFinite(t) && t >= 0 ? Math.min(360, t) : -1 }; };   // 通信で届いた名前や色を安全な値にする
+const cleanDesign = d => { const t = +d.tint, gb = d.gb ? Object.fromEntries(['atk', 'def', 'sta', 'bur'].map(k => [k, Math.max(0, Math.min(GR_MAX, d.gb[k] | 0))])) : undefined; return { ...d, gb, sp: SPECIALS[d.sp] ? d.sp : undefined, sname: String(d.sname || '').replace(/[\u0000-\u001f<>&"']/g, '').slice(0, 10), tint: Number.isFinite(t) && t >= 0 ? Math.min(360, t) : -1 }; };   // 通信で届いた名前や色を安全な値にする
 const accentOf = d => d.tint >= 0 ? `hsl(${d.tint},85%,62%)` : THEME[d.material].accent;
 const NAME_P = { metal: 'ステラ', gold: 'オーロ', copper: 'アカガネ', titan: 'ティタン', black: 'ノワール', neon: 'ネオン', rainbow: 'プリズム', wood: 'モリ', matte: 'ミスト', ice: 'グレイシア' };
 const NAME_S = { round: 'オービット', slim: 'ニードル', fat: 'ガルド', long: 'ランス', pointy: 'ファング', leaf: 'リーフ' };
@@ -1923,7 +1933,7 @@ function statsRaw(d) {
 // タイプ（じゃんけん）：攻撃型 > 持久型 > 防御型 > 攻撃型。総合的な強さの差は小さくして、「何が得意か」で勝ち負けが決まるようにする
 // 環境の調整：シミュレーションで全デザインを戦わせ、強すぎる／弱すぎる部品を補正した倍率（1＝補正なし）
 const PW = { material: { metal: 0.95, gold: 0.972, copper: 0.973, titan: 1.07, black: 0.891, neon: 0.973, rainbow: 1.023, wood: 1.135, matte: 0.903, ice: 1.27 }, shape: { round: 0.977, slim: 1.109, fat: 0.932, long: 1.058, pointy: 1.017, leaf: 0.983 }, hole: { round: 1.017, big: 1.062, small: 0.996, weight: 0.969 }, arms: { 2: 1.202, 3: 1.044, 4: 0.964, 5: 0.939, 6: 0.929 }, type: { atk: 1.038, def: 0.803, sta: 1.172, bal: 1.031 } };
-const TYPE_NAME = { atk: '攻撃型', def: '防御型', sta: '持久型', bal: 'バランス型' };
+const TYPE_NAME = { atk: '攻撃型', def: '防御型', sta: '持久型', bal: 'バランス型', wm: '特別型' };
 function statsOf(d) {
   const st = statsRaw(d), r = ranges();
   const nz = k => 0.05 + 0.95 * (st[k] - r[k][0]) / ((r[k][1] - r[k][0]) || 1);
@@ -1935,6 +1945,7 @@ function statsOf(d) {
   st.atkE = Math.pow(st.atk, 0.45 * PHYS.LAM) * Math.pow(sh.atk, PHYS.MU);
   st.defE = Math.pow(st.def, 0.45 * PHYS.LAM) * Math.pow(sh.def, PHYS.MU);
   st.staE = Math.pow(st.sta, PHYS.LAM) * Math.pow(sh.sta, PHYS.MU * 0.8);
+  if (d.sp && SPECIALS[d.sp]) { const k = SPECIALS[d.sp]; st.atkE *= k.atk; st.defE *= k.def; st.staE *= k.sta; st.bres *= k.bur; st.pw *= k.pw; st.mass *= k.mass; st.type = 'wm'; }   // 特別なスピナー
   if (d.gb) { st.atkE *= 1 + 0.04 * (d.gb.atk | 0); st.defE *= 1 + 0.04 * (d.gb.def | 0); st.staE *= 1 + 0.05 * (d.gb.sta | 0); st.bres *= 1 + 0.05 * (d.gb.bur | 0); }   // 育成の強化
   return st;
 }
@@ -1965,7 +1976,7 @@ function ranges() {                                         // 全1,200通りの
   return (statRange = r);
 }
 function fillBars(el, st) {
-  const r = ranges(), nrm = (k, v) => 0.08 + 0.92 * (v - r[k][0]) / ((r[k][1] - r[k][0]) || 1);
+  const r = ranges(), nrm = (k, v) => Math.min(1, 0.08 + 0.92 * (v - r[k][0]) / ((r[k][1] - r[k][0]) || 1));
   el.innerHTML = [['攻撃', 'atk'], ['防御', 'def'], ['持久', 'sta'], ['重さ', 'mass'], ['リーチ', 'reach'], ['頑丈', 'bres']]
     .map(([l, k]) => `<span>${l}</span><div class="bar"><i style="width:${(nrm(k, st[k]) * 100) | 0}%"></i></div>`).join('');
 }
@@ -2104,7 +2115,7 @@ function applyDodge(f, o, Bt) {                              // 回避：敵の�
   f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dodgeCd = PHYS.DODGE_CD; f.dashed++; f.inv = PHYS.INV;
   if (Bt) Bt.ev.push({ type: 'dash', who: f.side, x: f.x, y: f.y, z: f.z, dx: dx / d, dy: dy / d, dodge: true });
 }
-const SKILLS = { atk: ['疾風ラッシュ', '255,107,107'], def: ['鉄壁パルス', '93,180,255'], sta: ['リバイブ', '107,220,139'], bal: ['ツインブースト', '240,194,77'] };
+const SKILLS = { atk: ['疾風ラッシュ', '255,107,107'], def: ['鉄壁パルス', '93,180,255'], sta: ['リバイブ', '107,220,139'], bal: ['ツインブースト', '240,194,77'], wm: SPECIALS.windmill.skill };
 function useSkill(f, o, Bt) {                                // 必殺技：ゲージが満タンで発動。タイプごとに効果が違う
   if (!f.skReq) return; f.skReq = false;
   if (f.sp < 100 || f.out || f.burst || f.fin) return;
@@ -2113,6 +2124,7 @@ function useSkill(f, o, Bt) {                                // 必殺技：ゲ�
   if (t === 'atk') { f.vx += nx * PHYS.LUNGE * Q / ms; f.vy += ny * PHYS.LUNGE * Q / ms; f.sk.rush = 1.6; f.vz = Math.max(f.vz, 0.25); f.z += 0.002; }                      // 突進して、次の一撃が大ダメージ
   else if (t === 'def') { f.sk.guard = 3.2; const k = PHYS.PULSE * Q / (0.5 + d * 3) / Math.sqrt(o.st.mass); o.vx += nx * k; o.vy += ny * k; o.vz = Math.max(o.vz, 0.7); o.z += 0.002; o.w = Math.max(0, o.w - 0.04 * o.w0); }   // 衝撃波で弾き飛ばし、しばらく硬くなる
   else if (t === 'sta') { f.w = Math.min(f.w0, f.w + 0.3 * f.w0); f.bg = Math.max(0, f.bg - 35); f.sk.eco = 4; }                                                         // 回転を回復して、しばらく落ちにくい
+  else if (t === 'wm') { f.w = Math.min(f.w0, f.w + 0.2 * f.w0); f.bg = Math.max(0, f.bg - 40); f.sk.rush = 1.8; f.sk.guard = 3.5; f.sk.eco = 4; f.vx += nx * PHYS.LUNGE * 0.8 * Q; f.vy += ny * PHYS.LUNGE * 0.8 * Q; const k = PHYS.PULSE * Q / (0.5 + d * 3) / Math.sqrt(o.st.mass); o.vx += nx * k; o.vy += ny * k; o.vz = Math.max(o.vz, 0.7); o.z += 0.002; }   // ハリケーン：突進・防御・回復・衝撃波の全部入り
   else { f.w = Math.min(f.w0, f.w + 0.1 * f.w0); f.sk.guard = 2; f.sk.rush = 1; f.vx += nx * PHYS.LUNGE * 0.6 * Q; f.vy += ny * PHYS.LUNGE * 0.6 * Q; }                    // 少しずつ全部
   Bt.ev.push({ type: 'skill', who: f.side, kind: t, x: f.x, y: f.y, z: f.z });
 }
@@ -2210,7 +2222,7 @@ const BT = { type: null, diff: 1, phase: 'idle', lock: false, role: 'local', fli
   rand: false, ghost: null, hard: false, practice: false, tut: null, drag: null, stageTitle: '', banner: null, streak: false, stage: 1, streakCont: false, go: false, stop: 0, speed: 0, puffs: [], rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
 function showScreen(id) { for (const s of SCREENS) $b(s).hidden = s !== id; btEl.classList.add('show'); document.body.classList.add('btmode'); }
 function hideOverlay() { btEl.classList.remove('show'); }
-const TYPE_COL = { atk: '#ff6b6b', def: '#5db4ff', sta: '#6bdc8b', bal: '#d0d0d0' };
+const TYPE_COL = { atk: '#ff6b6b', def: '#5db4ff', sta: '#6bdc8b', bal: '#d0d0d0', wm: '#ff7bff' };
 const typeBadge = st => `<br><b style="color:${TYPE_COL[st.type]}">${TYPE_NAME[st.type]}</b> <span style="opacity:.65;font-size:11px">相性：攻撃→持久→防御→攻撃</span>`;
 function drawArenaChips() {
   const el = $b('arenaChips'); el.innerHTML = '';
@@ -2224,6 +2236,26 @@ function syncCustom() {
   $b('cName').value = settings.sname || ''; const t = settings.tint === undefined ? -1 : settings.tint;
   $b('cHueOff').setAttribute('aria-pressed', t < 0); if (t >= 0) $b('cHue').value = t;
   $b('cHue').style.background = 'linear-gradient(90deg,hsl(0,80%,52%),hsl(60,80%,52%),hsl(120,80%,52%),hsl(180,80%,52%),hsl(240,80%,52%),hsl(300,80%,52%),hsl(360,80%,52%))';
+}
+function equipSpecial(id) {                                  // 特別なスピナーを装備（いまの組み合わせは保存しておいて、はずすと元に戻る）
+  const cur = specialOn();
+  if (!cur && id) settings.spBackup = { material: settings.material, shape: settings.shape, arms: settings.arms, hole: settings.hole, sname: settings.sname, tint: settings.tint };
+  if (id) { const l = SPECIALS[id].look; Object.assign(settings, l, { sname: SPECIALS[id].name, tint: -1, special: id }); }
+  else if (cur) { Object.assign(settings, settings.spBackup || {}, { special: '' }); settings.spBackup = null; }
+  saveSettings(); S.hue = 200; S.tickIdx = null; refreshUI();
+}
+function drawSpecialChips() {
+  const have = (settings.codes || []).filter(id => SPECIALS[id]); $b('spBox').hidden = !have.length; const el = $b('spChips'); el.innerHTML = ''; if (!have.length) return;
+  const cur = specialOn();
+  for (const [id, name] of [['', 'ふつうのスピナー'], ...have.map(id => [id, SPECIALS[id].name])]) {
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = name; b.setAttribute('aria-pressed', cur === id); b.addEventListener('click', () => { equipSpecial(id); click(0.9); }); el.appendChild(b);
+  }
+}
+function tryCode() {
+  const raw = $b('codeIn').value.trim(), id = CODES[codeHash(raw)], msg = $b('codeMsg'); if (!raw) return;
+  if (!id) { msg.textContent = 'そのコードは使えません'; return; }
+  const codes = settings.codes || (settings.codes = []); const first = !codes.includes(id); if (first) codes.push(id);
+  equipSpecial(id); $b('codeIn').value = ''; msg.textContent = first ? `特別なスピナー「${SPECIALS[id].name}」を手に入れた！ そのまま装備したよ` : `「${SPECIALS[id].name}」を装備した`; if (bsOn()) { countSnd(0); }
 }
 function drawGrow() {                                        // 育成：レベル・経験値・強化ポイントの振り分け
   const d = designOf(), g = GR(d), el = $b('grChips'); el.innerHTML = '';
@@ -2243,7 +2275,7 @@ function drawDashChips() {
   }
 }
 function refreshMenu(skipSync) {
-  drawDashChips(); drawTitleChips(); drawGrow();
+  drawDashChips(); drawTitleChips(); drawGrow(); drawSpecialChips();
   $b('btHard').style.display = settings.hardOpen ? 'block' : 'none'; $b('btPractice').textContent = (settings.tutDone ? '' : '★ はじめての人はここから　') + 'れんしゅうモード（操作チュートリアル）';
   drawArenaChips(); if (!skipSync) syncCustom();
   const d = designOf(), st = statsOf(d);
@@ -2364,7 +2396,7 @@ function btStart(type, diff, keep, extra) {
   if (streak) { type = 'cpu'; if (!keep) BT.stage = 1; diff = hard ? 3 : BT.stage < 8 ? 1 : BT.stage < 18 ? 2 : 3; }
   BT.streak = streak; BT.hard = hard; BT.practice = practice; BT.go = false; BT.tut = null;
   BT.type = type; BT.diff = diff || 1; BT.saved = designOf(); BT.p1 = designOf(); BT.recorded = false;
-  if (type === 'online' || type === 'local') delete BT.p1.gb;       // 対人戦は育成なし（公平に）
+  if (type === 'online' || type === 'local') { delete BT.p1.gb; delete BT.p1.sp; }       // 対人戦は育成なし（公平に）
   BT.role = type === 'online' ? 'host' : 'local'; BT.flip = false; BT.mySpun = BT.peerSpun = false;
   initAudio();
   if (type === 'online') { showScreen('sOnline'); olReset(); return; }
@@ -2472,7 +2504,7 @@ function showResult() {
   }
   if (Bt.rec && BT.type === 'cpu') {                          // あなたのゴーストを、自動で保存（勝ったものは世界にも公開）
     const gh = makeGhost(Bt, win && !Bt.draw);
-    if (gh) { saveGhostLocal(gh); const up = win && !Bt.draw && gh.inputs.length >= 2 && gsOn() && settings.ghostUp !== false; $b('resBody').innerHTML += `<br><span style="opacity:.75">あなたのゴーストを保存しました${up ? '（世界に公開中…）' : ''}</span>`; if (up) gsUpload(gh).catch(() => {}); }
+    if (gh) { saveGhostLocal(gh); const up = win && !Bt.draw && !gh.design.sp && gh.inputs.length >= 2 && gsOn() && settings.ghostUp !== false; $b('resBody').innerHTML += `<br><span style="opacity:.75">あなたのゴーストを保存しました${up ? '（世界に公開中…）' : ''}</span>`; if (up) gsUpload(gh).catch(() => {}); }
   }
   { const got = checkTitles(); if (got.length) $b('resBody').innerHTML += `<br><b>称号を獲得：「${got.join('」「')}」</b>`; saveSettings(); }
   showScreen('sResult');
@@ -2917,6 +2949,11 @@ function drawFighter(f) {
     ctx.save(); aff(f.x, f.y, gz + 0.004, BS); ctx.lineWidth = 0.07; ctx.strokeStyle = accentOf(f.d); ctx.globalAlpha = 0.85;
     ctx.beginPath(); ctx.arc(0, 0, 1.2, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, f.w / f.w0)); ctx.stroke(); ctx.restore();
   }
+  if (f.d.sp && !f.out) {                                    // 特別なスピナー：虹色に回るオーラ
+    ctx.save(); aff(f.x, f.y, gz + 0.004, BS * 2.2); ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 0.1;
+    for (let i = 0; i < 6; i++) { ctx.strokeStyle = `hsla(${(CAM.t * 160 + i * 60) % 360},95%,62%,.75)`; ctx.beginPath(); ctx.arc(0, 0, 0.9, CAM.t * 3 + i * 1.047, CAM.t * 3 + i * 1.047 + 0.8); ctx.stroke(); }
+    ctx.restore();
+  }
   if (!f.out) {                                              // 速く回るほど、足元が光る（オーラ）
     const ia = Math.min(1, Math.log2(1 + f.w / 260) / 5) * 0.55;
     if (ia > 0.03) { ctx.save(); aff(f.x, f.y, gz + 0.003, BS * 2.4); ctx.globalCompositeOperation = 'lighter'; const ag = ctx.createRadialGradient(0, 0, 0.2, 0, 0, 1); ag.addColorStop(0, 'rgba(0,0,0,0)'); ag.addColorStop(0.5, accentOf(f.d)); ag.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = ia * 0.35; ctx.fillStyle = ag; ctx.beginPath(); ctx.arc(0, 0, 1, 0, TAU); ctx.fill(); ctx.restore(); }
@@ -3168,7 +3205,7 @@ async function olRandom() {
   peer.on('error', () => { if (MM.active && !MM.matched) olStatus('サーバーにつなげません。ネットワークを確認して、もどってやり直してください'); });
 }
 function onNetOpen(keep) {                                      // つながった：お互いのデザインを交換して、同時に準備タイムで回す
-  BT.type = 'online'; BT.p1 = designOf(); delete BT.p1.gb; BT.saved = designOf(); BT.recorded = false; BT.againSent = BT.peerAgain = false; BT.name1 = 'あなた'; BT.name2 = '相手'; BT.mySpun = BT.peerSpun = false; if (!keep) BT.peer = null; BT.sentHello = true;
+  BT.type = 'online'; BT.p1 = designOf(); delete BT.p1.gb; delete BT.p1.sp; BT.saved = designOf(); BT.recorded = false; BT.againSent = BT.peerAgain = false; BT.name1 = 'あなた'; BT.name2 = '相手'; BT.mySpun = BT.peerSpun = false; if (!keep) BT.peer = null; BT.sentHello = true;
   netSend({ t: 'hello', design: BT.p1, nick: myNick() }); olStatus('つながりました！'); maybeStartOnlineSpin();
 }
 function maybeStartOnlineSpin() {
@@ -3186,10 +3223,10 @@ function maybeBeginOnline() {
 const snapOf = Bt => ({ t: 'snap', tm: Bt.t, a: [Bt.A.x, Bt.A.y, Bt.A.w, +Bt.A.out, +Bt.A.fin, Bt.A.dashCd, Bt.A.z, +Bt.A.burst, Bt.A.bg, Math.round(Bt.A.sp), +(Bt.A.sk.rush > 0), +(Bt.A.sk.guard > 0), +(Bt.A.sk.eco > 0), +(Bt.A.inv > 0), Bt.A.dodgeCd], b: [Bt.B.x, Bt.B.y, Bt.B.w, +Bt.B.out, +Bt.B.fin, Bt.B.dashCd, Bt.B.z, +Bt.B.burst, Bt.B.bg, Math.round(Bt.B.sp), +(Bt.B.sk.rush > 0), +(Bt.B.sk.guard > 0), +(Bt.B.sk.eco > 0), +(Bt.B.inv > 0), Bt.B.dodgeCd],
   ev: Bt.ev.map(e => ({ ...e })), over: Bt.over, draw: !!Bt.draw, win: Bt.winner, why: Bt.reason, ha: [Bt.A.hits, Bt.A.maxHit, Bt.A.dashed], hb: [Bt.B.hits, Bt.B.maxHit, Bt.B.dashed] });
 function handleNet(m) {
-  if (m.t === 'hello') { if (m.design) delete m.design.gb; BT.peer = m; maybeStartOnlineSpin(); }
+  if (m.t === 'hello') { if (m.design) { delete m.design.gb; delete m.design.sp; } BT.peer = m; maybeStartOnlineSpin(); }
   else if (m.t === 'spun') { BT.rpm2 = m.rpm; BT.peerSpun = true; maybeBeginOnline(); }
   else if (m.t === 'start' && BT.role === 'guest') {
-    delete m.A.d.gb; delete m.B.d.gb;
+    delete m.A.d.gb; delete m.B.d.gb; delete m.A.d.sp; delete m.B.d.sp;
     const fa = makeFighter(m.A.d, m.A.rpm, cleanNick(BT.peer && BT.peer.nick) || '相手', 'A'), fb = makeFighter(m.B.d, m.B.rpm, 'あなた', 'B');   // A=ホスト、B=ゲスト（自分）
     fa.dir = m.A.dir; fb.dir = m.B.dir;
     BT.battle = makeBattle(fa, fb, ARENAS[m.arena] ? m.arena : 'normal');
@@ -3227,7 +3264,7 @@ for (const b of btEl.querySelectorAll('[data-bt]')) b.addEventListener('click', 
 $b('p2Pick').addEventListener('click', () => setSheet(true));
 $b('p2Rand').addEventListener('click', () => { applyDesign(randomDesign()); click(0.9); refreshP2(); });
 $b('p2Go').addEventListener('click', () => {
-  BT.p2 = { ...designOf(), sname: '', tint: -1 }; delete BT.p2.gb;
+  BT.p2 = { ...designOf(), sname: '', tint: -1 }; delete BT.p2.gb; delete BT.p2.sp;
   startSpin('2P', rpm => { BT.rpm2 = rpm; beginBattle(); });
 });
 function startRematch() {                                    // 同じ相手と再戦：つながったまま、もう一度準備タイムから
@@ -3243,6 +3280,7 @@ $b('resAgain').addEventListener('click', () => {
   }
   const t = BT.type, d = BT.diff, rand = BT.rand, st = BT.streak, keep = BT.streakCont, pr = BT.practice, hd = BT.hard, gh = BT.ghost; endBattle(false); if (gh) btStart('ghost', 0, false, gh); else if (pr) btStart('practice'); else if (st) btStart(hd ? 'hard' : 'streak', 0, keep); else btStart(t, d); if (t === 'online' && rand) olRandom(); });
 $b('resMenu').addEventListener('click', () => endBattle(true));
+$b('codeGo').addEventListener('click', tryCode); $b('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') tryCode(); });
 $b('gBack').addEventListener('click', () => { showScreen('sMenu'); refreshMenu(); });
 $b('gCodeGo').addEventListener('click', () => { const g = readGhostCode($b('gCodeIn').value); if (!g) { $b('gStatus').textContent = 'ゴーストコードが正しくありません'; return; } startGhost(g); });
 $b('gUp').addEventListener('click', () => { settings.ghostUp = settings.ghostUp === false; saveSettings(); drawGhostTabs(); });
