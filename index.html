@@ -114,6 +114,7 @@ body.inbattle #rand{display:none}
 <div id="toast"></div>
 <div id="hint">どこでもスワイプで回る ／ 指を置くと止まる</div>
 <button id="battleBtn">⚔ バトル</button>
+<div id="stamps" style="position:fixed;right:8px;top:50%;transform:translateY(-50%);z-index:9;display:none;flex-direction:column;gap:6px"><button class="chip" data-st="0" style="padding:0;width:42px;justify-content:center;font-size:20px">👍</button><button class="chip" data-st="1" style="padding:0;width:42px;justify-content:center;font-size:20px">😆</button><button class="chip" data-st="2" style="padding:0;width:42px;justify-content:center;font-size:20px">😱</button><button class="chip" data-st="3" style="padding:0;width:42px;justify-content:center;font-size:20px">🔥</button></div>
 <div id="btCount"><b id="btCountB">10</b><div id="btCountT"></div></div>
 <button class="chip" id="tutExit" style="position:fixed;left:8px;top:calc(env(safe-area-inset-top,0px) + 6px);z-index:9;display:none;min-height:34px;padding:0 12px;font-size:13px">× おわる</button>
 <button class="dash round" id="dash1"><i></i><b class="knob"></b><span>ダッシュ</span></button>
@@ -185,7 +186,10 @@ body.inbattle #rand{display:none}
     <div class="col" id="olStep0">
       <input id="olNick" maxlength="10" placeholder="ニックネーム（10文字まで）" autocomplete="off" style="background:#1c1f27;color:#fff;border:1px solid #3a3f4b;border-radius:12px;padding:12px;font-size:16px;text-align:center">
       <button class="btn main wide" id="olRandom">ランダム対戦</button>
-      <div class="btgrid"><button class="btn" id="olHost">友だちとルームを作る</button><button class="btn" id="olJoin">ルームに入る</button></div>
+      <input id="olWord" maxlength="12" placeholder="合言葉（友だちと同じ言葉を入れる）" autocomplete="off" style="background:#1c1f27;color:#fff;border:1px solid #3a3f4b;border-radius:12px;padding:12px;font-size:16px;text-align:center">
+      <button class="btn main wide" id="olRoom" style="background:#5db4ff;color:#07121c">合言葉で友だちと対戦</button>
+      <div class="btgrid"><button class="btn" id="olHost">コードで部屋を作る</button><button class="btn" id="olJoin">コードで入る</button></div>
+      <div id="olRecord" style="font-size:12px;opacity:.7;text-align:center"></div>
     </div>
     <div id="olHostBox" class="col" hidden>
       <h3>① このコードを友だちに送る</h3>
@@ -210,6 +214,7 @@ body.inbattle #rand{display:none}
     <h2 id="resTitle"></h2>
     <p id="resBody" style="text-align:center"></p>
     <div class="btgrid"><button class="btn main" id="resAgain">もう一度</button><button class="btn" id="resMenu">メニューへ</button></div>
+    <button class="btn wide" id="resNew" style="display:none">べつの相手をさがす</button>
   </div>
 </div>
 <button id="rand" aria-label="ランダム"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="12" cy="12" r="1.1" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.1" fill="currentColor"/></svg></button>
@@ -293,7 +298,7 @@ const VOL_NAME = ['小', '中', '大'], VOL_GAIN = [0.35, 0.65, 1];
 const MIX_NAME = ['OFF', '小', '中', '大'], MIX_GAIN = [0, 0.5, 1, 1.5];
 function mixApply() { if (!ac || !sfxBus) return; const t = ac.currentTime; sfxBus.gain.setTargetAtTime(MIX_GAIN[settings.mixSfx === undefined ? 2 : settings.mixSfx], t, 0.05); ambBus.gain.setTargetAtTime(MIX_GAIN[settings.mixAmb === undefined ? 2 : settings.mixAmb], t, 0.05); }
 const KEY = 'fidget-spinner-v1';
-const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
+const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
 
 function loadSettings() {
   let raw = {};
@@ -2313,12 +2318,12 @@ function enterBattleView() {
   MODE = 'battle'; camReset(); BT.phase = 'count'; BT.count = 3.2; BT.sparks = []; BT.snapT = 0; BT.endT = 0;
   document.body.classList.add('btmode', 'inbattle');
   hideOverlay();
-  $b('tutExit').style.display = BT.practice ? 'block' : 'none';
+  $b('tutExit').style.display = BT.practice ? 'block' : 'none'; $b('stamps').style.display = BT.type === 'online' ? 'flex' : 'none';
   $b('dash1').style.display = $b('dodge1').style.display = $b('guard1').style.display = 'block'; $b('skill1').style.display = 'none'; $b('dash2').style.display = $b('dodge2').style.display = $b('guard2').style.display = BT.type === 'local' ? 'block' : 'none'; $b('skill2').style.display = 'none';
   { const bt = BT.battle, mine = BT.flip ? bt.B : bt.A; $b('skill1').lastChild.textContent = SKILLS[mine.st.type][0] + '！'; $b('skill2').lastChild.textContent = SKILLS[bt.B.st.type][0] + '！'; }
 }
 function endBattle(toMenu) {
-  MODE = 'free'; BT.phase = 'idle'; BT.lock = false; BT.battle = null; droneStop(); $b('tutExit').style.display = 'none';
+  MODE = 'free'; BT.phase = 'idle'; BT.lock = false; BT.battle = null; droneStop(); $b('tutExit').style.display = $b('stamps').style.display = 'none';
   $b('dash1').style.display = $b('dash2').style.display = $b('skill1').style.display = $b('skill2').style.display = $b('guard1').style.display = $b('guard2').style.display = $b('dodge1').style.display = $b('dodge2').style.display = 'none'; $b('btCount').style.display = 'none';
   document.body.classList.remove('inbattle');
   if (BT.saved) { applyDesign(BT.saved); saveSettings(); BT.saved = null; }
@@ -2347,7 +2352,11 @@ function showResult() {
   $b('resBody').innerHTML = `${Bt.draw ? '相打ち！ 同時に倒れた' : win || BT.type === 'local' ? why : (Bt.reason === 'burst' ? 'スピナーが壊れた…' : Bt.reason === 'ringout' ? '場外に出された…' : Bt.reason === 'stop' ? '回転が止まった…' : why)}<br>
     ${Bt.t.toFixed(1)}秒 ／ ヒット ${me.hits}回 ／ 最大ダメージ ${Math.round(me.maxHit)} ／ ダッシュ ${me.dashed}回<br>
     あなた ${me.rpm.toLocaleString('en-US')}rpm（${designLabel(me.d)}）<br>${BT.type === 'online' ? op.name : '相手'} ${op.rpm.toLocaleString('en-US')}rpm（${designLabel(op.d)}）`;
-  $b('resAgain').disabled = BT.type === 'online' && !BT.rand; $b('resAgain').textContent = 'もう一度';
+  $b('resAgain').disabled = false; $b('resAgain').textContent = 'もう一度'; $b('resNew').style.display = 'none';
+  if (BT.type === 'online') {                                  // オンライン：同じ相手と再戦／ランダムならべつの相手
+    if (win && !Bt.draw) (settings.onl || (settings.onl = { w: 0, l: 0 })).w++; else if (!Bt.draw) (settings.onl || (settings.onl = { w: 0, l: 0 })).l++; saveSettings();
+    $b('resAgain').textContent = '同じ相手ともう一度'; $b('resAgain').disabled = !Net.open; $b('resNew').style.display = BT.rand ? 'block' : 'none';
+  }
   if (BT.streak) {                                           // 連勝戦：勝てば次のステージ、負ければ終わり
     const cleared = win && !Bt.draw ? BT.stage : BT.stage - 1;
     if (Bt.draw) { title = 'DRAW'; BT.streakCont = true; $b('resAgain').textContent = `STAGE ${BT.stage} をやり直す`; }
@@ -2507,6 +2516,19 @@ function drawTutorial() {
   ctx.fillStyle = '#fff'; ctx.font = '600 13px system-ui, sans-serif'; lines.forEach((l, i) => ctx.fillText(l, x + 14, y + 48 + i * 19));
   for (let i = 0; i < TUT.length; i++) { ctx.fillStyle = i < tt.step ? '#ffd24d' : 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.arc(x + w - 14 - (TUT.length - 1 - i) * 14, y + 18, 4, 0, TAU); ctx.fill(); }
   if (tt.flash > 0) { ctx.globalAlpha = Math.min(1, tt.flash * 1.6); ctx.textAlign = 'center'; ctx.fillStyle = '#ffd24d'; ctx.shadowColor = '#ffd24d'; ctx.shadowBlur = 24; ctx.font = `800 ${60 + 30 * tt.flash | 0}px system-ui, sans-serif`; ctx.fillText('OK!', W / 2, H * 0.42); }
+  ctx.restore();
+}
+const STAMPS = ['👍', '😆', '😱', '🔥'];
+function addStamp(id, mine) { id = id | 0; if (!STAMPS[id]) return; (BT.stamps || (BT.stamps = [])).push({ e: STAMPS[id], t: 2, mine }); if (bsOn()) { const prev = OUT; OUT = sfxBus; try { chime(mine ? 2 : 3); } finally { OUT = prev; } } }
+for (const b of document.querySelectorAll('#stamps [data-st]')) b.addEventListener('click', () => { if (BT.type !== 'online' || !Net.open) return; const now = performance.now(); if (now < (BT.stampCd || 0)) return; BT.stampCd = now + 900; netSend({ t: 'stamp', id: +b.dataset.st }); addStamp(+b.dataset.st, true); });
+function drawStamps(dt) {
+  const L = BT.stamps; if (!L || !L.length) return;
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let i = L.length - 1; i >= 0; i--) {
+    const q = L[i]; q.t -= dt; if (q.t <= 0) { L.splice(i, 1); continue; }
+    const u = 2 - q.t, pop = 1 + 0.5 * Math.max(0, 1 - u * 6); ctx.globalAlpha = Math.min(1, q.t * 2); ctx.font = `${(q.mine ? 54 : 72) * pop | 0}px system-ui, sans-serif`;
+    ctx.fillText(q.e, W / 2 + (q.mine ? 60 : -60), (q.mine ? H * 0.62 : H * 0.26) - u * 24);
+  }
   ctx.restore();
 }
 function btEvents(Bt) {
@@ -2748,7 +2770,7 @@ function drawBattle(dt, Bt) {
       ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(PX, PY); ctx.stroke(); ctx.beginPath(); ctx.arc(PX, PY, 9, 0, TAU); ctx.fill(); ctx.restore();
     }
   }
-  drawTutorial();
+  drawTutorial(); drawStamps(dt);
   drawBattleHud(Bt);
   ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.shadowColor = P.accent; ctx.shadowBlur = 24;
   if (BT.phase === 'count') {
@@ -2888,6 +2910,8 @@ function iceDone(pc) {
 }
 function olStatus(t) { $b('olStatus').textContent = t; }
 function olReset() {
+  try { $b('olWord').value = localStorage.getItem('spinWord') || ''; } catch (e) { /* 無視 */ }
+  $b('olRecord').textContent = `オンライン戦績 ${(settings.onl || {}).w | 0}勝 ${(settings.onl || {}).l | 0}敗`;
   netClose(); $b('olStep0').hidden = false; $b('olHostBox').hidden = $b('olJoinBox').hidden = true;
   for (const id of ['olHostCode', 'olAnsIn', 'olHostIn', 'olAnsCode']) $b(id).value = '';
   olStatus(typeof RTCPeerConnection === 'undefined' ? 'この環境ではオンライン対戦が使えません（GitHub Pagesなど、普通のWebページとして開いてください）' : '');
@@ -2911,7 +2935,7 @@ function netSend(o) { if (Net.dc && Net.dc.readyState === 'open') Net.dc.send(JS
 function netLost() {
   if (BT.type !== 'online' || BT.phase === 'end') return;
   if (MODE === 'free' && btEl.classList.contains('show')) { olStatus('接続が切れました'); return; }
-  MODE = 'free'; BT.phase = 'idle'; BT.lock = false; droneStop(); $b('dash1').style.display = $b('skill1').style.display = $b('guard1').style.display = $b('dodge1').style.display = $b('tutExit').style.display = 'none'; BT.drag = null; $b('btCount').style.display = 'none';
+  MODE = 'free'; BT.phase = 'idle'; BT.lock = false; droneStop(); $b('dash1').style.display = $b('skill1').style.display = $b('guard1').style.display = $b('dodge1').style.display = $b('tutExit').style.display = $b('stamps').style.display = 'none'; BT.drag = null; $b('btCount').style.display = 'none';
   document.body.classList.remove('inbattle');
   showScreen('sOnline'); $b('olStep0').hidden = true; olStatus('接続が切れました。「もどる」からやり直してください');
 }
@@ -2984,19 +3008,53 @@ function mmScan(slot) {
     else { try { lobby.destroy(); } catch (e) { /* 無視 */ } MM.lobby = null; olStatus('サーバーにつなげません。少し待ってやり直します…'); MM.tm = setTimeout(() => mmScan(slot), 3000); }
   });
 }
-function mmJoin(slot) {                                       // その部屋で誰かが待っている：声をかける
-  const c = MM.peer.connect(LOBBY + slot, { serialization: 'raw' }); let done = false;
-  const next = () => { if (done) return; done = true; try { c.close(); } catch (e) { /* 無視 */ } setTimeout(() => mmScan(slot + 1), 200); };
+function mmJoin(slot) { mmJoinId(LOBBY + slot, () => mmScan(slot + 1)); }   // その部屋で誰かが待っている：声をかける
+function mmJoinId(id, onFail) {
+  const c = MM.peer.connect(id, { serialization: 'raw' }); let done = false;
+  const next = () => { if (done) return; done = true; try { c.close(); } catch (e) { /* 無視 */ } setTimeout(onFail, 200); };
   MM.talk = setTimeout(next, 4000);
   c.on('data', d => {
     if (done) return; let m; try { m = JSON.parse(d); } catch (e) { m = { t: String(d) }; }
     if (m.t === 'go') {
       done = true; clearTimeout(MM.talk); MM.matched = true; olStatus('対戦相手が見つかりました！つないでいます…');
       const g = MM.peer.connect(m.id, { serialization: 'raw' }); mmWire(g, 'guest');
-      MM.talk = setTimeout(() => { if (!Net.open) mmRestart('つながりませんでした。もう一度さがします…'); }, 10000);
+      MM.talk = setTimeout(() => { if (!Net.open) { MM.matched = false; olStatus('つながりませんでした。もう一度やり直してください'); } }, 10000);
     } else next();
   });
   c.on('error', next); c.on('close', () => { if (!done) next(); });
+}
+const roomId = w => { let h1 = 5381, h2 = 52711; for (const ch of w.normalize('NFKC').toLowerCase()) { const c = ch.codePointAt(0); h1 = ((h1 << 5) + h1 + c) >>> 0; h2 = ((h2 << 5) ^ h2 ^ c) >>> 0; } return 'spinbattle-k-' + h1.toString(36) + h2.toString(36) + w.length; };
+function roomScan(w, tries) {                                  // 合言葉の部屋：空いていれば待つ、誰かが待っていれば入る
+  if (!MM.active || MM.matched) return;
+  const lobby = new Peer(roomId(w), peerCfg()); MM.lobby = lobby; let settled = false;
+  lobby.on('open', () => {
+    if (!MM.active) return; settled = true; olStatus(`合言葉「${w}」で友だちを待っています…（友だちにも同じ合言葉を入れてもらってね）`);
+    lobby.on('connection', c => c.on('open', () => {
+      if (MM.matched) { try { c.send('busy'); } catch (e) { /* 無視 */ } setTimeout(() => c.close(), 300); return; }
+      MM.matched = true; MM.guestId = c.peer; c.send(JSON.stringify({ t: 'go', id: MM.peer.id }));
+      setTimeout(() => { if (MM.lobby === lobby) mmLobbyClose(); }, 800);
+      MM.talk = setTimeout(() => { if (!Net.open) { MM.matched = false; mmLobbyClose(); roomScan(w, 0); } }, 10000);
+    }));
+  });
+  lobby.on('error', err => {
+    if (settled || !MM.active) return;
+    try { lobby.destroy(); } catch (e) { /* 無視 */ } MM.lobby = null;
+    if (err.type === 'unavailable-id') { olStatus(`合言葉「${w}」の部屋に入っています…`); mmJoinId(roomId(w), () => { if (tries < 3) roomScan(w, tries + 1); else olStatus('部屋に入れませんでした（相手がいない・人数オーバー）。少し待ってからやり直してね'); }); }
+    else { olStatus('サーバーにつなげません。少し待ってやり直します…'); MM.tm = setTimeout(() => roomScan(w, tries), 3000); }
+  });
+}
+async function olRoom() {
+  const w = String($b('olWord').value || '').replace(/[\u0000-\u001f<>&"']/g, '').trim().slice(0, 12);
+  if (w.length < 2) { olStatus('合言葉を2文字以上で入れてね'); return; }
+  try { localStorage.setItem('spinNick', myNick()); localStorage.setItem('spinWord', w); } catch (e) { /* 無視 */ }
+  mmClose(); BT.rand = false; BT.role = 'host'; BT.flip = false;
+  $b('olStep0').hidden = true; olStatus('サーバーにつないでいます…');
+  try { await loadPeerJS(); } catch (e) { olStatus('通信ライブラリを読み込めませんでした（ネットワークを確認してください）'); $b('olStep0').hidden = false; return; }
+  MM.active = true;
+  const peer = new Peer(undefined, peerCfg()); MM.peer = peer;
+  peer.on('open', () => roomScan(w, 0));
+  peer.on('connection', conn => { if (MM.matched && conn.peer === MM.guestId) { clearTimeout(MM.talk); mmWire(conn, 'host'); } else conn.close(); });
+  peer.on('error', () => { if (MM.active && !MM.matched) olStatus('サーバーにつなげません。ネットワークを確認して、もどってやり直してください'); });
 }
 async function olRandom() {
   try { localStorage.setItem('spinNick', myNick()); } catch (e) { /* 無視 */ }
@@ -3010,7 +3068,7 @@ async function olRandom() {
   peer.on('error', () => { if (MM.active && !MM.matched) olStatus('サーバーにつなげません。ネットワークを確認して、もどってやり直してください'); });
 }
 function onNetOpen(keep) {                                      // つながった：お互いのデザインを交換して、同時に準備タイムで回す
-  BT.type = 'online'; BT.p1 = designOf(); BT.saved = designOf(); BT.name1 = 'あなた'; BT.name2 = '相手'; BT.mySpun = BT.peerSpun = false; if (!keep) BT.peer = null; BT.sentHello = true;
+  BT.type = 'online'; BT.p1 = designOf(); delete BT.p1.gb; BT.saved = designOf(); BT.recorded = false; BT.againSent = BT.peerAgain = false; BT.name1 = 'あなた'; BT.name2 = '相手'; BT.mySpun = BT.peerSpun = false; if (!keep) BT.peer = null; BT.sentHello = true;
   netSend({ t: 'hello', design: BT.p1, nick: myNick() }); olStatus('つながりました！'); maybeStartOnlineSpin();
 }
 function maybeStartOnlineSpin() {
@@ -3046,7 +3104,9 @@ function handleNet(m) {
     for (const e of m.ev) Bt.ev.push(e);
     Bt.t = m.tm;
     if (m.over && !Bt.over) { Bt.over = true; Bt.winner = m.win; Bt.draw = !!m.draw; Bt.reason = m.why; }
-  } else if (m.t === 'dash' && BT.role === 'host' && BT.battle) { BT.battle.B.dashReq = true; BT.battle.B.dashDir = Array.isArray(m.dir) && m.dir.length === 2 && m.dir.every(Number.isFinite) ? [m.dir[0], m.dir[1]] : null; }
+  } else if (m.t === 'again') { BT.peerAgain = true; if (BT.againSent) startRematch(); }
+  else if (m.t === 'stamp') { addStamp(m.id, false); }
+  else if (m.t === 'dash' && BT.role === 'host' && BT.battle) { BT.battle.B.dashReq = true; BT.battle.B.dashDir = Array.isArray(m.dir) && m.dir.length === 2 && m.dir.every(Number.isFinite) ? [m.dir[0], m.dir[1]] : null; }
   else if (m.t === 'skill' && BT.role === 'host' && BT.battle) BT.battle.B.skReq = true;
   else if (m.t === 'guard' && BT.role === 'host' && BT.battle) BT.battle.B.jgReq = true;
   else if (m.t === 'dodge' && BT.role === 'host' && BT.battle) BT.battle.B.dodgeReq = true;
@@ -3070,12 +3130,25 @@ $b('p2Go').addEventListener('click', () => {
   BT.p2 = { ...designOf(), sname: '', tint: -1 }; delete BT.p2.gb;
   startSpin('2P', rpm => { BT.rpm2 = rpm; beginBattle(); });
 });
-$b('resAgain').addEventListener('click', () => { const t = BT.type, d = BT.diff, rand = BT.rand, st = BT.streak, keep = BT.streakCont, pr = BT.practice, hd = BT.hard; endBattle(false); if (pr) btStart('practice'); else if (st) btStart(hd ? 'hard' : 'streak', 0, keep); else btStart(t, d); if (t === 'online' && rand) olRandom(); });
+function startRematch() {                                    // 同じ相手と再戦：つながったまま、もう一度準備タイムから
+  BT.againSent = BT.peerAgain = false; hideOverlay(); MODE = 'free'; BT.phase = 'idle'; BT.lock = false; BT.battle = null; droneStop(); BT.drag = null;
+  for (const id of ['dash1', 'dodge1', 'guard1', 'skill1', 'dash2', 'dodge2', 'guard2', 'skill2', 'tutExit']) $b(id).style.display = 'none';
+  $b('stamps').style.display = 'none'; document.body.classList.remove('inbattle'); S.omega = 0; $b('btCount').style.display = 'none';
+  onNetOpen(true);
+}
+$b('resAgain').addEventListener('click', () => {
+  if (BT.type === 'online') {
+    if (!Net.open) return; BT.againSent = true; netSend({ t: 'again' }); $b('resAgain').disabled = true; $b('resAgain').textContent = '相手を待っています…';
+    if (BT.peerAgain) startRematch(); return;
+  }
+  const t = BT.type, d = BT.diff, rand = BT.rand, st = BT.streak, keep = BT.streakCont, pr = BT.practice, hd = BT.hard; endBattle(false); if (pr) btStart('practice'); else if (st) btStart(hd ? 'hard' : 'streak', 0, keep); else btStart(t, d); if (t === 'online' && rand) olRandom(); });
 $b('resMenu').addEventListener('click', () => endBattle(true));
+$b('resNew').addEventListener('click', () => { endBattle(false); btStart('online'); olRandom(); });
 $b('tutExit').addEventListener('click', () => endBattle(true));
 $b('olBack').addEventListener('click', () => { netClose(); BT.phase = 'idle'; endBattle(true); });
 $b('olHost').addEventListener('click', () => { BT.rand = false; olHost(); });
 $b('olRandom').addEventListener('click', olRandom);
+$b('olRoom').addEventListener('click', olRoom);
 try { $b('olNick').value = localStorage.getItem('spinNick') || ''; } catch (e) { /* 無視 */ }
 $b('olJoin').addEventListener('click', () => { BT.rand = false; $b('olStep0').hidden = true; $b('olJoinBox').hidden = false; });
 $b('olConnect').addEventListener('click', olConnect);
