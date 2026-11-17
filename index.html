@@ -215,6 +215,7 @@ html[data-ui="pop"] .dash i{opacity:.55}
       <button class="btn" data-bt="local">2人で対戦（1台）</button>
       <button class="btn wide" data-bt="practice" id="btPractice">れんしゅうモード（操作チュートリアル）</button>
       <button class="btn wide main" data-bt="big" style="background:#ff7a3d;color:#1a0a00">ビッグモード（大きなアリーナで、最大30体のバトルロイヤル）</button>
+      <button class="btn wide main" data-bt="daily" id="btDaily" style="background:#4dd2a0;color:#04201a">デイリーチャレンジ</button>
       <button class="btn wide" data-bt="rank">ランキング（世界）</button>
       <button class="btn wide" data-bt="dex">図鑑（特別なスピナー）</button>
       <button class="btn wide main" data-bt="ghostmenu" style="background:#b48cff;color:#120a22">ゴースト対決（世界中のゴースト）</button>
@@ -390,7 +391,7 @@ const VOL_NAME = ['小', '中', '大'], VOL_GAIN = [0.35, 0.65, 1];
 const MIX_NAME = ['OFF', '小', '中', '大'], MIX_GAIN = [0, 0.5, 1, 1.5];
 function mixApply() { if (!ac || !sfxBus) return; const t = ac.currentTime; sfxBus.gain.setTargetAtTime(MIX_GAIN[settings.mixSfx === undefined ? 2 : settings.mixSfx], t, 0.05); ambBus.gain.setTargetAtTime(MIX_GAIN[settings.mixAmb === undefined ? 2 : settings.mixAmb], t, 0.05); }
 const KEY = 'fidget-spinner-v1';
-const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, ui: 'std', bigLv: 1, bigN: 12, bigWins: 0, codes: [], special: '', spBackup: null, ghosts: [], gstat: { w: 0, l: 0 }, ghostUp: true, supa: { url: '', key: '' }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
+const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, ui: 'std', daily: { date: '', best: 0 }, dailyClears: 0, bigLv: 1, bigN: 12, bigWins: 0, codes: [], special: '', spBackup: null, ghosts: [], gstat: { w: 0, l: 0 }, ghostUp: true, supa: { url: '', key: '' }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
 
 function loadSettings() {
   let raw = {};
@@ -2202,7 +2203,7 @@ function stepFighter(f, o, dt) {
 }
 function applyDash(f, o, Bt) {
   if (!f.dashReq) return;
-  f.dashReq = false;
+  f.dashReq = false; if (BT.dailyRule === 'nodash') return;
   if (f.dashCd > 0 && f.dashDir) f.dashDir = null;
   if (f.dashCd > 0 || f.out || f.fin) return;
   let dx = o.x - f.x, dy = o.y - f.y; const man = !!f.dashDir;           // 自動：敵の方向 ／ マニュアル：指定された方向
@@ -2212,7 +2213,7 @@ function applyDash(f, o, Bt) {
   f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dashCd = PHYS.DASH_CD; f.dashed++; if (Bt) Bt.ev.push({ type: 'dash', who: f.side, x: f.x, y: f.y, z: f.z, dx: dx / d, dy: dy / d });
 }
 function applyDodge(f, o, Bt) {                              // 回避：敵の方向だけ。すり抜けられる（当たらない）
-  if (!f.dodgeReq) return; f.dodgeReq = false;
+  if (!f.dodgeReq) return; f.dodgeReq = false; if (BT.dailyRule === 'nodash') return;
   if (f.dodgeCd > 0 || f.out || f.fin) return;
   const dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy) || 1e-6, k = PHYS.DASH * Q / Math.sqrt(f.st.mass);
   if (Bt && Bt.rec && f === Bt.A) Bt.rec.push([+Bt.t.toFixed(2), 'o', 0, 0]);
@@ -2221,7 +2222,7 @@ function applyDodge(f, o, Bt) {                              // 回避：敵の�
 }
 const SKILLS = { atk: ['疾風ラッシュ', '255,107,107'], def: ['鉄壁パルス', '93,180,255'], sta: ['リバイブ', '107,220,139'], bal: ['ツインブースト', '240,194,77'], wm: SPECIALS.windmill.skill };
 function useSkill(f, o, Bt) {                                // 必殺技：ゲージが満タンで発動。タイプごとに効果が違う
-  if (!f.skReq) return; f.skReq = false;
+  if (!f.skReq) return; f.skReq = false; if (BT.dailyRule === 'noskill') return;
   if (f.sp < 100 || f.out || f.burst || f.fin) return;
   if (Bt.rec && f === Bt.A) Bt.rec.push([+Bt.t.toFixed(2), 'k', 0, 0]);
   f.sp = 0; const t = f.st.type, dx = o.x - f.x, dy = o.y - f.y, d = Math.hypot(dx, dy) || 1e-6, nx = dx / d, ny = dy / d, ms = Math.sqrt(f.st.mass);
@@ -2282,7 +2283,7 @@ function stepBattle(Bt, dt) {
   const A = Bt.A, B = Bt.B;
   Bt.t += dt;
   applyDash(A, B, Bt); applyDash(B, A, Bt); applyDodge(A, B, Bt); applyDodge(B, A, Bt); useSkill(A, B, Bt); useSkill(B, A, Bt);
-  for (const f of [A, B]) if (f.jgReq) { f.jgReq = false; if (f.jgCd <= 0 && !f.out && !f.burst) { f.jg = PHYS.JG_WIN; f.jgCd = PHYS.JG_CD; if (Bt.rec && f === Bt.A) Bt.rec.push([+Bt.t.toFixed(2), 'g', 0, 0]); Bt.ev.push({ type: 'guard', who: f.side, x: f.x, y: f.y, z: f.z }); } }
+  for (const f of [A, B]) if (f.jgReq) { f.jgReq = false; if (f.jgCd <= 0 && !f.out && !f.burst && BT.dailyRule !== 'noguard') { f.jg = PHYS.JG_WIN; f.jgCd = PHYS.JG_CD; if (Bt.rec && f === Bt.A) Bt.rec.push([+Bt.t.toFixed(2), 'g', 0, 0]); Bt.ev.push({ type: 'guard', who: f.side, x: f.x, y: f.y, z: f.z }); } }
   const sA = { x: A.x, y: A.y }, sB = { x: B.x, y: B.y };      // 2人を同時に動かす（先に動く側が有利にならないように）
   stepFighter(A, sB, dt); stepFighter(B, sA, dt);
   Bt.obj = arenaObjs(Bt.arena, Bt.t); gimmick(Bt, A, B, dt); gimmick(Bt, B, A, dt);
@@ -2325,7 +2326,7 @@ const cpuRpm = diff => Math.round([10000, 18000, 26000][diff - 1] * (0.85 + Math
 /* ---------- 画面の流れ ---------- */
 const btEl = $b('bt'), SCREENS = ['sMenu', 'sP2', 'sOnline', 'sGhost', 'sDex', 'sRank', 'sResult'];
 const BT = { spMsg: '', type: null, diff: 1, phase: 'idle', lock: false, role: 'local', flip: false, saved: null, p1: null, p2: null, name1: '', name2: '',
-  rand: false, big: false, feed: [], ghost: null, ghostRand: false, hard: false, practice: false, tut: null, drag: null, stageTitle: '', banner: null, streak: false, stage: 1, streakCont: false, go: false, stop: 0, speed: 0, puffs: [], rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
+  rand: false, dailyCont: false, daily: null, dailyRule: '', big: false, feed: [], ghost: null, ghostRand: false, hard: false, practice: false, tut: null, drag: null, stageTitle: '', banner: null, streak: false, stage: 1, streakCont: false, go: false, stop: 0, speed: 0, puffs: [], rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
 function showScreen(id) {
   for (const s of SCREENS) $b(s).hidden = s !== id; btEl.classList.add('show'); document.body.classList.add('btmode');
   if (id === 'sResult' && BT.spMsg) { $b('resBody').innerHTML += BT.spMsg; BT.spMsg = ''; }
@@ -2412,6 +2413,7 @@ function drawDashChips() {
 }
 function refreshMenu(skipSync) {
   drawDashChips(); drawTitleChips(); drawGrow(); drawSpecialChips(); drawBigChips();
+  { const pl = dailyPlan(todayStr()); $b('btDaily').innerHTML = `デイリーチャレンジ<br><span style="font-size:12px;font-weight:400">今日のルール：${pl.rule[1]}　（今日のベスト ${dailyBest()}点）</span>`; }
   $b('btHard').style.display = settings.hardOpen ? 'block' : 'none'; $b('btPractice').textContent = (settings.tutDone ? '' : '★ はじめての人はここから　') + 'れんしゅうモード（操作チュートリアル）';
   drawArenaChips(); if (!skipSync) syncCustom();
   const d = designOf(), st = statsOf(d);
@@ -2431,7 +2433,7 @@ const isBoss = n => n % 5 === 0, bossName = n => BOSSES[(n / 5 - 1) % BOSSES.len
 const ST = () => settings.stat || (settings.stat = { jg: 0, bw: 0, rw: 0, sk: 0 });
 const TITLES = [['new', '新人スピナー', '最初から', () => true], ['w1', '初勝利', '1勝する', () => settings.wins >= 1], ['tut', '練習おつかれさま', '練習モードをやる', () => !!settings.tutDone], ['w10', '10勝達成', '10勝する', () => settings.wins >= 10], ['w50', 'ベテラン', '50勝する', () => settings.wins >= 50],
   ['s5', '連勝の使い手', '連勝戦で5連勝', () => settings.sbest >= 5], ['s10', 'ステージ10突破', '連勝戦で10連勝', () => settings.sbest >= 10], ['s20', '歴戦の猛者', '連勝戦で20連勝', () => settings.sbest >= 20], ['clr', '闘技場の覇者', '連勝戦をALL CLEAR', () => settings.sbest >= LAST_STAGE],
-  ['jg10', '見切りの達人', 'ジャストガード10回', () => ST().jg >= 10], ['bw5', 'バーストハンター', 'バーストで5勝', () => ST().bw >= 5], ['rw5', '場外王', '場外で5勝', () => ST().rw >= 5], ['sk20', '必殺の使い手', '必殺技を20回', () => ST().sk >= 20], ['hard', '修羅の道', 'ハード連勝戦で10連勝', () => (settings.sbestH | 0) >= 10], ['gh', 'ゴーストハンター', 'ゴーストに5回勝つ', () => ((settings.gstat || {}).w | 0) >= 5], ['big', 'ビッグチャンピオン', 'ビッグモードで優勝', () => (settings.bigWins | 0) >= 1]];
+  ['jg10', '見切りの達人', 'ジャストガード10回', () => ST().jg >= 10], ['bw5', 'バーストハンター', 'バーストで5勝', () => ST().bw >= 5], ['rw5', '場外王', '場外で5勝', () => ST().rw >= 5], ['sk20', '必殺の使い手', '必殺技を20回', () => ST().sk >= 20], ['hard', '修羅の道', 'ハード連勝戦で10連勝', () => (settings.sbestH | 0) >= 10], ['gh', 'ゴーストハンター', 'ゴーストに5回勝つ', () => ((settings.gstat || {}).w | 0) >= 5], ['big', 'ビッグチャンピオン', 'ビッグモードで優勝', () => (settings.bigWins | 0) >= 1], ['dly', 'デイリー完走', 'デイリーを3ラウンドとも勝つ', () => (settings.dailyClears | 0) >= 1]];
 const titleName = () => (TITLES.find(t => t[0] === settings.title) || TITLES[0])[1];
 function checkSpecials() {                                   // 実績で手に入る特別なスピナー
   const codes = settings.codes || (settings.codes = []), got = [];
@@ -2557,6 +2559,17 @@ function makeGhost(Bt, win) {                               // いまの戦い�
 function saveGhostLocal(g) { const L = settings.ghosts || (settings.ghosts = []); L.unshift({ ...g, ts: Date.now() }); if (L.length > GHOST_MAX_LOCAL) L.length = GHOST_MAX_LOCAL; saveSettings(); }
 async function gsUpload(g) { if (!gsOn() || settings.ghostUp === false) return false; await gsReq('ghosts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ nick: g.nick, title: g.title, design: g.design, rpm: Math.round(g.rpm), arena: g.arena, inputs: g.inputs, res: g.res }) }); return true; }
 async function gsReport(id, ghostWon) { if (!gsOn() || !id) return; try { await gsReq('rpc/report_result', { method: 'POST', body: JSON.stringify({ gid: id, won: !!ghostWon }) }); } catch (e) { /* 無視 */ } }
+/* ---------- デイリーチャレンジ：その日のルール・敵・アリーナが、みんな同じ（日付から決まる）。3ラウンド、合計点で競う ---------- */
+const mulberry32 = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const DAILY_RULES = [['none', 'ルールなし'], ['noskill', '必殺技なし'], ['noguard', 'ガードなし'], ['nodash', 'ダッシュ・回避なし'], ['tough', '敵の回転数が1.4倍']];
+function dailyPlan(date) {
+  let h = 2166136261; for (const ch of 'spin-arena-' + date) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  const rng = mulberry32(h), pick = a => a[Math.floor(rng() * a.length)], rule = pick(DAILY_RULES), mul = rule[0] === 'tough' ? 1.4 : 1;
+  const rounds = [6000, 8500, 12000].map(r => ({ design: { material: pick(MATS), shape: pick(SHAPE_IDS), arms: pick(ARMS), hole: pick(HOLE_IDS), bg: 'plate', sname: '', tint: -1 }, rpm: Math.round(r * mul), arena: pick(ARENA_IDS.filter(a => a !== 'normal')) }));
+  return { date, rule, rounds, myRpm: 8000 };
+}
+const dailyBest = () => (settings.daily && settings.daily.date === todayStr() ? settings.daily.best | 0 : 0);
+function dailyRoundScore(Bt) { const me = Bt.A; return 100 + Math.round(40 * Math.max(0, 1 - Bt.t / 40)) + Math.round(60 * Math.max(0, Math.min(1, me.w / me.w0))) + (Bt.reason === 'burst' || Bt.reason === 'ringout' ? 10 : 0); }
 /* ---------- ランキング（Supabase）：端末ごとのランダムIDで、種目ごとのベスト記録を送る ---------- */
 const myUid = () => { try { let u = localStorage.getItem('spinUid'); if (!u) { u = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 20); localStorage.setItem('spinUid', u); } return u; } catch (e) { return 'anon-' + Math.random().toString(36).slice(2, 12); } };
 async function rankSubmit(board, score, meta) {
@@ -2632,8 +2645,10 @@ function ghostDrive(Bt) {                                    // ゴースト：�
 }
 function btStart(type, diff, keep, extra) {
   bigRestore();
-  const big = type === 'big', practice = type === 'practice', hard = type === 'hard', streak = type === 'streak' || hard, ghostMode = type === 'ghost';
+  const daily = type === 'daily', big = type === 'big', practice = type === 'practice', hard = type === 'hard', streak = type === 'streak' || hard, ghostMode = type === 'ghost';
   if (big) { type = 'cpu'; diff = 2; }
+  if (daily) { type = 'cpu'; diff = 2; if (!keep || !BT.daily) BT.daily = { plan: dailyPlan(todayStr()), idx: 0, pts: 0 }; } else BT.daily = null;
+  BT.dailyRule = daily ? BT.daily.plan.rule[0] : '';
   BT.big = big;
   if (practice) { type = 'cpu'; diff = 1; }
   if (ghostMode) { type = 'cpu'; diff = 2; }
@@ -2648,6 +2663,7 @@ function btStart(type, diff, keep, extra) {
   const hp = hard ? 'HARD ' : '';
   BT.name1 = type === 'cpu' ? titleName() : '1P'; BT.name2 = type === 'cpu' ? (practice ? 'ダミー' : ghostMode ? (extra ? 'ゴースト ' + extra.nick : 'ゴースト') : streak ? (isBoss(BT.stage) ? 'BOSS ' + bossName(BT.stage) : hp + 'STAGE ' + BT.stage) : 'CPU') : '2P'; BT.stageTitle = streak ? stageTitle(BT.stage) : '';
   if (type === 'cpu') BT.p2 = ghostMode ? (extra ? extra.design : randomDesign()) : streak ? cpuDesignFor(BT.stage, BT.p1) : randomDesign();
+  if (daily) { const R = BT.daily.plan.rounds[BT.daily.idx]; BT.p1 = designOf(); delete BT.p1.gb; delete BT.p1.sp; BT.p2 = R.design; BT.name2 = `ROUND ${BT.daily.idx + 1}/3`; BT.rpm1 = BT.daily.plan.myRpm; BT.rpm2 = R.rpm; beginBattle(); return; }                          // デイリー：準備タイムなし、回転数は全員同じ
   if (practice) { BT.rpm1 = 6000; BT.rpm2 = 4000; beginBattle(); return; }               // 練習：準備タイムなしで、すぐ始まる
   startSpin(type === 'cpu' ? (big ? 'ビッグモード' : streak ? `${hp}STAGE ${BT.stage}「${BT.stageTitle}」` : ghostMode ? 'ゴースト戦' : 'あなた') : '1P', rpm => {
     BT.rpm1 = rpm;
@@ -2675,6 +2691,7 @@ function spinTick(now) {
 function pickArena() {
   if (BT.practice) return 'normal';
   if (BT.big) return 'big';
+  if (BT.daily) return BT.daily.plan.rounds[BT.daily.idx].arena;
   if (BT.ghost) return BT.ghost.arena;                           // 練習はノーマルのアリーナ
   if (BT.streak) return stageInfo(BT.stage)[1];
   const a = settings.arena || 'normal'; return a === 'random' ? ARENA_IDS[Math.floor(Math.random() * ARENA_IDS.length)] : a;
@@ -2684,7 +2701,7 @@ function beginBattle() {
   const b = makeFighter(BT.flip ? BT.p1 : BT.p2, BT.flip ? BT.rpm1 : BT.rpm2, BT.flip ? BT.name1 : BT.name2, 'B');
   if (BT.type === 'local' && BT.saved) applyDesign(BT.saved);
   if (BT.practice) { a.st = { ...a.st, pw: 1.2 }; b.st = { ...b.st, pw: 0.5 }; BT.tut = { step: 0, cnt: { dash: 0, dodge: 0, jg: 0, skill: 0 }, stepT: null, flash: 0 }; }   // 練習：こちらは強く、ダミーは弱く
-  BT.battle = makeBattle(a, b, pickArena()); BT.battle.rec = BT.type === 'cpu' && !BT.practice ? [] : null; BT.battle.gi = 0; enterBattleView();
+  BT.battle = makeBattle(a, b, pickArena()); BT.battle.rec = BT.type === 'cpu' && !BT.practice && !BT.daily ? [] : null; BT.battle.gi = 0; enterBattleView();
 }
 function enterBattleView() {
   MODE = 'battle'; camReset(); BT.phase = 'count'; BT.count = 3.2; BT.sparks = []; BT.snapT = 0; BT.endT = 0;
@@ -2720,6 +2737,20 @@ function showResult() {
     $b('resBody').innerHTML = `${win ? '最後の1体になった！' : Bt.reason === 'elim' ? 'そこで脱落…' : '時間切れ'}<br>強さ［${(Bt.lv || BIG_LV[1]).name}］ ／ KO ${Bt.A.kos}体 ／ 生き残った時間 ${Bt.t.toFixed(0)}秒 ／ ヒット ${Bt.A.hits}回<br>経験値 +${xp}（Lv.${g.lv}${up ? `　<b style="color:#ffd24d">レベルアップ！ 強化ポイント +${up}</b>` : ''}）${got2.length ? `<br><b>称号を獲得：「${got2.join('」「')}」</b>` : ''}`;
     $b('resAgain').disabled = false; $b('resAgain').textContent = 'もう一度（同じ人数）'; $b('resNew').style.display = 'none'; showScreen('sResult'); return;
   }
+  if (BT.daily) {                                            // デイリー：3ラウンドの合計点
+    const D = BT.daily, ok = win && !Bt.draw; let body, title, again;
+    if (Bt.draw) { title = 'DRAW'; body = '相打ち。このラウンドをやり直し！'; again = `ROUND ${D.idx + 1} をやり直す`; BT.dailyCont = true; }
+    else if (ok) {
+      const pts = dailyRoundScore(Bt); D.pts += pts; body = `ROUND ${D.idx + 1} クリア！　+${pts}点（合計 ${D.pts}点）`;
+      if (D.idx < 2) { D.idx++; title = 'ROUND CLEAR!'; again = `ROUND ${D.idx + 1} へ`; BT.dailyCont = true; }
+      else { title = 'DAILY CLEAR!!'; again = 'もう一度（最初から）'; BT.dailyCont = false; settings.dailyClears = (settings.dailyClears | 0) + 1; }
+    } else { title = 'GAME OVER'; body = `ROUND ${D.idx + 1} で敗退…　合計 ${D.pts}点`; again = '最初からもう一度'; BT.dailyCont = false; }
+    if (!BT.dailyCont) {                                     // 終わり：記録して、ランキングへ
+      const best = Math.max(dailyBest(), D.pts); settings.daily = { date: todayStr(), best }; body += `<br>今日のベスト ${best}点`; rankSubmit('daily-' + todayStr(), D.pts, { r: ok ? 3 : D.idx }); saveSettings();
+    }
+    const got = checkTitles(); $b('resTitle').textContent = title; $b('resBody').innerHTML = `${body}<br><span style="opacity:.75">ルール：${D.plan.rule[1]}</span>${got.length ? `<br><b>称号を獲得：「${got.join('」「')}」</b>` : ''}`;
+    $b('resAgain').disabled = false; $b('resAgain').textContent = again; $b('resNew').style.display = 'none'; showScreen('sResult'); return;
+  }
   if (BT.practice) {                                         // 練習はノーカウント
     settings.tutDone = true; const got = checkTitles(); saveSettings();
     $b('resTitle').textContent = 'れんしゅう おつかれさま！';
@@ -2751,7 +2782,7 @@ function showResult() {
     $b('resTitle').textContent = (BT.hard && !title.startsWith('HARD') ? 'HARD ' : '') + title;
     $b('resBody').innerHTML += `<br><b>${cleared}連勝</b>　（${BT.hard ? 'ハード' : ''}ベスト ${settings[bk] | 0}連勝）`;
   }
-  if (BT.type === 'cpu' || BT.ghost) {                       // 経験値（育成）：対CPU・ゴースト戦のみ
+  if ((BT.type === 'cpu' || BT.ghost) && !BT.daily) {        // 経験値（育成）：対CPU・ゴースト戦のみ
     const xp = Bt.draw ? 15 : win ? 30 + (BT.streak ? Math.min(BT.stage, 30) * 2 : 0) + (BT.ghost ? 10 : 0) : 10, up = addXp(BT.p1, xp), g = GR(BT.p1);
     $b('resBody').innerHTML += `<br>経験値 +${xp}（Lv.${g.lv}${up ? `　<b style="color:#ffd24d">レベルアップ！ 強化ポイント +${up}</b>` : ''}）`;
   }
@@ -3178,6 +3209,7 @@ function drawBattle(dt, Bt) {
     ctx.font = `800 ${(n > 0 ? 84 : 96) * pop | 0}px system-ui, sans-serif`; ctx.fillText(n > 0 ? String(n) : 'FIGHT!', W / 2, H * 0.4);
     ctx.font = '700 15px system-ui, sans-serif'; ctx.fillText('ARENA：' + ARENAS[Bt.arena][0] + (Bt.arena === 'normal' ? '' : '　' + ARENAS[Bt.arena][1]), W / 2, H * 0.52);
     ctx.font = '600 13px system-ui, sans-serif'; ctx.fillText('丸＝ダッシュ　／　左＝回避（すり抜け）　／　右＝ガード', W / 2, H * 0.8); ctx.font = '700 15px system-ui, sans-serif';
+    if (BT.daily) { ctx.font = '800 18px system-ui, sans-serif'; ctx.fillText(`DAILY ROUND ${BT.daily.idx + 1}/3　［${BT.daily.plan.rule[1]}］`, W / 2, H * 0.56); ctx.font = '700 15px system-ui, sans-serif'; }
     if (BT.streak) { ctx.font = '800 18px system-ui, sans-serif'; ctx.fillText(`${BT.hard ? 'HARD ' : ''}STAGE ${BT.stage}「${BT.stageTitle}」`, W / 2, H * 0.56); ctx.font = '700 15px system-ui, sans-serif'; }
     if (Bt.big) { ctx.font = '800 22px system-ui, sans-serif'; ctx.fillText(`BIG BATTLE　${Bt.N}体　［${(Bt.lv || BIG_LV[1]).name}］`, W / 2, H * 0.2); ctx.font = '600 14px system-ui, sans-serif'; ctx.fillText('最後の1体になれ！　リングはだんだん縮むよ', W / 2, H * 0.25); }
     const mF = BT.flip ? Bt.B : Bt.A, oF = BT.flip ? Bt.A : Bt.B, sl = Math.min(1, (3.2 - BT.count) * 2.2);          // 入場：両者の名前と回転数がスライドインする
@@ -3555,7 +3587,7 @@ $b('resAgain').addEventListener('click', () => {
     if (!Net.open) return; BT.againSent = true; netSend({ t: 'again' }); $b('resAgain').disabled = true; $b('resAgain').textContent = '相手を待っています…';
     if (BT.peerAgain) startRematch(); return;
   }
-  const t = BT.type, d = BT.diff, rand = BT.rand, st = BT.streak, keep = BT.streakCont, pr = BT.practice, hd = BT.hard, gh = BT.ghost, gr = BT.ghostRand, bg = BT.big; endBattle(false); if (bg) btStart('big'); else if (gr) btStart('ghost', 0, false, null); else if (gh) btStart('ghost', 0, false, gh); else if (pr) btStart('practice'); else if (st) btStart(hd ? 'hard' : 'streak', 0, keep); else btStart(t, d); if (t === 'online' && rand) olRandom(); });
+  const t = BT.type, d = BT.diff, rand = BT.rand, st = BT.streak, keep = BT.streakCont, pr = BT.practice, hd = BT.hard, gh = BT.ghost, gr = BT.ghostRand, bg = BT.big, dl = BT.daily, dc = BT.dailyCont; endBattle(false); if (dl) btStart('daily', 0, dc); else if (bg) btStart('big'); else if (gr) btStart('ghost', 0, false, null); else if (gh) btStart('ghost', 0, false, gh); else if (pr) btStart('practice'); else if (st) btStart(hd ? 'hard' : 'streak', 0, keep); else btStart(t, d); if (t === 'online' && rand) olRandom(); });
 $b('resMenu').addEventListener('click', () => endBattle(true));
 $b('codeGo').addEventListener('click', tryCode); $b('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') tryCode(); });
 $b('gRandom').addEventListener('click', () => btStart('ghost', 0, false, null));
@@ -3634,7 +3666,7 @@ $b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventL
 for (const id of ['dash1', 'dash2']) { $b(id).addEventListener('pointermove', dashMove); $b(id).addEventListener('pointerup', dashRelease); $b(id).addEventListener('pointercancel', dashRelease); }
 $b('dodge1').addEventListener('pointerdown', dodgePress(1)); $b('dodge2').addEventListener('pointerdown', dodgePress(2));
 $b('guard1').addEventListener('pointerdown', guardPress(1)); $b('guard2').addEventListener('pointerdown', guardPress(2));
-window.__bt = { BIG_LV, makeBig, stepBig, bigAI, beginBig, cleanGhost, ghostCode, readGhostCode, gsPick, addXp, PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
+window.__bt = { dailyPlan, BIG_LV, makeBig, stepBig, bigAI, beginBig, cleanGhost, ghostCode, readGhostCode, gsPick, addXp, PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
 
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* Artifactなどでは使えない */ });   // ホーム画面に追加・オフライン起動用
 
