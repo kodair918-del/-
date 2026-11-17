@@ -918,13 +918,27 @@ function armPath(c, G) {
   c.closePath();
 }
 
-function drawWindmill(th, target, ox, oy) {                  // 絵文字の風車：4本の「指さし」が顔を囲んで回る（元ネタの絵文字アート）
-  const c = target || ctx, Rr = R, F = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
-  c.save(); c.translate(ox === undefined ? cx : ox, oy === undefined ? cy : oy); c.rotate(th); c.textAlign = 'center'; c.textBaseline = 'middle';
+function drawWindmill(th, target, ox, oy) {                  // 絵文字風の風車：4本の「指さし」👉が、顔😀を囲んで回る（端末の絵文字フォントに頼らず、自前で描く）
+  const c = target || ctx, Rr = R;
+  c.save(); c.translate(ox === undefined ? cx : ox, oy === undefined ? cy : oy); c.rotate(th);
   const g = c.createRadialGradient(0, 0, Rr * 0.1, 0, 0, Rr * 0.98); g.addColorStop(0, 'rgba(255,255,255,.22)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.beginPath(); c.arc(0, 0, Rr * 0.98, 0, TAU); c.fill();
-  c.font = `${Rr * 0.6}px ${F}`;
-  for (let k = 0; k < 4; k++) { c.save(); c.rotate(k * Math.PI / 2); c.translate(Rr * 0.6, 0); c.rotate(Math.PI / 2); c.fillText('\u{1F449}', 0, 0); c.restore(); }   // 👉 を、回る向きに4本
-  c.font = `${Rr * 0.8}px ${F}`; c.fillText('\u{1F600}', 0, Rr * 0.02);                                                                                   // 真ん中は、にっこりの顔 😀
+  const skin = (x0, y0, x1, y1) => { const q = c.createLinearGradient(x0, y0, x1, y1); q.addColorStop(0, '#ffe27a'); q.addColorStop(1, '#f2b01a'); return q; };
+  c.lineJoin = c.lineCap = 'round';
+  for (let k = 0; k < 4; k++) {                                // 👉 ×4（指先が回る向き）
+    c.save(); c.rotate(k * Math.PI / 2); c.translate(Rr * 0.5, 0); c.rotate(Math.PI / 2); const u = Rr * 0.5;
+    c.strokeStyle = '#b87800'; c.lineWidth = u * 0.07; c.fillStyle = skin(0, -0.4 * u, 0, 0.4 * u);
+    const rr = (x, y, w, h, r) => { c.beginPath(); c.roundRect(x * u, y * u, w * u, h * u, r * u); c.fill(); c.stroke(); };
+    rr(-0.62, -0.34, 0.72, 0.68, 0.2);                         // こぶし
+    rr(0.0, -0.22, 0.92, 0.2, 0.1);                            // 人さし指（まっすぐ伸びる）
+    for (let i = 0; i < 3; i++) rr(0.0, 0.0 + i * 0.12, 0.3 - i * 0.03, 0.14, 0.07);   // 曲げた3本の指
+    c.beginPath(); c.ellipse(-0.12 * u, -0.34 * u, 0.26 * u, 0.12 * u, -0.25, 0, TAU); c.fill(); c.stroke();   // 親指
+    c.restore();
+  }
+  const fr = Rr * 0.4, fg = c.createRadialGradient(-fr * 0.3, -fr * 0.4, fr * 0.1, 0, 0, fr); fg.addColorStop(0, '#fff09a'); fg.addColorStop(0.6, '#ffd23a'); fg.addColorStop(1, '#f0a800');
+  c.fillStyle = fg; c.strokeStyle = '#b87800'; c.lineWidth = fr * 0.07; c.beginPath(); c.arc(0, 0, fr, 0, TAU); c.fill(); c.stroke();   // 顔 😀
+  c.fillStyle = '#4a2a10'; for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(sx * fr * 0.34, -fr * 0.22, fr * 0.1, fr * 0.17, 0, 0, TAU); c.fill(); }           // 目
+  c.beginPath(); c.moveTo(-fr * 0.52, fr * 0.14); c.quadraticCurveTo(0, fr * 0.2, fr * 0.52, fr * 0.14); c.quadraticCurveTo(fr * 0.42, fr * 0.66, 0, fr * 0.68); c.quadraticCurveTo(-fr * 0.42, fr * 0.66, -fr * 0.52, fr * 0.14); c.fillStyle = '#5a2412'; c.fill();   // 口
+  c.save(); c.beginPath(); c.moveTo(-fr * 0.52, fr * 0.14); c.quadraticCurveTo(0, fr * 0.2, fr * 0.52, fr * 0.14); c.lineTo(fr * 0.5, fr * 0.32); c.quadraticCurveTo(0, fr * 0.36, -fr * 0.5, fr * 0.32); c.closePath(); c.fillStyle = '#fff'; c.fill(); c.restore();   // 歯
   c.restore();
 }
 const isWindmill = () => (DSG.sp || (DSG === settings ? specialOn() : '')) === 'windmill';
