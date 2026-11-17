@@ -1902,7 +1902,7 @@ function withDesign(d, r, fn) {                            // 一時的に別の
   try { return fn(); } finally { DSG = sD; R = sR; }
 }
 const SPECIALS = {                                            // コードで手に入る特別なスピナー（形はふつうの部品の組み合わせ、強さは特別）
-  windmill: { name: '暴走風車', look: { material: 'rainbow', shape: 'leaf', arms: 4, hole: 'big' }, atk: 2.6, def: 2.6, sta: 2.6, bur: 4, pw: 3, mass: 1.5, skill: ['認識された', '255,50,50'] }
+  windmill: { name: 'キ〇ガイ風車', look: { material: 'rainbow', shape: 'leaf', arms: 4, hole: 'big' }, atk: 2.6, def: 2.6, sta: 2.6, bur: 4, pw: 3, mass: 1.5, skill: ['認識された', '255,50,50'] }
 };
 const codeHash = s => { let h = 0x811c9dc5; for (const ch of String(s).normalize('NFKC').toLowerCase().replace(/[\s\-_]/g, '')) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
 const CODES = { cdi1pj: 'windmill', '680d0h': 'windmill' };   // コードそのものは書かず、ハッシュだけ持つ
