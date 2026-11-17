@@ -106,6 +106,52 @@ body.inbattle #rand{display:none}
 @media (min-aspect-ratio:23/20){#skill1{bottom:calc(env(safe-area-inset-bottom,0px) + 22px);margin-left:160px}#skill2{top:calc(env(safe-area-inset-top,0px) + 22px);margin-left:-264px}}
 .codebox{width:100%;min-height:84px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--fg);font:11px/1.3 monospace;padding:8px;resize:vertical;user-select:text;-webkit-user-select:text}
 #olStatus{font-size:13px;min-height:1.2em;color:var(--accent)}
+
+/* ---------- UIスタイル（設定で切り替え）：標準 / スタイリッシュ / ネオン / ポップ ---------- */
+html[data-ui="style"]{--panel:rgba(0,0,0,.7)}
+html[data-ui="style"] body{font-family:"Helvetica Neue","Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif;font-weight:300;letter-spacing:.08em}
+html[data-ui="style"] #bt{background:rgba(0,0,0,.9)}
+html[data-ui="style"] .btcard,html[data-ui="style"] #sheet{background:linear-gradient(180deg,#0d0d10,#000);border:1px solid rgba(255,255,255,.4);border-radius:2px}
+html[data-ui="style"] #sheet{border-radius:2px 2px 0 0}
+html[data-ui="style"] .btn,html[data-ui="style"] .chip,html[data-ui="style"] .row,html[data-ui="style"] #battleBtn,html[data-ui="style"] .dash{border-radius:2px;background:transparent;border:1px solid rgba(255,255,255,.6);font-weight:300;letter-spacing:.14em}
+html[data-ui="style"] .dash.round,html[data-ui="style"] #gear,html[data-ui="style"] #rand,html[data-ui="style"] #fs{border-radius:50%;background:transparent;border:1px solid rgba(255,255,255,.6)}
+html[data-ui="style"] .btn.main,html[data-ui="style"] .chip[aria-pressed="true"]{background:#fff!important;color:#000!important;border-color:#fff;font-weight:500}
+html[data-ui="style"] .row{border-radius:0;border:0;border-bottom:1px solid rgba(255,255,255,.2)}
+html[data-ui="style"] .rows{border-radius:0;background:transparent}
+html[data-ui="style"] .btcard h2{font-weight:200;letter-spacing:.4em;font-size:18px}
+html[data-ui="style"] .btcard h3,html[data-ui="style"] #sheet h3{letter-spacing:.3em;opacity:.7}
+html[data-ui="style"] .bar{height:3px;border-radius:0}
+html[data-ui="style"] .bar i{border-radius:0}
+html[data-ui="style"] .dash i{opacity:.25}
+
+html[data-ui="neon"]{--panel:rgba(6,8,26,.78)}
+html[data-ui="neon"] #bt{background:rgba(2,3,16,.84)}
+html[data-ui="neon"] .btcard,html[data-ui="neon"] #sheet{background:rgba(6,8,24,.96);border:1px solid #3ef6ff;box-shadow:0 0 22px rgba(62,246,255,.35),inset 0 0 26px rgba(255,62,200,.1);border-radius:16px}
+html[data-ui="neon"] #sheet{border-radius:16px 16px 0 0}
+html[data-ui="neon"] .btn,html[data-ui="neon"] .chip,html[data-ui="neon"] .row,html[data-ui="neon"] #battleBtn,html[data-ui="neon"] .dash,html[data-ui="neon"] #gear,html[data-ui="neon"] #rand,html[data-ui="neon"] #fs{background:rgba(10,14,44,.72);border:1px solid rgba(62,246,255,.65);box-shadow:0 0 10px rgba(62,246,255,.28);text-shadow:0 0 8px rgba(62,246,255,.7)}
+html[data-ui="neon"] .row{box-shadow:none;border-radius:0;border-width:0 0 1px 0}
+html[data-ui="neon"] .btn.main{background:linear-gradient(90deg,#3ef6ff,#ff3ec8)!important;color:#050818!important;border-color:transparent;text-shadow:none;box-shadow:0 0 20px rgba(255,62,200,.55)}
+html[data-ui="neon"] .chip[aria-pressed="true"]{border-color:#ff3ec8;color:#fff;box-shadow:0 0 14px rgba(255,62,200,.7)}
+html[data-ui="neon"] .btcard h2{text-shadow:0 0 14px #3ef6ff,0 0 28px rgba(255,62,200,.6)}
+html[data-ui="neon"] .btcard h3,html[data-ui="neon"] #sheet h3{color:#3ef6ff;opacity:.9;text-shadow:0 0 8px rgba(62,246,255,.6)}
+html[data-ui="neon"] .bar{background:rgba(62,246,255,.15);box-shadow:0 0 8px rgba(62,246,255,.3)}
+html[data-ui="neon"] .dash.rdy,html[data-ui="neon"] .skillb{box-shadow:0 0 22px #ffd24d}
+
+html[data-ui="pop"]{--panel:rgba(70,36,130,.86)}
+html[data-ui="pop"] body{font-weight:700}
+html[data-ui="pop"] #bt{background:rgba(32,14,76,.82)}
+html[data-ui="pop"] .btcard,html[data-ui="pop"] #sheet{background:linear-gradient(160deg,#5a35b5,#2d1870);border:4px solid #ffd23f;border-radius:30px;box-shadow:0 8px 0 #1a0f44}
+html[data-ui="pop"] #sheet{border-radius:30px 30px 0 0}
+html[data-ui="pop"] .btn,html[data-ui="pop"] .chip,html[data-ui="pop"] .row,html[data-ui="pop"] #battleBtn,html[data-ui="pop"] .dash,html[data-ui="pop"] #gear,html[data-ui="pop"] #rand,html[data-ui="pop"] #fs{background:#7b4df2;border:3px solid #fff;color:#fff;font-weight:800;box-shadow:0 4px 0 #1a0f44}
+html[data-ui="pop"] .btn,html[data-ui="pop"] .chip{border-radius:18px}
+html[data-ui="pop"] .row{border-radius:0;border-width:0 0 2px 0;box-shadow:none;background:none}
+html[data-ui="pop"] .btn:active,html[data-ui="pop"] .chip:active,html[data-ui="pop"] .dash:active{transform:translateY(3px);box-shadow:0 1px 0 #1a0f44}
+html[data-ui="pop"] .btn.main{background:#ffd23f!important;color:#3a1c00!important;border-color:#fff}
+html[data-ui="pop"] .chip[aria-pressed="true"]{background:#ff5fa2;color:#fff;border-color:#fff}
+html[data-ui="pop"] .btcard h2{text-shadow:0 3px 0 #1a0f44;font-size:24px;letter-spacing:.04em}
+html[data-ui="pop"] .btcard h3,html[data-ui="pop"] #sheet h3{color:#ffd23f;opacity:1;font-size:13px;font-weight:800}
+html[data-ui="pop"] .bar{height:12px;border:2px solid #fff;background:rgba(255,255,255,.2)}
+html[data-ui="pop"] .dash i{opacity:.55}
 </style>
 </head>
 <body>
@@ -252,6 +298,7 @@ body.inbattle #rand{display:none}
   <h3>アームの数</h3><div class="chips" id="chArms"></div>
   <h3>穴</h3><div class="chips" id="chHole"></div>
   <h3>背景</h3><div class="chips" id="chBg"></div>
+  <h3>UIスタイル</h3><div class="chips" id="chUi"></div>
   <h3>演出</h3>
   <div class="rows">
     <button id="bFx" class="row"></button>
@@ -316,11 +363,14 @@ const TICK_IDS = Object.keys(TICK_NAME);
 // 回転音（回っている間ずっと鳴る音）8種類
 const SPIN_NAME = { std: '標準', smooth: 'なめらか', jet: 'ジェット', fan: '扇風機', wind: '風', heli: 'ヘリ', motor: 'モーター', none: '無音' };
 const SPIN_IDS = Object.keys(SPIN_NAME);
+const UI_LIST = [['std', '標準'], ['style', 'スタイリッシュ'], ['neon', 'ネオン'], ['pop', 'ポップ']];
+const UIS = { std: { bh: 8, r: 4, font: '600', fs: 13, ls: 0, glow: 0 }, style: { bh: 3, r: 0, font: '300', fs: 12, ls: 2, glow: 0 }, neon: { bh: 8, r: 4, font: '600', fs: 13, ls: 0, glow: 12 }, pop: { bh: 12, r: 6, font: '800', fs: 14, ls: 0, glow: 0, outline: true } };
+function applyUi() { const u = UIS[settings.ui] ? settings.ui : 'std'; document.documentElement.dataset.ui = u; const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = { std: '#07080b', style: '#000000', neon: '#02030f', pop: '#2d1870' }[u]; }
 const VOL_NAME = ['小', '中', '大'], VOL_GAIN = [0.35, 0.65, 1];
 const MIX_NAME = ['OFF', '小', '中', '大'], MIX_GAIN = [0, 0.5, 1, 1.5];
 function mixApply() { if (!ac || !sfxBus) return; const t = ac.currentTime; sfxBus.gain.setTargetAtTime(MIX_GAIN[settings.mixSfx === undefined ? 2 : settings.mixSfx], t, 0.05); ambBus.gain.setTargetAtTime(MIX_GAIN[settings.mixAmb === undefined ? 2 : settings.mixAmb], t, 0.05); }
 const KEY = 'fidget-spinner-v1';
-const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, codes: [], special: '', spBackup: null, ghosts: [], gstat: { w: 0, l: 0 }, ghostUp: true, supa: { url: '', key: '' }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
+const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, onl: { w: 0, l: 0 }, ui: 'std', codes: [], special: '', spBackup: null, ghosts: [], gstat: { w: 0, l: 0 }, ghostUp: true, supa: { url: '', key: '' }, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
 
 function loadSettings() {
   let raw = {};
@@ -1769,6 +1819,7 @@ const setRow = (btn, label, value, on) => {
   if (on !== undefined) btn.setAttribute('aria-pressed', on);
 };
 function refreshUI() {
+  applyUi();
   const P = THEME[settings.material];
   document.documentElement.style.setProperty('--accent', P.accent);
   for (const g of chipGroups) for (const b of g.btns) b.setAttribute('aria-pressed', String(String(g.get()) === b.dataset.id));
@@ -1823,6 +1874,7 @@ addChips('chBg', BG_IDS.map(id => ({ id, label: BG_NAME[id] })), 'bg');
 // 音は、選んだらその場で試し聞きできる（ティック音は3回鳴らす／回転音は回して聞かせる）
 addChips('chTick', TICK_IDS.map(id => ({ id, label: TICK_NAME[id] })), 'timbre', () => { initAudio(); for (let i = 0; i < 4; i++) setTimeout(() => click(0.9), i * 140); });
 addChips('chSpin', SPIN_IDS.map(id => ({ id, label: SPIN_NAME[id] })), 'spin', () => { initAudio(); if (Math.abs(S.omega) < 90) S.omega = 90 * (Math.sign(S.omega) || 1); });
+addChips('chUi', UI_LIST.map(([id, label]) => ({ id, label })), 'ui', () => { applyUi(); click(0.8); });
 addChips('chVol', VOL_NAME.map((n, i) => ({ id: i, label: n })), 'vol', () => { initAudio(); setTimeout(() => click(0.9), 80); });
 addChips('chMixSfx', MIX_NAME.map((n, i) => ({ id: i, label: n })), 'mixSfx', () => { initAudio(); mixApply(); setTimeout(() => hitSnd(0.8), 120); });
 addChips('chMixAmb', MIX_NAME.map((n, i) => ({ id: i, label: n })), 'mixAmb', () => { initAudio(); mixApply(); setTimeout(() => { droneStart(); if (BA.drone) { BA.drone.g.gain.setTargetAtTime(0.06, ac.currentTime, 0.1); setTimeout(() => { if (MODE !== 'battle') droneStop(); }, 1500); } }, 120); });
@@ -3047,6 +3099,32 @@ function drawDebris(dt) {
     else ctx.arc(0, 0, 1, 0, TAU);
     ctx.fill('evenodd'); ctx.stroke(); ctx.restore();
   }
+}
+function drawBattleHud(Bt) {
+  const me = BT.flip ? Bt.B : Bt.A, op = BT.flip ? Bt.A : Bt.B;
+  const land = W > H * 1.15;                                                 // 横向き：HUDを端に寄せる
+  hudRow(op, BT.type === 'local' ? (land ? 130 : 182) : (land ? 34 : 60), BT.type === 'local');
+  hudRow(me, land ? H - 130 : H - 182, false);
+}
+function hudRow(f, y, upside) {
+  const U = UIS[settings.ui] || UIS.std, bw = Math.min(W * 0.8, 360), x0 = (W - bw) / 2, F = (n) => `${U.font} ${n}px system-ui, sans-serif`;
+  const bar = (yy, h, frac, col, minW) => {                               // バー（背景→中身。ポップは白い縁、ネオンは光る）
+    ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.beginPath(); ctx.roundRect(x0, yy, bw, h, Math.min(U.r, h / 2)); ctx.fill();
+    if (frac > 0.005) { ctx.save(); if (U.glow) { ctx.shadowColor = col; ctx.shadowBlur = U.glow; } ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect(x0, yy, Math.max(minW, bw * frac), h, Math.min(U.r, h / 2)); ctx.fill(); ctx.restore(); }
+    if (U.outline) { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x0, yy, bw, h, Math.min(U.r, h / 2)); ctx.stroke(); }
+  };
+  ctx.save();
+  if (upside) { ctx.translate(W / 2, y); ctx.rotate(Math.PI); ctx.translate(-W / 2, -y); }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = U.ls + 'px';
+  ctx.font = F(U.fs); ctx.fillStyle = 'rgba(255,255,255,.92)'; if (U.glow) { ctx.shadowColor = '#3ef6ff'; ctx.shadowBlur = 8; }
+  const lab = f.name + '　' + nameOf(f.d) + '・' + TYPE_NAME[f.st.type]; let fz = U.fs; while (fz > 9 && ctx.measureText(lab).width > bw - 96) { fz--; ctx.font = F(fz); }
+  ctx.textAlign = 'left'; ctx.fillText(lab, x0, y - 9); ctx.font = F(U.fs);
+  ctx.textAlign = 'right'; ctx.fillText(Math.round(f.w * 60 / TAU).toLocaleString('en-US') + ' rpm', x0 + bw, y - 9); ctx.shadowBlur = 0;
+  bar(y, U.bh, Math.min(1, f.w / f.w0), accentOf(f.d), 8);
+  const by = y + U.bh + 5, bgr = Math.min(1, f.bg / 100);                  // バーストゲージ（満タンで壊れる）／必殺技ゲージ
+  bar(by, 4, bgr, bgr > 0.75 ? '#ff4d4d' : '#ff9a4d', 4);
+  bar(by + 8, 4, Math.min(1, f.sp / 100), f.sp >= 100 ? '#ffd24d' : 'rgba(255,210,77,.6)', 3);
+  ctx.restore();
 }
 function drawBattleHud(Bt) {
   const me = BT.flip ? Bt.B : Bt.A, op = BT.flip ? Bt.A : Bt.B;
