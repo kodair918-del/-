@@ -2288,11 +2288,11 @@ function cpuDesignFor(stage, me) {                           // 進むほど、�
   return d;
 }
 /* ---------- ゴースト：操作を記録して、あとで再現する ---------- */
-const GHOST_MAX_LOCAL = 20, GHOST_MAX_INPUTS = 240, SUPA_DEFAULT = { url: '', key: '' };   // SUPA_DEFAULT：サーバー設定をコードに書いておきたい時の既定値
+const GHOST_MAX_LOCAL = 20, GHOST_MAX_INPUTS = 240, SUPA_DEFAULT = { url: 'https://agquocqnopxxskbgljsf.supabase.co', key: 'sb_publishable_D50D04qQ1wMYWJ4-qQlHdA_OLMXhGR4' };   // SUPA_DEFAULT：サーバー設定をコードに書いておきたい時の既定値
 const gsCfg = () => { const c = settings.supa || {}; return { url: String(c.url || SUPA_DEFAULT.url || '').trim().replace(/\/+$/, ''), key: String(c.key || SUPA_DEFAULT.key || '').trim() }; };
 const gsOn = () => { const c = gsCfg(); return /^(https:\/\/|http:\/\/localhost)/.test(c.url) && c.key.length > 8; };
 async function gsReq(path, opt) {
-  const c = gsCfg(), r = await fetch(`${c.url}/rest/v1/${path}`, { ...opt, headers: { apikey: c.key, Authorization: 'Bearer ' + c.key, 'Content-Type': 'application/json', ...((opt || {}).headers || {}) } });
+  const c = gsCfg(), r = await fetch(`${c.url}/rest/v1/${path}`, { ...opt, headers: { apikey: c.key, ...(c.key.startsWith('eyJ') ? { Authorization: 'Bearer ' + c.key } : {}), 'Content-Type': 'application/json', ...((opt || {}).headers || {}) } });   // 新形式の公開キー(sb_publishable_)は apikey だけ送る
   if (!r.ok) throw new Error('HTTP ' + r.status); return r;
 }
 const savedNick = () => { try { return cleanNick(localStorage.getItem('spinNick')); } catch (e) { return ''; } };
