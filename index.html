@@ -217,7 +217,8 @@ body.inbattle #rand{display:none}
   </div>
   <div class="btcard" id="sGhost" hidden>
     <h2>ゴースト対決</h2>
-    <p style="font-size:13px">だれかが戦ったときの「操作」を再現するゴーストと戦えるよ。CPU戦のたびに、あなたのゴーストも自動で生まれる。</p>
+    <p style="font-size:13px">だれかが戦ったときの「操作」を再現するゴーストと戦えるよ。CPU戦に勝つたびに、あなたのゴーストも世界に公開される。ゴーストは、3回負けるとサーバーから消えるよ。</p>
+    <button class="btn main wide" id="gRandom" style="background:#b48cff;color:#120a22">ゴーストとたたかう<br><span style="font-size:12px;font-weight:400">自分より少し強い相手が、ランダムで選ばれる</span></button>
     <div class="chips" id="gTabs"></div>
     <div id="gList" class="col" style="gap:8px"></div>
     <div id="gCodeBox" class="col" style="gap:6px" hidden><textarea class="codebox" id="gCodeIn" placeholder="ゴーストコード（SG1:…）を貼る"></textarea><button class="btn main" id="gCodeGo">このゴーストと戦う</button></div>
@@ -2244,7 +2245,7 @@ const cpuRpm = diff => Math.round([10000, 18000, 26000][diff - 1] * (0.85 + Math
 /* ---------- 画面の流れ ---------- */
 const btEl = $b('bt'), SCREENS = ['sMenu', 'sP2', 'sOnline', 'sGhost', 'sResult'];
 const BT = { type: null, diff: 1, phase: 'idle', lock: false, role: 'local', flip: false, saved: null, p1: null, p2: null, name1: '', name2: '',
-  rand: false, ghost: null, hard: false, practice: false, tut: null, drag: null, stageTitle: '', banner: null, streak: false, stage: 1, streakCont: false, go: false, stop: 0, speed: 0, puffs: [], rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
+  rand: false, ghost: null, ghostRand: false, hard: false, practice: false, tut: null, drag: null, stageTitle: '', banner: null, streak: false, stage: 1, streakCont: false, go: false, stop: 0, speed: 0, puffs: [], rpm1: 0, rpm2: 0, battle: null, sparks: [], spinEnd: 0, spinDone: null, ts: 1, debris: [], rings: [], flash: 0, count: 0, endT: 0, snapT: 0, recorded: false, sentHello: false, peer: null, mySpun: false, peerSpun: false };
 function showScreen(id) { for (const s of SCREENS) $b(s).hidden = s !== id; btEl.classList.add('show'); document.body.classList.add('btmode'); }
 function hideOverlay() { btEl.classList.remove('show'); }
 const TYPE_COL = { atk: '#ff6b6b', def: '#5db4ff', sta: '#6bdc8b', bal: '#d0d0d0', wm: '#ff7bff' };
@@ -2372,18 +2373,30 @@ function makeGhost(Bt, win) {                               // いまの戦い�
 function saveGhostLocal(g) { const L = settings.ghosts || (settings.ghosts = []); L.unshift({ ...g, ts: Date.now() }); if (L.length > GHOST_MAX_LOCAL) L.length = GHOST_MAX_LOCAL; saveSettings(); }
 async function gsUpload(g) { if (!gsOn() || settings.ghostUp === false) return false; await gsReq('ghosts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ nick: g.nick, title: g.title, design: g.design, rpm: Math.round(g.rpm), arena: g.arena, inputs: g.inputs, res: g.res }) }); return true; }
 async function gsReport(id, ghostWon) { if (!gsOn() || !id) return; try { await gsReq('rpc/report_result', { method: 'POST', body: JSON.stringify({ gid: id, won: !!ghostWon }) }); } catch (e) { /* 無視 */ } }
-async function gsList(tab) {
-  const sel = 'id,nick,title,design,rpm,arena,inputs,res,wins,losses', center = Math.max(3000, settings.best || 0);
-  const q = tab === 'hall' ? `ghosts?select=${sel}&order=wins.desc,created_at.desc&limit=12` : `ghosts?select=${sel}&rpm=gte.${Math.round(center * 0.3)}&rpm=lte.${Math.round(center * 2.5)}&order=created_at.desc&limit=40`;
-  const rows = await (await gsReq(q)).json(); let list = rows.map(cleanGhost).filter(Boolean);
-  if (tab !== 'hall') { for (let i = list.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [list[i], list[j]] = [list[j], list[i]]; } list = list.slice(0, 8); }
-  return list;
+const GHOST_LIVES = 3;                                        // ゴーストは、3回負けたらサーバーから消える
+async function gsPick(rpm) {                                  // 自分より少し強いゴーストを、ランダムに1体（いなければ範囲を広げる）
+  if (!gsOn()) return null;
+  const sel = 'id,nick,title,design,rpm,arena,inputs,res,wins,losses';
+  for (const [lo, hi] of [[1.05, 1.45], [0.9, 1.9], [0.4, 5]]) {
+    const rows = await (await gsReq(`ghosts?select=${sel}&rpm=gte.${Math.round(rpm * lo)}&rpm=lte.${Math.round(rpm * hi)}&losses=lt.${GHOST_LIVES}&order=created_at.desc&limit=30`)).json();
+    const list = rows.map(cleanGhost).filter(Boolean); if (list.length) return list[Math.random() * list.length | 0];
+  }
+  return null;
 }
-let gTab = 'near';
+async function ghostSearch(rpm) {                             // 準備タイムのあと：相手のゴーストを探して、バトル開始
+  $b('btCount').style.display = 'block'; $b('btCountB').textContent = '…'; $b('btCountT').textContent = 'ゴーストを探しています…（自分より少し強い相手）';
+  let g = null; try { g = await gsPick(rpm); } catch (e) { g = null; }
+  if (!g) { const L = (settings.ghosts || []).map(cleanGhost).filter(Boolean); if (L.length) g = L[Math.random() * L.length | 0]; }
+  $b('btCount').style.display = 'none';
+  if (g) { BT.ghost = g; BT.p2 = g.design; BT.name2 = 'ゴースト ' + g.nick; BT.rpm2 = g.rpm; }
+  else { BT.ghost = null; BT.p2 = randomDesign(); BT.name2 = 'CPU（ゴーストなし）'; BT.rpm2 = Math.round(rpm * 1.15); }
+  beginBattle();
+}
+let gTab = 'mine';
 function openGhost() { initAudio(); showScreen('sGhost'); $b('gUrl').value = (settings.supa || {}).url || ''; $b('gKey').value = (settings.supa || {}).key || ''; drawGhostTabs(); loadGhosts(); }
 function drawGhostTabs() {
   const el = $b('gTabs'); el.innerHTML = '';
-  for (const [id, name] of [['near', '世界（近い強さ）'], ['hall', '殿堂入り'], ['mine', '自分のゴースト'], ['code', 'コード']]) {
+  for (const [id, name] of [['mine', '自分のゴースト'], ['code', 'コードで対戦']]) {
     const b = document.createElement('button'); b.className = 'chip'; b.textContent = name; b.setAttribute('aria-pressed', gTab === id); b.addEventListener('click', () => { gTab = id; drawGhostTabs(); loadGhosts(); }); el.appendChild(b);
   }
   $b('gUp').textContent = '自分のゴーストを公開：' + (settings.ghostUp === false ? 'OFF' : 'ON'); $b('gUp').setAttribute('aria-pressed', settings.ghostUp !== false);
@@ -2391,19 +2404,16 @@ function drawGhostTabs() {
 function ghostCard(g, mine) {
   const card = document.createElement('div'); card.style.cssText = 'border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,.04)';
   const l1 = document.createElement('div'); l1.style.fontSize = '14px'; const b1 = document.createElement('b'); b1.textContent = g.nick; l1.append(b1, document.createTextNode(g.title ? `「${g.title}」` : ''));
-  const l2 = document.createElement('div'); l2.style.cssText = 'font-size:12px;opacity:.8'; const st = statsOf(g.design); l2.textContent = `${nameOf(g.design)}・${TYPE_NAME[st.type]}・${Math.round(g.rpm).toLocaleString('en-US')}rpm・${ARENAS[g.arena][0]}${g.res ? '・' + (g.res.w ? '勝ち' : '負け') + 'の記録' : ''}${g.id || g.wins || g.losses ? `・ゴースト ${g.wins}勝 ${g.losses}敗` : ''}`;
+  const l2 = document.createElement('div'); l2.style.cssText = 'font-size:12px;opacity:.8'; const st = statsOf(g.design); l2.textContent = `${nameOf(g.design)}・${TYPE_NAME[st.type]}・${Math.round(g.rpm).toLocaleString('en-US')}rpm・${ARENAS[g.arena][0]}${g.res ? '・' + (g.res.w ? '勝ち' : '負け') + 'の記録' : ''}`;
   const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px'; const go = document.createElement('button'); go.className = 'btn main'; go.style.flex = 1; go.textContent = 'たたかう'; go.addEventListener('click', () => startGhost(g)); row.appendChild(go);
   const cp = document.createElement('button'); cp.className = 'btn'; cp.textContent = 'コードをコピー'; cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(ghostCode(g)); $b('gStatus').textContent = 'ゴーストコードをコピーした！友だちに送ろう'; } catch (e) { $b('gStatus').textContent = 'コピーできませんでした'; } }); row.appendChild(cp);
   card.append(l1, l2, row); return card;
 }
-async function loadGhosts() {
+function loadGhosts() {
   const box = $b('gList'); box.innerHTML = ''; $b('gCodeBox').hidden = gTab !== 'code'; $b('gStatus').textContent = '';
   if (gTab === 'code') return;
-  if (gTab === 'mine') { const L = (settings.ghosts || []).map(cleanGhost).filter(Boolean); if (!L.length) $b('gStatus').textContent = 'まだゴーストがないよ。CPU戦をやると、あなたのゴーストが自動で保存される'; for (const g of L) box.appendChild(ghostCard(g, true)); return; }
-  if (!gsOn()) { $b('gStatus').textContent = '世界中のゴーストを使うには、下の「サーバー設定」にURLとキーを入れてね（手順は SETUP_SUPABASE.md）'; $b('gSetup').open = true; return; }
-  $b('gStatus').textContent = 'ゴーストを探しています…';
-  try { const L = await gsList(gTab); $b('gStatus').textContent = L.length ? '' : 'まだゴーストがいないよ。CPU戦に勝つと、あなたのゴーストが公開される'; for (const g of L) box.appendChild(ghostCard(g, false)); }
-  catch (e) { $b('gStatus').textContent = 'サーバーにつなげませんでした（' + e.message + '）。URLとキー、テーブルの設定を確認してね'; }
+  const L = (settings.ghosts || []).map(cleanGhost).filter(Boolean); if (!L.length) $b('gStatus').textContent = 'まだゴーストがないよ。CPU戦をやると、あなたのゴーストが自動で保存される';
+  for (const g of L) box.appendChild(ghostCard(g, true));
 }
 function startGhost(g) { btStart('ghost', 0, false, g); }
 function ghostDrive(Bt) {                                    // ゴースト：記録された操作を、その時刻に再現する（向きは反対側から来るので反転）
@@ -2417,7 +2427,7 @@ function btStart(type, diff, keep, extra) {
   const practice = type === 'practice', hard = type === 'hard', streak = type === 'streak' || hard, ghostMode = type === 'ghost';
   if (practice) { type = 'cpu'; diff = 1; }
   if (ghostMode) { type = 'cpu'; diff = 2; }
-  BT.ghost = ghostMode ? extra : null;
+  BT.ghost = ghostMode ? extra : null; BT.ghostRand = ghostMode && !extra;
   if (streak) { type = 'cpu'; if (!keep) BT.stage = 1; diff = hard ? 3 : BT.stage < 8 ? 1 : BT.stage < 18 ? 2 : 3; }
   BT.streak = streak; BT.hard = hard; BT.practice = practice; BT.go = false; BT.tut = null;
   BT.type = type; BT.diff = diff || 1; BT.saved = designOf(); BT.p1 = designOf(); BT.recorded = false;
@@ -2426,12 +2436,13 @@ function btStart(type, diff, keep, extra) {
   initAudio();
   if (type === 'online') { showScreen('sOnline'); olReset(); return; }
   const hp = hard ? 'HARD ' : '';
-  BT.name1 = type === 'cpu' ? titleName() : '1P'; BT.name2 = type === 'cpu' ? (practice ? 'ダミー' : ghostMode ? 'ゴースト ' + extra.nick : streak ? (isBoss(BT.stage) ? 'BOSS ' + bossName(BT.stage) : hp + 'STAGE ' + BT.stage) : 'CPU') : '2P'; BT.stageTitle = streak ? stageTitle(BT.stage) : '';
-  if (type === 'cpu') BT.p2 = ghostMode ? extra.design : streak ? cpuDesignFor(BT.stage, BT.p1) : randomDesign();
+  BT.name1 = type === 'cpu' ? titleName() : '1P'; BT.name2 = type === 'cpu' ? (practice ? 'ダミー' : ghostMode ? (extra ? 'ゴースト ' + extra.nick : 'ゴースト') : streak ? (isBoss(BT.stage) ? 'BOSS ' + bossName(BT.stage) : hp + 'STAGE ' + BT.stage) : 'CPU') : '2P'; BT.stageTitle = streak ? stageTitle(BT.stage) : '';
+  if (type === 'cpu') BT.p2 = ghostMode ? (extra ? extra.design : randomDesign()) : streak ? cpuDesignFor(BT.stage, BT.p1) : randomDesign();
   if (practice) { BT.rpm1 = 6000; BT.rpm2 = 4000; beginBattle(); return; }               // 練習：準備タイムなしで、すぐ始まる
   startSpin(type === 'cpu' ? (streak ? `${hp}STAGE ${BT.stage}「${BT.stageTitle}」` : ghostMode ? 'ゴースト戦' : 'あなた') : '1P', rpm => {
     BT.rpm1 = rpm;
-    if (type === 'cpu') { BT.rpm2 = ghostMode ? extra.rpm : streak ? stageRpm(BT.stage) : cpuRpm(BT.diff); beginBattle(); } else { refreshP2(); showScreen('sP2'); }
+    if (type === 'cpu' && ghostMode && !extra) ghostSearch(rpm);
+    else if (type === 'cpu') { BT.rpm2 = ghostMode ? extra.rpm : streak ? stageRpm(BT.stage) : cpuRpm(BT.diff); beginBattle(); } else { refreshP2(); showScreen('sP2'); }
   });
 }
 const SPIN_SEC = 10;                                         // 準備タイム（回す時間）
@@ -2526,6 +2537,7 @@ function showResult() {
   }
   if (BT.ghost && !Bt.draw) {                                // ゴースト戦の結果を、ゴーストの持ち主に知らせる
     const gs = settings.gstat || (settings.gstat = { w: 0, l: 0 }); if (win) gs.w++; else gs.l++; gsReport(BT.ghost.id, !win);
+    if (BT.ghost.id) { const left = GHOST_LIVES - ((BT.ghost.losses | 0) + (win ? 1 : 0)); $b('resBody').innerHTML += win ? `<br><span style="opacity:.8">このゴーストは、${left <= 0 ? '3回負けたので、サーバーから消えました' : 'あと' + left + '回負けると消える'}</span>` : '<br><span style="opacity:.8">ゴーストは、まだ元気</span>'; }
   }
   if (Bt.rec && BT.type === 'cpu') {                          // あなたのゴーストを、自動で保存（勝ったものは世界にも公開）
     const gh = makeGhost(Bt, win && !Bt.draw);
@@ -3303,9 +3315,10 @@ $b('resAgain').addEventListener('click', () => {
     if (!Net.open) return; BT.againSent = true; netSend({ t: 'again' }); $b('resAgain').disabled = true; $b('resAgain').textContent = '相手を待っています…';
     if (BT.peerAgain) startRematch(); return;
   }
-  const t = BT.type, d = BT.diff, rand = BT.rand, st = BT.streak, keep = BT.streakCont, pr = BT.practice, hd = BT.hard, gh = BT.ghost; endBattle(false); if (gh) btStart('ghost', 0, false, gh); else if (pr) btStart('practice'); else if (st) btStart(hd ? 'hard' : 'streak', 0, keep); else btStart(t, d); if (t === 'online' && rand) olRandom(); });
+  const t = BT.type, d = BT.diff, rand = BT.rand, st = BT.streak, keep = BT.streakCont, pr = BT.practice, hd = BT.hard, gh = BT.ghost, gr = BT.ghostRand; endBattle(false); if (gr) btStart('ghost', 0, false, null); else if (gh) btStart('ghost', 0, false, gh); else if (pr) btStart('practice'); else if (st) btStart(hd ? 'hard' : 'streak', 0, keep); else btStart(t, d); if (t === 'online' && rand) olRandom(); });
 $b('resMenu').addEventListener('click', () => endBattle(true));
 $b('codeGo').addEventListener('click', tryCode); $b('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') tryCode(); });
+$b('gRandom').addEventListener('click', () => btStart('ghost', 0, false, null));
 $b('gBack').addEventListener('click', () => { showScreen('sMenu'); refreshMenu(); });
 $b('gCodeGo').addEventListener('click', () => { const g = readGhostCode($b('gCodeIn').value); if (!g) { $b('gStatus').textContent = 'ゴーストコードが正しくありません'; return; } startGhost(g); });
 $b('gUp').addEventListener('click', () => { settings.ghostUp = settings.ghostUp === false; saveSettings(); drawGhostTabs(); });
@@ -3379,7 +3392,7 @@ $b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventL
 for (const id of ['dash1', 'dash2']) { $b(id).addEventListener('pointermove', dashMove); $b(id).addEventListener('pointerup', dashRelease); $b(id).addEventListener('pointercancel', dashRelease); }
 $b('dodge1').addEventListener('pointerdown', dodgePress(1)); $b('dodge2').addEventListener('pointerdown', dodgePress(2));
 $b('guard1').addEventListener('pointerdown', guardPress(1)); $b('guard2').addEventListener('pointerdown', guardPress(2));
-window.__bt = { cleanGhost, ghostCode, readGhostCode, gsList, addXp, PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
+window.__bt = { cleanGhost, ghostCode, readGhostCode, gsPick, addXp, PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
 
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* Artifactなどでは使えない */ });   // ホーム画面に追加・オフライン起動用
 

@@ -25,13 +25,19 @@ create policy "ghosts_read" on public.ghosts for select using (true);
 drop policy if exists "ghosts_insert" on public.ghosts;
 create policy "ghosts_insert" on public.ghosts for insert with check (wins = 0 and losses = 0);
 
--- 勝敗の報告（ゴーストの wins / losses を1だけ増やす専用の関数）
+-- 勝敗の報告：ゴーストの wins / losses を1だけ増やす専用の関数。ゴーストが3回負けたら、サーバーから消える
 create or replace function public.report_result(gid uuid, won boolean)
-returns void language sql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public as $$
+begin
   update public.ghosts set wins = wins + (case when won then 1 else 0 end), losses = losses + (case when won then 0 else 1 end) where id = gid;
+  delete from public.ghosts where id = gid and losses >= 3;
+end;
 $$;
 revoke all on function public.report_result(uuid, boolean) from public;
 grant execute on function public.report_result(uuid, boolean) to anon;
+
+-- すでに3回以上負けているゴーストを、いま消しておく（1回だけでOK）
+delete from public.ghosts where losses >= 3;
 
 -- （おすすめ）古いゴーストを消したいとき：30日より前のもの。必要なら SQL Editor で時々実行するか、Supabase の Scheduled Jobs に登録
 -- delete from public.ghosts where created_at < now() - interval '30 days' and wins < 3;
