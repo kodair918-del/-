@@ -140,6 +140,11 @@ body.inbattle #rand{display:none}
       <input id="cName" maxlength="10" placeholder="スピナーに名前をつける（空なら自動）" autocomplete="off" style="background:#1c1f27;color:#fff;border:1px solid #3a3f4b;border-radius:12px;padding:10px;font-size:15px;text-align:center">
       <div style="display:flex;gap:10px;align-items:center"><span style="font-size:12px;opacity:.75;white-space:nowrap">色</span><input id="cHue" type="range" min="0" max="360" value="200" style="flex:1;accent-color:#f0c24d"><button class="chip" id="cHueOff" aria-pressed="true">元の色</button></div>
     </div>
+    <div id="growBox" class="col" style="gap:6px">
+      <div style="font-size:13px">育成　<b id="grLv"></b>　<span id="grXp" style="opacity:.7"></span>　強化ポイント <b id="grPts" style="color:#ffd24d"></b></div>
+      <div class="bar" style="height:6px"><i id="grBar"></i></div>
+      <div class="chips" id="grChips"></div>
+    </div>
     <h3>称号 <span id="titleDesc" style="font-weight:400;opacity:.7;font-size:12px"></span></h3>
     <div class="chips" id="titleChips"></div>
     <div class="btgrid">
@@ -288,7 +293,7 @@ const VOL_NAME = ['小', '中', '大'], VOL_GAIN = [0.35, 0.65, 1];
 const MIX_NAME = ['OFF', '小', '中', '大'], MIX_GAIN = [0, 0.5, 1, 1.5];
 function mixApply() { if (!ac || !sfxBus) return; const t = ac.currentTime; sfxBus.gain.setTargetAtTime(MIX_GAIN[settings.mixSfx === undefined ? 2 : settings.mixSfx], t, 0.05); ambBus.gain.setTargetAtTime(MIX_GAIN[settings.mixAmb === undefined ? 2 : settings.mixAmb], t, 0.05); }
 const KEY = 'fidget-spinner-v1';
-const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
+const DEF = { material: 'metal', shape: 'round', arms: 3, hole: 'round', bg: 'plate', timbre: 'metal', spin: 'std', vol: 2, wins: 0, losses: 0, sound: true, vib: true, bass: true, tilt: true, fx: 1, best: 0, sbest: 0, arena: 'normal', sname: '', tint: -1, dashMode: 'auto', mixSfx: 2, mixAmb: 2, grow: {}, stat: { jg: 0, bw: 0, rw: 0, sk: 0 }, title: 'new', titles: ['new'], tutDone: false, hardOpen: false, sbestH: 0 };
 
 function loadSettings() {
   let raw = {};
@@ -1859,13 +1864,21 @@ function withDesign(d, r, fn) {                            // 一時的に別の
   DSG = d; R = r;
   try { return fn(); } finally { DSG = sD; R = sR; }
 }
-const designOf = () => ({ material: settings.material, shape: settings.shape, arms: settings.arms, hole: settings.hole, bg: settings.bg, sname: settings.sname || '', tint: settings.tint === undefined ? -1 : settings.tint });
+const gkey = d => `${d.material}|${d.shape}|${d.arms}|${d.hole}`;
+const GR = d => { const g = settings.grow || (settings.grow = {}), k = gkey(d); return g[k] || (g[k] = { xp: 0, lv: 1, pts: 0, gb: { atk: 0, def: 0, sta: 0, bur: 0 } }); };   // スピナー（素材・形・アーム・穴ごと）の育成記録
+const GR_MAX = 20, grNeed = lv => 40 + 25 * lv;
+function addXp(d, n) {                                       // 経験値を足して、レベルが上がった数を返す（上がるたびに強化ポイント+1）
+  const g = GR(d); let up = 0; if (g.lv >= GR_MAX) return 0; g.xp += n;
+  while (g.lv < GR_MAX && g.xp >= grNeed(g.lv)) { g.xp -= grNeed(g.lv); g.lv++; g.pts++; up++; }
+  if (g.lv >= GR_MAX) g.xp = 0; saveSettings(); return up;
+}
+const designOf = () => ({ material: settings.material, shape: settings.shape, arms: settings.arms, hole: settings.hole, bg: settings.bg, sname: settings.sname || '', tint: settings.tint === undefined ? -1 : settings.tint, gb: { ...GR(settings).gb } });
 function applyDesign(d) { settings.material = d.material; settings.shape = d.shape; settings.arms = d.arms; settings.hole = d.hole; settings.bg = d.bg; if ('sname' in d) settings.sname = d.sname || ''; if ('tint' in d) settings.tint = d.tint; S.hue = 200; S.tickIdx = null; refreshUI(); }
 function randomDesign() {
   const pick = a => a[Math.floor(Math.random() * a.length)];
   return { material: pick(MATS), shape: pick(SHAPE_IDS), arms: pick(ARMS), hole: pick(HOLE_IDS), bg: pick(BG_IDS) };
 }
-const cleanDesign = d => { const t = +d.tint; return { ...d, sname: String(d.sname || '').replace(/[\u0000-\u001f<>&"']/g, '').slice(0, 10), tint: Number.isFinite(t) && t >= 0 ? Math.min(360, t) : -1 }; };   // 通信で届いた名前や色を安全な値にする
+const cleanDesign = d => { const t = +d.tint, gb = d.gb ? Object.fromEntries(['atk', 'def', 'sta', 'bur'].map(k => [k, Math.max(0, Math.min(GR_MAX, d.gb[k] | 0))])) : undefined; return { ...d, gb, sname: String(d.sname || '').replace(/[\u0000-\u001f<>&"']/g, '').slice(0, 10), tint: Number.isFinite(t) && t >= 0 ? Math.min(360, t) : -1 }; };   // 通信で届いた名前や色を安全な値にする
 const accentOf = d => d.tint >= 0 ? `hsl(${d.tint},85%,62%)` : THEME[d.material].accent;
 const NAME_P = { metal: 'ステラ', gold: 'オーロ', copper: 'アカガネ', titan: 'ティタン', black: 'ノワール', neon: 'ネオン', rainbow: 'プリズム', wood: 'モリ', matte: 'ミスト', ice: 'グレイシア' };
 const NAME_S = { round: 'オービット', slim: 'ニードル', fat: 'ガルド', long: 'ランス', pointy: 'ファング', leaf: 'リーフ' };
@@ -1900,6 +1913,7 @@ function statsOf(d) {
   st.atkE = Math.pow(st.atk, 0.45 * PHYS.LAM) * Math.pow(sh.atk, PHYS.MU);
   st.defE = Math.pow(st.def, 0.45 * PHYS.LAM) * Math.pow(sh.def, PHYS.MU);
   st.staE = Math.pow(st.sta, PHYS.LAM) * Math.pow(sh.sta, PHYS.MU * 0.8);
+  if (d.gb) { st.atkE *= 1 + 0.04 * (d.gb.atk | 0); st.defE *= 1 + 0.04 * (d.gb.def | 0); st.staE *= 1 + 0.05 * (d.gb.sta | 0); st.bres *= 1 + 0.05 * (d.gb.bur | 0); }   // 育成の強化
   return st;
 }
 const BEATS = { atk: 'sta', sta: 'def', def: 'atk' };                                    // 攻撃は持久に強く、持久は防御に強く、防御は攻撃に強い
@@ -2169,6 +2183,16 @@ function syncCustom() {
   $b('cHueOff').setAttribute('aria-pressed', t < 0); if (t >= 0) $b('cHue').value = t;
   $b('cHue').style.background = 'linear-gradient(90deg,hsl(0,80%,52%),hsl(60,80%,52%),hsl(120,80%,52%),hsl(180,80%,52%),hsl(240,80%,52%),hsl(300,80%,52%),hsl(360,80%,52%))';
 }
+function drawGrow() {                                        // 育成：レベル・経験値・強化ポイントの振り分け
+  const d = designOf(), g = GR(d), el = $b('grChips'); el.innerHTML = '';
+  $b('grLv').textContent = `Lv.${g.lv}${g.lv >= GR_MAX ? '（MAX）' : ''}`; $b('grPts').textContent = g.pts;
+  $b('grXp').textContent = g.lv >= GR_MAX ? '' : `経験値 ${g.xp} / ${grNeed(g.lv)}`; $b('grBar').style.width = (g.lv >= GR_MAX ? 100 : g.xp / grNeed(g.lv) * 100) + '%';
+  for (const [k, name, per] of [['atk', '攻撃', 4], ['def', '防御', 4], ['sta', '持久', 5], ['bur', '頑丈', 5]]) {
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = `${name} +${g.gb[k] * per}%${g.pts > 0 ? '　＋' : ''}`; b.disabled = g.pts <= 0; b.style.opacity = g.pts > 0 ? 1 : 0.6;
+    b.addEventListener('click', () => { if (g.pts > 0) { g.pts--; g.gb[k]++; saveSettings(); click(0.9); refreshMenu(true); } }); el.appendChild(b);
+  }
+  const r = document.createElement('button'); r.className = 'chip'; r.textContent = '振り直す'; r.addEventListener('click', () => { g.gb = { atk: 0, def: 0, sta: 0, bur: 0 }; g.pts = g.lv - 1; saveSettings(); click(0.7); refreshMenu(true); }); el.appendChild(r);
+}
 function drawDashChips() {
   const el = $b('dashChips'); el.innerHTML = '';
   for (const [id, name] of [['auto', '自動（敵の方向）'], ['manual', 'マニュアル（引っ張って離す）']]) {
@@ -2177,7 +2201,7 @@ function drawDashChips() {
   }
 }
 function refreshMenu(skipSync) {
-  drawDashChips(); drawTitleChips();
+  drawDashChips(); drawTitleChips(); drawGrow();
   $b('btHard').style.display = settings.hardOpen ? 'block' : 'none'; $b('btPractice').textContent = (settings.tutDone ? '' : '★ はじめての人はここから　') + 'れんしゅうモード（操作チュートリアル）';
   drawArenaChips(); if (!skipSync) syncCustom();
   const d = designOf(), st = statsOf(d);
@@ -2226,6 +2250,7 @@ function btStart(type, diff, keep) {
   if (streak) { type = 'cpu'; if (!keep) BT.stage = 1; diff = hard ? 3 : BT.stage < 8 ? 1 : BT.stage < 18 ? 2 : 3; }
   BT.streak = streak; BT.hard = hard; BT.practice = practice; BT.go = false; BT.tut = null;
   BT.type = type; BT.diff = diff || 1; BT.saved = designOf(); BT.p1 = designOf(); BT.recorded = false;
+  if (type === 'online' || type === 'local') delete BT.p1.gb;       // 対人戦は育成なし（公平に）
   BT.role = type === 'online' ? 'host' : 'local'; BT.flip = false; BT.mySpun = BT.peerSpun = false;
   initAudio();
   if (type === 'online') { showScreen('sOnline'); olReset(); return; }
@@ -2318,6 +2343,10 @@ function showResult() {
     if (win && !Bt.draw && BT.stage > LAST_STAGE) { title = BT.hard ? 'HARD ALL CLEAR!!' : 'ALL CLEAR!!'; if (!BT.hard && !settings.hardOpen) { settings.hardOpen = true; saveSettings(); $b('resBody').innerHTML += '<br><b>ハード連勝戦が解放された！</b>'; } }
     $b('resTitle').textContent = (BT.hard && !title.startsWith('HARD') ? 'HARD ' : '') + title;
     $b('resBody').innerHTML += `<br><b>${cleared}連勝</b>　（${BT.hard ? 'ハード' : ''}ベスト ${settings[bk] | 0}連勝）`;
+  }
+  if (BT.type === 'cpu' || BT.ghost) {                       // 経験値（育成）：対CPU・ゴースト戦のみ
+    const xp = Bt.draw ? 15 : win ? 30 + (BT.streak ? Math.min(BT.stage, 30) * 2 : 0) + (BT.ghost ? 10 : 0) : 10, up = addXp(BT.p1, xp), g = GR(BT.p1);
+    $b('resBody').innerHTML += `<br>経験値 +${xp}（Lv.${g.lv}${up ? `　<b style="color:#ffd24d">レベルアップ！ 強化ポイント +${up}</b>` : ''}）`;
   }
   { const got = checkTitles(); if (got.length) $b('resBody').innerHTML += `<br><b>称号を獲得：「${got.join('」「')}」</b>`; saveSettings(); }
   showScreen('sResult');
@@ -2965,9 +2994,10 @@ function maybeBeginOnline() {
 const snapOf = Bt => ({ t: 'snap', tm: Bt.t, a: [Bt.A.x, Bt.A.y, Bt.A.w, +Bt.A.out, +Bt.A.fin, Bt.A.dashCd, Bt.A.z, +Bt.A.burst, Bt.A.bg, Math.round(Bt.A.sp), +(Bt.A.sk.rush > 0), +(Bt.A.sk.guard > 0), +(Bt.A.sk.eco > 0), +(Bt.A.inv > 0), Bt.A.dodgeCd], b: [Bt.B.x, Bt.B.y, Bt.B.w, +Bt.B.out, +Bt.B.fin, Bt.B.dashCd, Bt.B.z, +Bt.B.burst, Bt.B.bg, Math.round(Bt.B.sp), +(Bt.B.sk.rush > 0), +(Bt.B.sk.guard > 0), +(Bt.B.sk.eco > 0), +(Bt.B.inv > 0), Bt.B.dodgeCd],
   ev: Bt.ev.map(e => ({ ...e })), over: Bt.over, draw: !!Bt.draw, win: Bt.winner, why: Bt.reason, ha: [Bt.A.hits, Bt.A.maxHit, Bt.A.dashed], hb: [Bt.B.hits, Bt.B.maxHit, Bt.B.dashed] });
 function handleNet(m) {
-  if (m.t === 'hello') { BT.peer = m; maybeStartOnlineSpin(); }
+  if (m.t === 'hello') { if (m.design) delete m.design.gb; BT.peer = m; maybeStartOnlineSpin(); }
   else if (m.t === 'spun') { BT.rpm2 = m.rpm; BT.peerSpun = true; maybeBeginOnline(); }
   else if (m.t === 'start' && BT.role === 'guest') {
+    delete m.A.d.gb; delete m.B.d.gb;
     const fa = makeFighter(m.A.d, m.A.rpm, cleanNick(BT.peer && BT.peer.nick) || '相手', 'A'), fb = makeFighter(m.B.d, m.B.rpm, 'あなた', 'B');   // A=ホスト、B=ゲスト（自分）
     fa.dir = m.A.dir; fb.dir = m.B.dir;
     BT.battle = makeBattle(fa, fb, ARENAS[m.arena] ? m.arena : 'normal');
@@ -3003,7 +3033,7 @@ for (const b of btEl.querySelectorAll('[data-bt]')) b.addEventListener('click', 
 $b('p2Pick').addEventListener('click', () => setSheet(true));
 $b('p2Rand').addEventListener('click', () => { applyDesign(randomDesign()); click(0.9); refreshP2(); });
 $b('p2Go').addEventListener('click', () => {
-  BT.p2 = { ...designOf(), sname: '', tint: -1 };
+  BT.p2 = { ...designOf(), sname: '', tint: -1 }; delete BT.p2.gb;
   startSpin('2P', rpm => { BT.rpm2 = rpm; beginBattle(); });
 });
 $b('resAgain').addEventListener('click', () => { const t = BT.type, d = BT.diff, rand = BT.rand, st = BT.streak, keep = BT.streakCont, pr = BT.practice, hd = BT.hard; endBattle(false); if (pr) btStart('practice'); else if (st) btStart(hd ? 'hard' : 'streak', 0, keep); else btStart(t, d); if (t === 'online' && rand) olRandom(); });
@@ -3071,7 +3101,7 @@ $b('dash1').addEventListener('pointerdown', dashPress(1)); $b('dash2').addEventL
 for (const id of ['dash1', 'dash2']) { $b(id).addEventListener('pointermove', dashMove); $b(id).addEventListener('pointerup', dashRelease); $b(id).addEventListener('pointercancel', dashRelease); }
 $b('dodge1').addEventListener('pointerdown', dodgePress(1)); $b('dodge2').addEventListener('pointerdown', dodgePress(2));
 $b('guard1').addEventListener('pointerdown', guardPress(1)); $b('guard2').addEventListener('pointerdown', guardPress(2));
-window.__bt = { PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
+window.__bt = { addXp, PW, nameOf, setBS: v => { BS = v; Q = v / 0.36; }, setStart: v => { START = v; }, statsOf, RPS_X, hitCircles, makeFighter, makeBattle, stepBattle, randomDesign, designOf, withDesign, cpuRpm, BT, PHYS, applyDesign, fh };
 
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* Artifactなどでは使えない */ });   // ホーム画面に追加・オフライン起動用
 
