@@ -918,7 +918,18 @@ function armPath(c, G) {
   c.closePath();
 }
 
+function drawWindmill(th, target, ox, oy) {                  // 絵文字の風車：4本の「指さし」が顔を囲んで回る（元ネタの絵文字アート）
+  const c = target || ctx, Rr = R, F = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  c.save(); c.translate(ox === undefined ? cx : ox, oy === undefined ? cy : oy); c.rotate(th); c.textAlign = 'center'; c.textBaseline = 'middle';
+  const g = c.createRadialGradient(0, 0, Rr * 0.1, 0, 0, Rr * 0.98); g.addColorStop(0, 'rgba(255,255,255,.22)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.beginPath(); c.arc(0, 0, Rr * 0.98, 0, TAU); c.fill();
+  c.font = `${Rr * 0.6}px ${F}`;
+  for (let k = 0; k < 4; k++) { c.save(); c.rotate(k * Math.PI / 2); c.translate(Rr * 0.6, 0); c.rotate(Math.PI / 2); c.fillText('\u{1F449}', 0, 0); c.restore(); }   // 👉 を、回る向きに4本
+  c.font = `${Rr * 0.8}px ${F}`; c.fillText('\u{1F600}', 0, Rr * 0.02);                                                                                   // 真ん中は、にっこりの顔 😀
+  c.restore();
+}
+const isWindmill = () => (DSG.sp || (DSG === settings ? specialOn() : '')) === 'windmill';
 function drawSpinner(th, full, target, ox, oy) {
+  if (isWindmill()) { drawWindmill(th, target, ox, oy); return; }
   const c = target || ctx, name = DSG.material, P = THEME[name], n = DSG.arms, step = TAU / n;
   const G = geom(), tipD = G.tipD, tipR = G.tipR, hubR = G.hubR;
   const neonCol = hsl(S.hue, 100, 62);
@@ -1469,7 +1480,7 @@ function mipChain(src, prev) {
 const spCache = new Map();
 function getSprite() {
   const dyn = DYN.has(DSG.material);
-  const key = [DSG.material, DSG.shape, DSG.hole, DSG.arms, Math.round(R), dpr, dyn ? Math.round(S.hue / 30) : 0, DSG.tint >= 0 ? DSG.tint : -1].join('|');
+  const key = [DSG.sp || (DSG === settings ? specialOn() : ''), DSG.material, DSG.shape, DSG.hole, DSG.arms, Math.round(R), dpr, dyn ? Math.round(S.hue / 30) : 0, DSG.tint >= 0 ? DSG.tint : -1].join('|');
   let sp = spCache.get(key);
   if (sp) return sp;
   const size = Math.ceil(2 * R * dpr);
@@ -1891,7 +1902,7 @@ function withDesign(d, r, fn) {                            // 一時的に別の
   try { return fn(); } finally { DSG = sD; R = sR; }
 }
 const SPECIALS = {                                            // コードで手に入る特別なスピナー（形はふつうの部品の組み合わせ、強さは特別）
-  windmill: { name: '暴走風車', look: { material: 'rainbow', shape: 'leaf', arms: 4, hole: 'big' }, atk: 2.6, def: 2.6, sta: 2.6, bur: 4, pw: 3, mass: 1.5, skill: ['ハリケーン', '255,120,255'] }
+  windmill: { name: '暴走風車', look: { material: 'rainbow', shape: 'leaf', arms: 4, hole: 'big' }, atk: 2.6, def: 2.6, sta: 2.6, bur: 4, pw: 3, mass: 1.5, skill: ['認識された', '255,50,50'] }
 };
 const codeHash = s => { let h = 0x811c9dc5; for (const ch of String(s).normalize('NFKC').toLowerCase().replace(/[\s\-_]/g, '')) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
 const CODES = { cdi1pj: 'windmill', '680d0h': 'windmill' };   // コードそのものは書かず、ハッシュだけ持つ
