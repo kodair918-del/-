@@ -1995,10 +1995,11 @@ const SPECIALS = {                                            // コードで手
   fortress: { name: '鉄壁要塞', look: { material: 'titan', shape: 'fat', arms: 6, hole: 'weight' }, tint: -1, atk: 1.5, def: 3, sta: 1.5, bur: 5, pw: 2.2, mass: 1.6, base: 'def', aura: 215, hint: 'ビッグモードで優勝', ach: () => (settings.bigWins | 0) >= 1 },
   marathon: { name: '永久機関', look: { material: 'ice', shape: 'round', arms: 2, hole: 'weight' }, tint: 140, atk: 1.4, def: 1.5, sta: 4, bur: 2, pw: 2, mass: 1.1, base: 'sta', aura: 140, hint: 'ゴーストに10回勝つ', ach: () => ((settings.gstat || {}).w | 0) >= 10 },
   golden: { name: '黄金の王', look: { material: 'gold', shape: 'leaf', arms: 5, hole: 'weight' }, tint: -1, atk: 2, def: 2, sta: 2, bur: 2.5, pw: 2.5, mass: 1.3, base: 'bal', aura: 45, hint: '連勝戦をALL CLEAR', ach: () => (settings.sbest | 0) >= LAST_STAGE },
+  omega: { name: 'ΩΩ 終焉の覇王', look: { material: 'black', shape: 'leaf', arms: 6, hole: 'weight' }, tint: 275, atk: 7, def: 7, sta: 7, bur: 12, pw: 9, mass: 3, base: 'om', aura: 'rainbow', hint: 'コードで手に入る（ガチ最強）', skill: ['ジ・エンド', '255,215,0'] },
   windmill: { base: 'wm', aura: 'rainbow', hint: 'コードで手に入る', name: 'キ〇ガイ風車', look: { material: 'rainbow', shape: 'leaf', arms: 4, hole: 'big' }, atk: 2.6, def: 2.6, sta: 2.6, bur: 4, pw: 3, mass: 1.5, skill: ['認識された', '255,50,50'] }
 };
 const codeHash = s => { let h = 0x811c9dc5; for (const ch of String(s).normalize('NFKC').toLowerCase().replace(/[\s\-_]/g, '')) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
-const CODES = { cdi1pj: 'windmill', '680d0h': 'windmill', '1jrvbv6': 'comet', '1xzrssn': 'fortress', qy6564: 'marathon', '1raucd7': 'golden' };   // コードそのものは書かず、ハッシュだけ持つ
+const CODES = { cdi1pj: 'windmill', '680d0h': 'windmill', '1jrvbv6': 'comet', '1xzrssn': 'fortress', qy6564: 'marathon', '1raucd7': 'golden', '17exhr9': 'omega', wddc3z: 'omega' };   // コードそのものは書かず、ハッシュだけ持つ
 const specialOn = () => { const id = settings.special, sp = id && SPECIALS[id], l = sp && sp.look; if (sp && l.material === settings.material && l.shape === settings.shape && l.arms === settings.arms && l.hole === settings.hole) return id; if (id) settings.special = ''; return ''; };
 const gkey = d => d.sp ? 'sp:' + d.sp : `${d.material}|${d.shape}|${d.arms}|${d.hole}`;
 const GR = d => { const g = settings.grow || (settings.grow = {}), k = gkey(d); return g[k] || (g[k] = { xp: 0, lv: 1, pts: 0, gb: { atk: 0, def: 0, sta: 0, bur: 0 } }); };   // スピナー（素材・形・アーム・穴ごと）の育成記録
@@ -2220,7 +2221,7 @@ function applyDodge(f, o, Bt) {                              // 回避：敵の�
   f.vx += dx / d * k; f.vy += dy / d * k; f.vz = PHYS.HOP; f.z += 0.002; f.w *= 0.94; f.dodgeCd = PHYS.DODGE_CD; f.dashed++; f.inv = PHYS.INV;
   if (Bt) Bt.ev.push({ type: 'dash', who: f.side, x: f.x, y: f.y, z: f.z, dx: dx / d, dy: dy / d, dodge: true });
 }
-const SKILLS = { atk: ['疾風ラッシュ', '255,107,107'], def: ['鉄壁パルス', '93,180,255'], sta: ['リバイブ', '107,220,139'], bal: ['ツインブースト', '240,194,77'], wm: SPECIALS.windmill.skill };
+const SKILLS = { atk: ['疾風ラッシュ', '255,107,107'], def: ['鉄壁パルス', '93,180,255'], sta: ['リバイブ', '107,220,139'], bal: ['ツインブースト', '240,194,77'], wm: SPECIALS.windmill.skill, om: SPECIALS.omega.skill };
 function useSkill(f, o, Bt) {                                // 必殺技：ゲージが満タンで発動。タイプごとに効果が違う
   if (!f.skReq) return; f.skReq = false; if (BT.dailyRule === 'noskill') return;
   if (f.sp < 100 || f.out || f.burst || f.fin) return;
@@ -2229,6 +2230,7 @@ function useSkill(f, o, Bt) {                                // 必殺技：ゲ�
   if (t === 'atk') { f.vx += nx * PHYS.LUNGE * Q / ms; f.vy += ny * PHYS.LUNGE * Q / ms; f.sk.rush = 1.6; f.vz = Math.max(f.vz, 0.25); f.z += 0.002; }                      // 突進して、次の一撃が大ダメージ
   else if (t === 'def') { f.sk.guard = 3.2; const k = PHYS.PULSE * Q / (0.5 + d * 3) / Math.sqrt(o.st.mass); o.vx += nx * k; o.vy += ny * k; o.vz = Math.max(o.vz, 0.7); o.z += 0.002; o.w = Math.max(0, o.w - 0.04 * o.w0); }   // 衝撃波で弾き飛ばし、しばらく硬くなる
   else if (t === 'sta') { f.w = Math.min(f.w0, f.w + 0.3 * f.w0); f.bg = Math.max(0, f.bg - 35); f.sk.eco = 4; }                                                         // 回転を回復して、しばらく落ちにくい
+  else if (t === 'om') { f.w = f.w0; f.bg = 0; f.sk.rush = 2.6; f.sk.guard = 6; f.sk.eco = 6; f.vx += nx * PHYS.LUNGE * Q / ms; f.vy += ny * PHYS.LUNGE * Q / ms; const k = PHYS.PULSE * 1.6 * Q / (0.5 + d * 3) / Math.sqrt(o.st.mass); o.vx += nx * k; o.vy += ny * k; o.vz = Math.max(o.vz, 0.9); o.z += 0.002; o.w = Math.max(0, o.w - 0.1 * o.w0); }   // ジ・エンド：完全回復・無敵に近い防御・強烈な突進と衝撃波
   else if (t === 'wm') { f.w = Math.min(f.w0, f.w + 0.2 * f.w0); f.bg = Math.max(0, f.bg - 40); f.sk.rush = 1.8; f.sk.guard = 3.5; f.sk.eco = 4; f.vx += nx * PHYS.LUNGE * 0.8 * Q; f.vy += ny * PHYS.LUNGE * 0.8 * Q; const k = PHYS.PULSE * Q / (0.5 + d * 3) / Math.sqrt(o.st.mass); o.vx += nx * k; o.vy += ny * k; o.vz = Math.max(o.vz, 0.7); o.z += 0.002; }   // ハリケーン：突進・防御・回復・衝撃波の全部入り
   else { f.w = Math.min(f.w0, f.w + 0.1 * f.w0); f.sk.guard = 2; f.sk.rush = 1; f.vx += nx * PHYS.LUNGE * 0.6 * Q; f.vy += ny * PHYS.LUNGE * 0.6 * Q; }                    // 少しずつ全部
   Bt.ev.push({ type: 'skill', who: f.side, kind: t, x: f.x, y: f.y, z: f.z });
