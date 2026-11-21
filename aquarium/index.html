@@ -2,567 +2,220 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#1b4f8a">
-<title>ドットアクアリウム</title>
-<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#7a4a21">
+<title>木目しらべ</title>
 <style>
-  :root{--ui:#fff;--ui-bg:rgba(10,30,70,.55)}
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
-  html,body{margin:0;height:100%;background:#0d2c55;overflow:hidden;overscroll-behavior:none;
-    font-family:'DotGothic16',ui-monospace,monospace;color:var(--ui)}
-  #c{position:fixed;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none}
-  .bar{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 10px) 14px 0;
-    display:flex;justify-content:space-between;align-items:center;pointer-events:none}
-  .title{font-size:15px;text-shadow:2px 2px 0 #0d2c55}
-  .count{font-size:13px;background:var(--ui-bg);padding:4px 8px;border:2px solid #fff;border-radius:2px}
-  .dock{position:fixed;left:0;right:0;bottom:0;padding:0 12px calc(env(safe-area-inset-bottom) + 12px);
-    display:flex;gap:10px;justify-content:center}
-  button{font:inherit;font-size:15px;color:#fff;background:var(--ui-bg);border:2px solid #fff;
-    padding:10px 14px;border-radius:2px;box-shadow:0 3px 0 #0d2c55;touch-action:manipulation}
-  button:active{transform:translateY(3px);box-shadow:none}
-  .hint{position:fixed;left:0;right:0;top:46%;text-align:center;font-size:14px;text-shadow:2px 2px 0 #0d2c55;
-    pointer-events:none;transition:opacity 1.2s}
-  .dock button{flex:1;padding:10px 4px;font-size:13px}
-  .modal{position:fixed;inset:0;background:rgba(5,15,40,.8);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
-  .modal.on{display:flex}
-  .panel{width:100%;max-width:360px;max-height:100%;overflow:auto;background:#10325f;border:3px solid #fff;padding:14px;
-    box-shadow:0 4px 0 #061a38;font-size:14px;line-height:1.6}
-  .panel h2{margin:0 0 8px;font-size:16px}
-  .panel button{width:100%;margin:6px 0}
-  .panel .sec{display:none}.panel .sec.on{display:block}
-  #qr{display:block;margin:8px auto;width:260px;height:260px;image-rendering:pixelated;background:#fff;border:6px solid #fff}
-  video{width:100%;aspect-ratio:1;object-fit:cover;background:#000;border:2px solid #fff}
-  textarea{width:100%;height:56px;font:11px monospace;background:#061a38;color:#bde;border:2px solid #4a78b8;user-select:text;-webkit-user-select:text}
-  details{margin-top:6px;font-size:12px}
-  .small{font-size:12px;opacity:.85}
-  .toast{position:fixed;left:50%;top:60px;transform:translateX(-50%);background:var(--ui-bg);border:2px solid #fff;padding:6px 12px;
-    font-size:14px;z-index:20;opacity:0;transition:opacity .4s;pointer-events:none}
-  .toast.on{opacity:1}
+:root{--bg:#f6efe3;--card:#fffaf0;--ink:#3b2a1a;--sub:#7d6850;--brand:#7a4a21;--brand2:#a8672d;--line:#e4d5bc;--ok:#3d7a3a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.6}
+header{background:linear-gradient(180deg,#8a5426,#6c3f1a);color:#fff;padding:calc(env(safe-area-inset-top) + 14px) 16px 14px;display:flex;align-items:center;justify-content:space-between}
+header h1{margin:0;font-size:19px;letter-spacing:.04em}
+header button{background:none;border:0;color:#fff;font-size:22px;padding:4px 8px}
+main{max-width:560px;margin:0 auto;padding:16px 16px calc(env(safe-area-inset-bottom) + 40px)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+h2{font-size:15px;margin:0 0 8px;color:var(--brand)}
+.shoot{display:block;width:100%;text-align:center;background:var(--brand);color:#fff;border-radius:14px;padding:18px;font-size:18px;font-weight:700;border:0;box-shadow:0 3px 0 #4e2c10}
+.shoot:active{transform:translateY(3px);box-shadow:none}
+.btn{background:#fff;border:1.5px solid var(--brand);color:var(--brand);border-radius:10px;padding:10px 14px;font-size:15px;font-weight:600}
+.btn.primary{background:var(--brand2);color:#fff;border-color:var(--brand2)}
+.btn:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.thumbs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.thumb{position:relative;width:96px;height:96px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb b{position:absolute;left:0;bottom:0;right:0;background:rgba(0,0,0,.55);color:#fff;font-size:11px;text-align:center;padding:1px}
+.thumb i{position:absolute;right:2px;top:2px;background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:22px;height:22px;text-align:center;font-style:normal;line-height:22px}
+.tips{font-size:13px;color:var(--sub);margin:8px 0 0;padding-left:1.2em}
+.sp{border-bottom:1px dashed var(--line);padding:8px 0}.sp:last-child{border:0}
+.sp .n{font-weight:700;font-size:17px}.sp .sci{font-size:12px;color:var(--sub);font-style:italic}
+.bar{height:8px;border-radius:4px;background:#eadfca;margin:4px 0;overflow:hidden}.bar>div{height:100%;background:var(--brand2)}
+.pct{font-size:12px;color:var(--sub)}
+.tag{display:inline-block;background:#efe2c8;border-radius:999px;padding:2px 10px;font-size:13px;margin:2px 4px 2px 0}
+.kv{display:grid;grid-template-columns:5.5em 1fr;gap:4px 8px;font-size:14px}.kv dt{color:var(--sub)}.kv dd{margin:0}
+.big{font-size:22px;font-weight:800}
+.caveat{font-size:12px;color:var(--sub)}
+.err{color:#b3261e;font-size:14px}
+.loading{text-align:center;padding:26px 0}
+.spin{width:34px;height:34px;border:4px solid #e4d5bc;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:r 1s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}
+.hist{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.hist img{width:56px;height:56px;border-radius:8px;object-fit:cover}
+.hist button{all:unset;display:flex;gap:10px;align-items:center;width:100%;cursor:pointer}
+dialog{border:0;border-radius:14px;padding:16px;max-width:92vw;width:420px;background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+input[type=password],input[type=text]{width:100%;padding:10px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;margin:6px 0}
+.hidden{display:none}
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div class="bar"><div class="title">🐟 ドットアクアリウム</div><div class="count" id="count">0ひき</div></div>
-<div class="hint" id="hint">画面をタップしてごはんをあげよう</div>
-<div class="dock">
-  <button id="add">＋ さかな</button>
-  <button id="jelly">＋ クラゲ</button>
-  <button id="link">🔗 つなぐ</button>
-  <button id="reset">リセット</button>
-</div>
-<div class="toast" id="toast"></div>
-<div class="modal" id="modal"><div class="panel">
-  <div class="sec" id="m-menu">
-    <h2>🔗 すいそうをつなぐ</h2>
-    <p class="small">ふたりのスマホを近づけて、おたがいのQRコードを読み合うとつながります。魚が画面のはしから、となりのスマホへ泳いで行きます。</p>
-    <button id="m-host">① 左がわになる（QRを見せる）</button>
-    <button id="m-guest">② 右がわになる（QRを読む）</button>
-    <button id="m-unlink">つなぎをやめる</button>
-    <button class="m-close">とじる</button>
+<header><h1>🪵 木目しらべ</h1><button id="gear" aria-label="設定">⚙️</button></header>
+<main>
+  <div class="card">
+    <button class="shoot" id="shoot">📷 木目を撮る</button>
+    <input type="file" id="file" accept="image/*" capture="environment" class="hidden">
+    <input type="file" id="pick" accept="image/*" class="hidden">
+    <div class="thumbs" id="thumbs"></div>
+    <div class="row" id="actions" style="display:none">
+      <button class="btn" id="add">＋ 写真を足す（木口など）</button>
+      <button class="btn" id="gallery">アルバムから</button>
+      <button class="btn primary" id="go">しらべる</button>
+    </div>
+    <ul class="tips">
+      <li>明るい場所で、木目にピントを合わせて近くから</li>
+      <li>フラッシュはテカるのでオフ。影も避けて</li>
+      <li>切り口（木口）があれば、もう1枚足すと当たりやすい</li>
+    </ul>
   </div>
-  <div class="sec" id="m-show">
-    <h2 id="m-title"></h2>
-    <canvas id="qr" width="260" height="260"></canvas>
-    <p class="small" id="m-note"></p>
-    <button id="m-next">つぎへ：相手のQRを読む</button>
-    <details><summary>QRが読めないとき</summary>
-      <p class="small">この文字を相手に送ってください（AirDropやLINEでOK）</p>
-      <textarea id="m-code" readonly></textarea>
-      <button id="m-copy">コピー</button>
-    </details>
-    <button class="m-close">やめる</button>
-  </div>
-  <div class="sec" id="m-scan">
-    <h2 id="m-scan-title"></h2>
-    <video id="vid" playsinline muted></video>
-    <p class="small" id="m-scan-note">相手のQRコードを枠に入れてください</p>
-    <details><summary>QRが読めないとき</summary>
-      <p class="small">相手から届いた文字をここに貼り付けてください</p>
-      <textarea id="m-paste"></textarea>
-      <button id="m-paste-ok">決定</button>
-    </details>
-    <button class="m-close">やめる</button>
-  </div>
-</div></div>
-<script src="lib/qrcode.js"></script>
-<script src="lib/jsQR.js"></script>
+  <div id="result"></div>
+  <div class="card" id="histCard" style="display:none"><h2>これまでの結果</h2><div id="hist"></div></div>
+</main>
+
+<dialog id="dlg">
+  <h2>設定</h2>
+  <p style="font-size:13px;margin:0 0 6px">AI（Claude）に写真を送って判定します。<br>あなたの <b>Anthropic APIキー</b> を入れてください。</p>
+  <input type="password" id="key" placeholder="sk-ant-..." autocomplete="off">
+  <p class="caveat">キーはこのスマホの中だけに保存され、判定のときに Anthropic にだけ送られます。使いすぎ防止に、Anthropic のコンソールで月の上限を設定しておくと安心です。</p>
+  <div class="row"><button class="btn primary" id="save">保存</button><button class="btn" id="close">とじる</button><button class="btn" id="clear">履歴を消す</button></div>
+</dialog>
+
 <script>
 (()=>{
 'use strict';
-const cv=document.getElementById('c'),ctx=cv.getContext('2d');
-let W=0,H=0;
-const R=(a,b)=>a+Math.random()*(b-a), RI=(a,b)=>Math.floor(R(a,b+1));
-const pick=a=>a[Math.floor(Math.random()*a.length)];
-
-function resize(){
-  W=112; H=Math.round(W*innerHeight/innerWidth);
-  if(H<150)H=150;
-  cv.width=W; cv.height=H;
-  ctx.imageSmoothingEnabled=false;
-  initScenery();
-}
-
-/* ---------- sprites ---------- */
-function sprite(rows,pal){
-  const c=document.createElement('canvas');c.width=rows[0].length;c.height=rows.length;
-  const g=c.getContext('2d');
-  rows.forEach((r,y)=>[...r].forEach((ch,x)=>{ if(pal[ch]){g.fillStyle=pal[ch];g.fillRect(x,y,1,1);} }));
-  return c;
-}
-const FISH=[
-"....fff....",
-"f..bbbbbb..",
-"ffbbbbbbwb.",
-"fbbbbbbbebb",
-"ffllllllbb.",
-"f..llllll..",
-];
-const FISH_BIG=[
-"......ff.......",
-".....ffff......",
-"ff..bbbbbbb....",
-"fff.bbbbbbbbb..",
-"ffbbbbbbbbbwbb.",
-"fffbbbbbbbbbebb",
-"ffbllllllllllb.",
-"fff.llllllllb..",
-"ff...lllllll...",
-".....fff.......",
-];
-const SCHEMES=[
- {b:'#ff8fa3',l:'#ffd6dd',f:'#ff5d7e'},
- {b:'#ffb347',l:'#ffe2a8',f:'#ff7a2f'},
- {b:'#6ee7ff',l:'#d5f8ff',f:'#2bb4e0'},
- {b:'#b49bff',l:'#e4dcff',f:'#7d5cff'},
- {b:'#8ef0a0',l:'#d8ffe0',f:'#3cc46a'},
- {b:'#ffe14d',l:'#fff4b0',f:'#f2b200'},
-];
-const fishSprites=SCHEMES.map(s=>{
-  const pal={b:s.b,l:s.l,f:s.f,e:'#1a1a3a',w:'#fff'};
-  return {s:sprite(FISH,pal),B:sprite(FISH_BIG,pal)};
-});
-const JELLY_A=sprite([
-"..jjjj..",
-".jjjjjj.",
-"jjwjjjjj",
-"jjjjjjjj",
-"jjjjjjjj",
-],{j:'#ffb8f0',w:'#fff'});
-const JELLY_B=sprite([
-"..jjjj..",
-".jjjjjj.",
-"jjwjjjjj",
-"jjjjjjjj",
-".jjjjjj.",
-],{j:'#ffb8f0',w:'#fff'});
-const CRAB=[sprite([
-"r......r",
-"rr.rr.rr",
-".rrrrrr.",
-"rrwrrwrr",
-".rrrrrr.",
-"r.r..r.r",
-],{r:'#ff6b5a',w:'#fff'}),sprite([
-"r......r",
-"rr.rr.rr",
-".rrrrrr.",
-"rrwrrwrr",
-".rrrrrr.",
-".r.rr.r.",
-],{r:'#ff6b5a',w:'#fff'})];
-const STAR=sprite([
-"..y..",
-"..y..",
-"yyyyy",
-".yyy.",
-".y.y.",
-],{y:'#ffcf3d'});
-const HEART=sprite([
-".rr.rr.",
-"rrrrrrr",
-"rrrrrrr",
-".rrrrr.",
-"..rrr..",
-"...r...",
-],{r:'#ff5d8f'});
-const SHELL=sprite([
-".ppp.",
-"ppppp",
-"pwpwp",
-],{p:'#ffc2d6',w:'#fff'});
-
-/* ---------- state ---------- */
-const link={pc:null,dc:null,role:null};
-let fishes=[],jellies=[],foods=[],bubbles=[],hearts=[],plants=[],rocks=[],crab,t=0;
-function sandY(){return H-30;}
-
-let scn={seed:(Math.random()*1e9)|0,off:0,tot:0};
-function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-function initScenery(){
-  const tot=scn.tot||W,off=scn.off,rnd=rng(scn.seed);
-  const r=(a,b)=>a+rnd()*(b-a),ri=(a,b)=>Math.floor(r(a,b+1)),pk=a=>a[Math.floor(rnd()*a.length)];
-  plants=[];
-  const n=Math.floor(tot/12);
-  for(let i=0;i<n;i++){
-    const p={x:6+i*(tot-12)/(n-1)+r(-3,3)-off,h:ri(14,30),c:pk(['#3fbf6f','#2fa862','#58d68d']),
-      ph:r(0,6),front:rnd()<.4,ph2:r(.6,1.2)};
-    if(p.x>-8&&p.x<W+8)plants.push(p);
-  }
-  rocks=[];
-  const nr=Math.round(5*tot/W);
-  for(let i=0;i<nr;i++){const k={x:ri(4,tot-12)-off,w:ri(5,10),h:ri(3,6)};if(k.x>-12&&k.x<W)rocks.push(k);}
-  if(!crab)crab={x:W*.3,dir:1,f:0,t:0,pause:0};
-  fishes.forEach(f=>{f.y=Math.min(f.y,sandY()-14);});
-}
-
-function newFish(){
-  const big=Math.random()<.3;
-  const sc=RI(0,SCHEMES.length-1);
-  const dir=Math.random()<.5?1:-1;
-  return {x:dir>0?-10:W+10,y:R(28,sandY()-22),vx:dir*R(.12,.3),dir,sc,big,ty:R(28,sandY()-22),
-    sw:R(0,6),next:R(2,6),eat:0,speed:R(.12,.3)};
-}
-function addFish(){ fishes.push(newFish()); save(); }
-function addJelly(){ jellies.push({x:R(14,W-14),y:R(30,sandY()-30),ph:R(0,6),dx:R(-.05,.05)}); save(); }
-
-function save(){ try{localStorage.setItem('dotaqua',JSON.stringify({f:fishes.length,j:jellies.length}));}catch(e){} updateCount(); }
-function load(){
-  let d=null; try{d=JSON.parse(localStorage.getItem('dotaqua'));}catch(e){}
-  const nf=d?d.f:5, nj=d?d.j:1;
-  for(let i=0;i<nf;i++){const f=newFish();f.x=R(10,W-10);f.dir=f.vx>0?1:-1;fishes.push(f);}
-  for(let i=0;i<nj;i++)addJelly();
-  updateCount();
-}
-function updateCount(){const lk=link.dc&&link.dc.readyState==='open';document.getElementById('count').textContent=(lk?'🔗 ':'')+(fishes.filter(f=>!f.sent).length+jellies.length)+'ひき';}
-
-/* ---------- input ---------- */
-function toLogical(e){
-  const r=cv.getBoundingClientRect();
-  return {x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H};
-}
-cv.addEventListener('pointerdown',e=>{
-  const p=toLogical(e);
-  document.getElementById('hint').style.opacity=0;
-  // tap on a fish -> heart + bubble
-  const hit=fishes.find(f=>!f.sent&&Math.abs(f.x-p.x)<9&&Math.abs(f.y-p.y)<7);
-  if(hit){hearts.push({x:hit.x,y:hit.y-6,life:50});hit.next=0;hit.vx*=-1;hit.dir*=-1;return;}
-  for(let i=0;i<3;i++)foods.push({x:p.x+R(-4,4),y:Math.max(p.y,10)+R(-3,0),vy:R(.1,.2),life:900});
-  for(let i=0;i<2;i++)bubbles.push({x:p.x+R(-3,3),y:p.y,r:1,vy:R(.2,.4),w:R(0,6)});
-});
-document.getElementById('add').onclick=addFish;
-document.getElementById('jelly').onclick=addJelly;
-document.getElementById('reset').onclick=()=>{fishes=[];jellies=[];foods=[];for(let i=0;i<5;i++)addFish();addJelly();};
-
-/* ---------- update ---------- */
-function update(){
-  t++;
-  // ambient bubbles
-  if(t%40===0)bubbles.push({x:R(4,W-4),y:sandY()-2,r:Math.random()<.3?2:1,vy:R(.15,.35),w:R(0,6)});
-  bubbles.forEach(b=>{b.y-=b.vy;b.x+=Math.sin(t*.06+b.w)*.15;});
-  bubbles=bubbles.filter(b=>b.y>2);
-
-  foods.forEach(f=>{ if(f.y<sandY()+1){f.y+=f.vy;} f.life--; });
-  foods=foods.filter(f=>f.life>0);
-
-  fishes.forEach(f=>{
-    f.sw+=.15;
-    let target=null,best=1e9;
-    for(const fd of foods){const d=Math.hypot(fd.x-f.x,fd.y-f.y);if(d<best){best=d;target=fd;}}
-    if(!f.sent&&target&&best<70){
-      const dx=target.x-f.x,dy=target.y-f.y,d=Math.hypot(dx,dy)||1;
-      const sp=f.speed*2.2;
-      f.x+=dx/d*sp; f.y+=dy/d*sp*.9;
-      f.dir=dx>=0?1:-1; f.vx=f.dir*f.speed;
-      if(d<4){foods.splice(foods.indexOf(target),1);f.eat=20;hearts.push({x:f.x,y:f.y-6,life:40});
-        if(Math.random()<.5)bubbles.push({x:f.x+f.dir*5,y:f.y-2,r:1,vy:R(.25,.4),w:R(0,6)});}
-    }else{
-      f.x+=f.vx; f.y+=(f.ty-f.y)*.01+Math.sin(f.sw)*.08;
-      f.next-=1/60; if(f.next<=0){f.ty=R(26,sandY()-20);f.next=R(2,7);}
-      const lk=link.dc&&link.dc.readyState==='open';
-      if(lk&&!f.sent&&((link.role==='host'&&f.vx>0&&f.x>W)||(link.role==='guest'&&f.vx<0&&f.x<0))){
-        sendFish(f);f.sent=true;updateCount();
-      }
-      if(f.sent){if(f.x>W+12||f.x<-12)f.gone=true;}
-      else{
-        if(f.x>W+14){f.x=W+14;f.vx=-Math.abs(f.vx);f.dir=-1;}
-        if(f.x<-14){f.x=-14;f.vx=Math.abs(f.vx);f.dir=1;}
-      }
-    }
-    if(f.eat>0)f.eat--;
-    f.y=Math.max(18,Math.min(sandY()-10,f.y));
-  });
-  if(fishes.some(f=>f.gone)){fishes=fishes.filter(f=>!f.gone);updateCount();}
-
-  jellies.forEach(j=>{
-    j.ph+=.05;
-    const pulse=Math.sin(j.ph);
-    j.y-=pulse>0?pulse*.18:pulse*.05; j.x+=j.dx+Math.sin(j.ph*.4)*.05;
-    if(j.y<16)j.y=16; if(j.y>sandY()-18){j.y=sandY()-18;}
-    if(j.x<8||j.x>W-8)j.dx*=-1;
-    if(Math.random()<.002)j.dx=R(-.08,.08);
-    if(j.y<=18&&pulse>0.9)j.y=sandY()-20;
-  });
-
-  hearts.forEach(h=>{h.y-=.25;h.life--;});
-  hearts=hearts.filter(h=>h.life>0);
-
-  // crab
-  const c=crab;
-  if(c.pause>0){c.pause--;}
-  else{
-    c.x+=c.dir*.18; c.t++; c.f=(c.t>>3)&1;
-    if(c.x<6||c.x>W-14||Math.random()<.004){c.dir=c.x<6?1:c.x>W-14?-1:-c.dir; if(Math.random()<.5)c.pause=RI(40,140);}
-  }
-}
-
-/* ---------- draw ---------- */
-const WATER=['#2f8fd8','#2a84cf','#2578c4','#206cb8','#1b60aa','#17559c','#134a8c','#10407c'];
-function drawBG(){
-  const bands=WATER.length, bh=Math.ceil(H/bands);
-  WATER.forEach((c,i)=>{ctx.fillStyle=c;ctx.fillRect(0,i*bh,W,bh);});
-  // dither between bands
-  for(let i=1;i<bands;i++){
-    ctx.fillStyle=WATER[i];
-    for(let x=0;x<W;x+=2)ctx.fillRect(x+(i&1),i*bh-1,1,1);
-  }
-  // light rays
-  ctx.fillStyle='rgba(255,255,255,.07)';
-  for(let i=0;i<8;i++){
-    const bx=12+i*30-scn.off+Math.sin(t*.01+i)*4;
-    for(let y=0;y<H*.7;y+=1){ctx.fillRect(Math.floor(bx+y*.35),y,5-(y/H*3)|0,1);}
-  }
-  // surface sparkle
-  ctx.fillStyle='rgba(255,255,255,.5)';
-  for(let x=0;x<W;x+=6){const y=1+((Math.sin(t*.04+x)+1)>1.2?1:0);ctx.fillRect(x,y,3,1);}
-  ctx.fillStyle='rgba(255,255,255,.25)';
-  ctx.fillRect(0,0,W,1);
-}
-function drawSand(){
-  const sy=sandY();
-  ctx.fillStyle='#f3d9a0';ctx.fillRect(0,sy,W,H-sy);
-  ctx.fillStyle='#e6c585';
-  for(let x=0;x<W;x+=3)for(let y=sy+2;y<H;y+=4)ctx.fillRect(x+((y>>2)&1)*2,y,1,1);
-  ctx.fillStyle='#ffeabd';
-  for(let x=0;x<W;x++)if((x*7)%5<2)ctx.fillRect(x,sy,1,1);
-  // rocks
-  rocks.forEach((r,i)=>{
-    ctx.fillStyle='#8a93a8';ctx.fillRect(r.x+1,sy-r.h+2,r.w-2,r.h);ctx.fillRect(r.x,sy-r.h+4,r.w,r.h-2);
-    ctx.fillStyle='#aeb6c9';ctx.fillRect(r.x+2,sy-r.h+2,Math.max(2,r.w-5),1);
-  });
-  ctx.drawImage(STAR,(scn.tot||W)-20-scn.off,sy+3);
-  ctx.drawImage(SHELL,8-scn.off,sy+8);
-}
-function drawPlant(p){
-  const base=sandY()+1;
-  for(let i=0;i<p.h;i++){
-    const k=i/p.h;
-    const x=Math.round(p.x+Math.sin(t*.03*p.ph2+p.ph+i*.28)*3.5*k);
-    ctx.fillStyle=p.c;ctx.fillRect(x,base-i,2,1);
-    if(i%7===5){ctx.fillRect(x+2,base-i,2,1);ctx.fillRect(x-2,base-i-1,2,1);}
-  }
-}
-function drawFish(f){
-  const spr=(f.big?fishSprites[f.sc].B:fishSprites[f.sc].s);
-  const w=spr.width,h=spr.height;
-  const bob=Math.round(Math.sin(f.sw)*.6);
-  ctx.save();
-  ctx.translate(Math.round(f.x),Math.round(f.y)+bob);
-  if(f.dir<0)ctx.scale(-1,1);
-  ctx.drawImage(spr,-(w>>1),-(h>>1));
-  if(f.eat>0){ctx.fillStyle='#1a1a3a';ctx.fillRect((w>>1)-1,1,2,1);} // open mouth
-  ctx.restore();
-}
-function drawJelly(j){
-  const spr=Math.sin(j.ph)>0?JELLY_A:JELLY_B;
-  const x=Math.round(j.x),y=Math.round(j.y);
-  ctx.globalAlpha=.9;
-  ctx.drawImage(spr,x-4,y-3);
-  ctx.fillStyle='#ffb8f0';
-  for(let i=0;i<4;i++){
-    for(let k=1;k<=5;k++){
-      const ox=Math.round(Math.sin(t*.08+k*.7+i)*1.2);
-      ctx.globalAlpha=.9-k*.12;
-      ctx.fillRect(x-3+i*2+ox,y+2+k,1,1);
-    }
-  }
-  ctx.globalAlpha=1;
-}
-function drawBubble(b){
-  ctx.fillStyle='rgba(255,255,255,.75)';
-  const x=Math.round(b.x),y=Math.round(b.y);
-  if(b.r>=2){ctx.fillRect(x,y-1,2,1);ctx.fillRect(x-1,y,1,2);ctx.fillRect(x+2,y,1,2);ctx.fillRect(x,y+2,2,1);}
-  else ctx.fillRect(x,y,1,1);
-}
-function draw(){
-  drawBG();
-  plants.filter(p=>!p.front).forEach(drawPlant);
-  drawSand();
-  jellies.forEach(drawJelly);
-  fishes.forEach(drawFish);
-  // crab
-  ctx.save();ctx.translate(Math.round(crab.x),sandY()-3);
-  ctx.drawImage(CRAB[crab.pause>0?0:crab.f],0,0);ctx.restore();
-  plants.filter(p=>p.front).forEach(drawPlant);
-  foods.forEach(f=>{ctx.fillStyle='#ff9f43';ctx.fillRect(Math.round(f.x),Math.round(f.y),2,2);ctx.fillStyle='#ffd08a';ctx.fillRect(Math.round(f.x),Math.round(f.y),1,1);});
-  bubbles.forEach(drawBubble);
-  if(link.dc&&link.dc.readyState==='open'){
-    const ex=link.role==='host'?W-1:0,ph=(t>>3)&1;
-    ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(link.role==='host'?W-3:0,0,3,H);
-    ctx.fillStyle='rgba(255,255,255,.75)';
-    for(let y=ph;y<H;y+=2)ctx.fillRect(ex,y,1,1);
-  }
-  hearts.forEach(h=>{ctx.globalAlpha=Math.min(1,h.life/20);ctx.drawImage(HEART,Math.round(h.x)-3,Math.round(h.y));ctx.globalAlpha=1;});
-}
-
-/* ---------- loop (fixed 60 updates/sec) ---------- */
-let last=0,acc=0;
-function loop(ts){
-  if(!last)last=ts;
-  acc+=Math.min(100,ts-last);last=ts;
-  while(acc>=1000/60){update();acc-=1000/60;}
-  draw();
-  requestAnimationFrame(loop);
-}
-/* ---------- linking (WebRTC, no server) ---------- */
+const MODEL='claude-sonnet-5-5';
 const $=id=>document.getElementById(id);
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2500);}
-function sendFish(f){
-  try{link.dc.send(JSON.stringify({t:'fish',sc:f.sc,big:f.big,speed:f.speed,r:f.y/sandY(),x:f.x}));}catch(e){}
-}
-function recvFish(m){
-  const host=link.role==='host';
-  const dir=host?-1:1;
-  const y=Math.max(20,Math.min(sandY()-14,m.r*sandY()));
-  fishes.push({x:host?W+m.x:m.x-W,y,vx:dir*m.speed,dir,sc:m.sc,big:m.big,ty:y,sw:R(0,6),next:R(2,5),eat:0,speed:m.speed});
-  updateCount();
-}
-function setupDC(dc){
-  link.dc=dc;
-  dc.onopen=()=>{
-    if(link.role==='host'){const seed=(Math.random()*1e9)|0;dc.send(JSON.stringify({t:'seed',s:seed}));scn={seed,off:0,tot:W*2};initScenery();}
-    closeModal();updateCount();toast('つながった！🐟');};
-  dc.onclose=()=>{if(link.dc===dc){link.dc=null;scn={seed:(Math.random()*1e9)|0,off:0,tot:0};initScenery();updateCount();toast('つなぎが切れました');}};
-  dc.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.t==='fish')recvFish(m);else if(m.t==='seed'){scn={seed:m.s,off:W,tot:W*2};initScenery();}}catch(_){}};
-}
-const b64=u8=>{let s='';u8.forEach(b=>s+=String.fromCharCode(b));return btoa(s);};
-const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-async function pipe(stream,bytes){
-  const w=stream.writable.getWriter();w.write(bytes);w.close();
-  return new Uint8Array(await new Response(stream.readable).arrayBuffer());
-}
-async function pack(d){
-  const raw=new TextEncoder().encode(JSON.stringify({type:d.type,sdp:d.sdp}));
-  if(window.CompressionStream)return 'z'+b64(await pipe(new CompressionStream('deflate-raw'),raw));
-  return 'p'+b64(raw);
-}
-async function unpack(str){
-  str=str.replace(/\s+/g,'');
-  let bytes=unb64(str.slice(1));
-  if(str[0]==='z')bytes=await pipe(new DecompressionStream('deflate-raw'),bytes);
-  return JSON.parse(new TextDecoder().decode(bytes));
-}
-function newPC(){
-  closePC();
-  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-  pc.onconnectionstatechange=()=>{if(['failed','closed'].includes(pc.connectionState)&&link.pc===pc&&!(link.dc&&link.dc.readyState==='open'))toast('つなげませんでした。もう一度ためしてね');};
-  link.pc=pc;return pc;
-}
-function closePC(){
-  if(link.dc){const d=link.dc;link.dc=null;try{d.close();}catch(e){}}
-  if(link.pc){try{link.pc.close();}catch(e){}link.pc=null;}
-  link.role=null;updateCount();
-}
-function waitIce(pc){
-  return new Promise(res=>{
-    if(pc.iceGatheringState==='complete')return res();
-    const done=()=>{pc.removeEventListener('icegatheringstatechange',chk);res();};
-    const chk=()=>{if(pc.iceGatheringState==='complete')done();};
-    pc.addEventListener('icegatheringstatechange',chk);
-    setTimeout(done,3500);
-  });
-}
-function drawQR(text){
-  const qr=qrcode(0,'L');qr.addData(text,'Byte');qr.make();
-  const n=qr.getModuleCount(),c=$('qr'),g=c.getContext('2d');
-  c.width=c.height=n+8;g.fillStyle='#fff';g.fillRect(0,0,n+8,n+8);g.fillStyle='#000';
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(qr.isDark(y,x))g.fillRect(x+4,y+4,1,1);
-}
-function section(id){['m-menu','m-show','m-scan'].forEach(k=>$(k).classList.toggle('on',k===id));}
-function openModal(){$('modal').classList.add('on');section('m-menu');}
-function closeModal(){$('modal').classList.remove('on');stopScan();}
-let scanStream=null,scanning=false;
-function stopScan(){scanning=false;if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}$('vid').srcObject=null;}
-async function startScan(cb){
-  $('m-paste').value='';
-  let handled=false;
-  const handle=code=>{if(handled)return;handled=true;stopScan();cb(code);};
-  $('m-paste-ok').onclick=()=>{const v=$('m-paste').value.trim();if(v)handle(v);};
-  try{
-    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-    const v=$('vid');v.srcObject=scanStream;await v.play();
-    scanning=true;
-    const cvs=document.createElement('canvas'),g=cvs.getContext('2d',{willReadFrequently:true});
-    const tick=()=>{
-      if(!scanning)return;
-      if(v.videoWidth){
-        cvs.width=v.videoWidth;cvs.height=v.videoHeight;g.drawImage(v,0,0);
-        const r=jsQR(g.getImageData(0,0,cvs.width,cvs.height).data,cvs.width,cvs.height);
-        if(r&&r.data)return handle(r.data);
-      }
-      setTimeout(tick,120);
-    };
-    tick();
-  }catch(e){$('m-scan-note').textContent='カメラが使えません。下の「QRが読めないとき」から文字を貼り付けてね';}
-}
-function showCode(code,title,note,next){
-  $('m-title').textContent=title;$('m-note').textContent=note;$('m-code').value=code;
-  drawQR(code);
-  $('m-next').style.display=next?'block':'none';$('m-next').onclick=next||null;
-  section('m-show');
-}
-async function fail(e){console.error(e);toast('うまく読み取れませんでした');section('m-menu');closePC();}
-async function startHost(){
-  try{
-    const pc=newPC();link.role='host';setupDC(pc.createDataChannel('aq'));
-    await pc.setLocalDescription(await pc.createOffer());await waitIce(pc);
-    const code=await pack(pc.localDescription);
-    showCode(code,'① 相手にこのQRを読んでもらう','相手が「右がわになる」でこのQRを読み取ったら、下のボタンを押してね',()=>{
-      $('m-scan-title').textContent='② 相手のQRを読む';
-      section('m-scan');
-      startScan(async c=>{try{await pc.setRemoteDescription(await unpack(c));$('m-scan-note').textContent='つなぎ中…';section('m-show');$('m-next').style.display='none';$('m-note').textContent='つなぎ中… しばらく待ってね';}catch(e){fail(e);}});
-    });
-  }catch(e){fail(e);}
-}
-async function startGuest(){
-  link.role='guest';
-  $('m-scan-title').textContent='① 左がわのQRを読む';
-  $('m-scan-note').textContent='左がわの人が出しているQRを枠に入れてください';
-  section('m-scan');
-  startScan(async c=>{
-    try{
-      const pc=newPC();link.role='guest';pc.ondatachannel=e=>setupDC(e.channel);
-      await pc.setRemoteDescription(await unpack(c));
-      await pc.setLocalDescription(await pc.createAnswer());await waitIce(pc);
-      showCode(await pack(pc.localDescription),'② 相手にこのQRを読んでもらう','左がわの人が読み取ると、自動でつながります',null);
-    }catch(e){fail(e);}
-  });
-}
-$('link').onclick=openModal;
-$('m-host').onclick=startHost;
-$('m-guest').onclick=startGuest;
-$('m-unlink').onclick=()=>{closePC();closeModal();toast('つなぎをやめました');};
-document.querySelectorAll('.m-close').forEach(b=>b.onclick=()=>{
-  if(!(link.dc&&link.dc.readyState==='open'))closePC();
-  closeModal();
-});
-$('m-copy').onclick=async()=>{try{await navigator.clipboard.writeText($('m-code').value);toast('コピーしました');}catch(e){$('m-code').select();}};
+const store={
+  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}}
+};
+let photos=[]; // {data(base64 jpeg), url}
+const MAXP=3,LABELS=['表面','追加1','追加2'];
 
-addEventListener('resize',resize);
-addEventListener('contextmenu',e=>e.preventDefault());
-resize();load();
-setTimeout(()=>{document.getElementById('hint').style.opacity=0;},6000);
-requestAnimationFrame(loop);
+/* ---------- photos ---------- */
+async function shrink(file,max,q){
+  const bmp=await createImageBitmap(file);
+  const k=Math.min(1,max/Math.max(bmp.width,bmp.height));
+  const c=document.createElement('canvas');c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);
+  c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',q);
+}
+async function addFile(f){
+  if(!f)return;
+  if(photos.length>=MAXP){return;}
+  try{const url=await shrink(f,1280,.85);photos.push({url,data:url.split(',')[1]});renderThumbs();}
+  catch(e){showErr('写真を読み込めませんでした');}
+}
+function renderThumbs(){
+  $('thumbs').innerHTML='';
+  photos.forEach((p,i)=>{
+    const d=document.createElement('div');d.className='thumb';
+    d.innerHTML=`<img src="${p.url}"><b>${i?'写真'+(i+1):'表面'}</b><i data-i="${i}">×</i>`;
+    $('thumbs').appendChild(d);
+  });
+  $('actions').style.display=photos.length?'flex':'none';
+  $('add').style.display=photos.length&&photos.length<MAXP?'':'none';
+  $('gallery').style.display=photos.length<MAXP?'':'none';
+  $('shoot').textContent=photos.length?'📷 撮りなおす':'📷 木目を撮る';
+}
+$('thumbs').onclick=e=>{const i=e.target.dataset.i;if(i!=null){photos.splice(+i,1);renderThumbs();}};
+$('shoot').onclick=()=>{photos=[];renderThumbs();$('result').innerHTML='';$('file').click();};
+$('add').onclick=()=>$('file').click();
+$('gallery').onclick=()=>$('pick').click();
+$('file').onchange=async e=>{await addFile(e.target.files[0]);e.target.value='';};
+$('pick').onchange=async e=>{for(const f of [...e.target.files].slice(0,MAXP-photos.length))await addFile(f);e.target.value='';};
+
+/* ---------- AI ---------- */
+const SYSTEM=`あなたは木材と木工に詳しい樹種鑑定の専門家です。送られた写真（木目・木口など）から、樹種と板材の種類を推定します。
+必ず次のJSONだけを返してください（前後に文章やコードブロックを付けない）。
+{
+ "is_wood": true/false,
+ "summary": "ひとことでの結論（日本語・30字程度）",
+ "species": [{"name":"和名（例：ナラ（オーク））","scientific":"属名または学名","confidence":0-100の整数,"reason":"写真のどこからそう判断したか"}],
+ "cut": {"type":"板目|柾目|追柾|木口|不明","note":"木目の取り方の説明"},
+ "material": {"type":"無垢材|集成材|合板|突板（化粧板）|プリント化粧板|不明","note":"根拠（接ぎ目、層、模様の繰り返しなど）"},
+ "hardness": "やわらかい|ふつう|かたい|不明",
+ "uses": ["向く用途を2〜3個"],
+ "tips": "判定を確かにするための撮り方や確認方法（木口を撮る、重さ、香り、削った面など）",
+ "caveat": "判定の限界や、他の候補と間違えやすい点"
+}
+speciesは可能性の高い順に最大3つ。confidenceの合計が100を超えないように。写真が木材でない・判定できない場合は is_wood を false にし、summary と tips に理由と撮り直しのコツを書く。確実でないことは断定せず、confidenceを低めにする。`;
+
+function parseJSON(t){
+  const a=t.indexOf('{'),b=t.lastIndexOf('}');
+  if(a<0||b<a)throw new Error('結果を読み取れませんでした');
+  return JSON.parse(t.slice(a,b+1));
+}
+async function analyze(){
+  const key=store.get('woodkey','');
+  if(!key){$('dlg').showModal();return;}
+  const content=photos.map(p=>({type:'image',source:{type:'base64',media_type:'image/jpeg',data:p.data}}));
+  content.push({type:'text',text:`写真は${photos.length}枚です（1枚目が表面、他は木口など）。樹種と板材の種類を判定してください。`});
+  $('result').innerHTML='<div class="card loading"><div class="spin"></div>AIが木目を観察中…</div>';
+  $('go').disabled=true;
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{
+      'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:MODEL,max_tokens:1800,system:SYSTEM,messages:[{role:'user',content}]})});
+    if(!r.ok){
+      let m='';try{m=(await r.json()).error.message;}catch(e){}
+      if(r.status===401)throw new Error('APIキーが正しくないようです（⚙️で確認してね）');
+      if(r.status===429)throw new Error('使いすぎ、またはアクセスが集中しています。少し待ってね');
+      throw new Error('判定に失敗しました（'+r.status+'）'+(m?' '+m:''));
+    }
+    const j=await r.json();
+    const res=parseJSON(j.content.filter(c=>c.type==='text').map(c=>c.text).join(''));
+    renderResult(res);saveHist(res);
+  }catch(e){showErr(e.message==='Failed to fetch'?'通信できませんでした。電波を確認してね':e.message);}
+  finally{$('go').disabled=false;}
+}
+$('go').onclick=analyze;
+
+/* ---------- render ---------- */
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function showErr(m){$('result').innerHTML=`<div class="card err">⚠️ ${esc(m)}</div>`;}
+function renderResult(r){
+  if(!r.is_wood){
+    $('result').innerHTML=`<div class="card"><h2>うまく判定できませんでした</h2><p>${esc(r.summary)}</p><p class="tips" style="padding:0;list-style:none">${esc(r.tips)}</p></div>`;return;
+  }
+  const sp=(r.species||[]).map(s=>`<div class="sp"><div class="n">${esc(s.name)}</div><div class="sci">${esc(s.scientific)}</div>
+    <div class="bar"><div style="width:${Math.max(2,Math.min(100,+s.confidence||0))}%"></div></div>
+    <div class="pct">${+s.confidence||0}%　${esc(s.reason)}</div></div>`).join('');
+  $('result').innerHTML=`
+  <div class="card"><div class="big">${esc(r.species?.[0]?.name||'？')}</div><div>${esc(r.summary)}</div></div>
+  <div class="card"><h2>🌳 樹種の候補</h2>${sp}</div>
+  <div class="card"><h2>🪚 板材のようす</h2><dl class="kv">
+    <dt>木取り</dt><dd><b>${esc(r.cut?.type)}</b><br>${esc(r.cut?.note)}</dd>
+    <dt>材の種類</dt><dd><b>${esc(r.material?.type)}</b><br>${esc(r.material?.note)}</dd>
+    <dt>かたさ</dt><dd>${esc(r.hardness)}</dd>
+    <dt>向く用途</dt><dd>${(r.uses||[]).map(u=>`<span class="tag">${esc(u)}</span>`).join('')}</dd></dl></div>
+  <div class="card"><h2>🔎 もっと確かめるには</h2><p style="margin:0">${esc(r.tips)}</p>
+    <p class="caveat">${esc(r.caveat)}<br>※AIの推定です。購入や加工の判断には、専門家や木材店にも確認してください。</p></div>`;
+  scrollTo({top:$('result').offsetTop-8,behavior:'smooth'});
+}
+
+/* ---------- history ---------- */
+async function thumbOf(url){const b=await (await fetch(url)).blob();return shrink(b,140,.6);}
+async function saveHist(r){
+  try{
+    const h=store.get('woodhist',[]);
+    h.unshift({t:Date.now(),th:await thumbOf(photos[0].url),r});
+    store.set('woodhist',h.slice(0,15));renderHist();
+  }catch(e){}
+}
+function renderHist(){
+  const h=store.get('woodhist',[]);
+  $('histCard').style.display=h.length?'block':'none';
+  $('hist').innerHTML=h.map((x,i)=>`<div class="hist"><button data-i="${i}"><img src="${x.th}"><span><b>${esc(x.r.species?.[0]?.name||'判定なし')}</b><br><span class="caveat">${esc(x.r.cut?.type||'')} ・ ${esc(x.r.material?.type||'')} ・ ${new Date(x.t).toLocaleDateString('ja-JP')}</span></span></button></div>`).join('');
+}
+$('hist').onclick=e=>{const b=e.target.closest('button');if(!b)return;const x=store.get('woodhist',[])[+b.dataset.i];if(x)renderResult(x.r);};
+
+/* ---------- settings ---------- */
+$('gear').onclick=()=>{$('key').value=store.get('woodkey','');$('dlg').showModal();};
+$('close').onclick=()=>$('dlg').close();
+$('save').onclick=()=>{store.set('woodkey',$('key').value.trim());$('dlg').close();};
+$('clear').onclick=()=>{store.set('woodhist',[]);renderHist();$('dlg').close();};
+renderHist();renderThumbs();
 })();
 </script>
 </body>
