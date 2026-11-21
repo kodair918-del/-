@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1b4f8a">
+<title>ドットアクアリウム</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  :root{--ui:#fff;--ui-bg:rgba(10,30,70,.55)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;background:#0d2c55;overflow:hidden;overscroll-behavior:none;
+    font-family:'DotGothic16',ui-monospace,monospace;color:var(--ui)}
+  canvas{position:fixed;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none}
+  .bar{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 10px) 14px 0;
+    display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+  .title{font-size:15px;text-shadow:2px 2px 0 #0d2c55}
+  .count{font-size:13px;background:var(--ui-bg);padding:4px 8px;border:2px solid #fff;border-radius:2px}
+  .dock{position:fixed;left:0;right:0;bottom:0;padding:0 12px calc(env(safe-area-inset-bottom) + 12px);
+    display:flex;gap:10px;justify-content:center}
+  button{font:inherit;font-size:15px;color:#fff;background:var(--ui-bg);border:2px solid #fff;
+    padding:10px 14px;border-radius:2px;box-shadow:0 3px 0 #0d2c55;touch-action:manipulation}
+  button:active{transform:translateY(3px);box-shadow:none}
+  .hint{position:fixed;left:0;right:0;top:46%;text-align:center;font-size:14px;text-shadow:2px 2px 0 #0d2c55;
+    pointer-events:none;transition:opacity 1.2s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="bar"><div class="title">🐟 ドットアクアリウム</div><div class="count" id="count">0ひき</div></div>
+<div class="hint" id="hint">画面をタップしてごはんをあげよう</div>
+<div class="dock">
+  <button id="add">＋ さかな</button>
+  <button id="jelly">＋ クラゲ</button>
+  <button id="reset">リセット</button>
+</div>
+<script>
+(()=>{
+'use strict';
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W=0,H=0;
+const R=(a,b)=>a+Math.random()*(b-a), RI=(a,b)=>Math.floor(R(a,b+1));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+
+function resize(){
+  W=112; H=Math.round(W*innerHeight/innerWidth);
+  if(H<150)H=150;
+  cv.width=W; cv.height=H;
+  ctx.imageSmoothingEnabled=false;
+  initScenery();
+}
+
+/* ---------- sprites ---------- */
+function sprite(rows,pal){
+  const c=document.createElement('canvas');c.width=rows[0].length;c.height=rows.length;
+  const g=c.getContext('2d');
+  rows.forEach((r,y)=>[...r].forEach((ch,x)=>{ if(pal[ch]){g.fillStyle=pal[ch];g.fillRect(x,y,1,1);} }));
+  return c;
+}
+const FISH=[
+"....fff....",
+"f..bbbbbb..",
+"ffbbbbbbwb.",
+"fbbbbbbbebb",
+"ffllllllbb.",
+"f..llllll..",
+];
+const FISH_BIG=[
+"......ff.......",
+".....ffff......",
+"ff..bbbbbbb....",
+"fff.bbbbbbbbb..",
+"ffbbbbbbbbbwbb.",
+"fffbbbbbbbbbebb",
+"ffbllllllllllb.",
+"fff.llllllllb..",
+"ff...lllllll...",
+".....fff.......",
+];
+const SCHEMES=[
+ {b:'#ff8fa3',l:'#ffd6dd',f:'#ff5d7e'},
+ {b:'#ffb347',l:'#ffe2a8',f:'#ff7a2f'},
+ {b:'#6ee7ff',l:'#d5f8ff',f:'#2bb4e0'},
+ {b:'#b49bff',l:'#e4dcff',f:'#7d5cff'},
+ {b:'#8ef0a0',l:'#d8ffe0',f:'#3cc46a'},
+ {b:'#ffe14d',l:'#fff4b0',f:'#f2b200'},
+];
+const fishSprites=SCHEMES.map(s=>{
+  const pal={b:s.b,l:s.l,f:s.f,e:'#1a1a3a',w:'#fff'};
+  return {s:sprite(FISH,pal),B:sprite(FISH_BIG,pal)};
+});
+const JELLY_A=sprite([
+"..jjjj..",
+".jjjjjj.",
+"jjwjjjjj",
+"jjjjjjjj",
+"jjjjjjjj",
+],{j:'#ffb8f0',w:'#fff'});
+const JELLY_B=sprite([
+"..jjjj..",
+".jjjjjj.",
+"jjwjjjjj",
+"jjjjjjjj",
+".jjjjjj.",
+],{j:'#ffb8f0',w:'#fff'});
+const CRAB=[sprite([
+"r......r",
+"rr.rr.rr",
+".rrrrrr.",
+"rrwrrwrr",
+".rrrrrr.",
+"r.r..r.r",
+],{r:'#ff6b5a',w:'#fff'}),sprite([
+"r......r",
+"rr.rr.rr",
+".rrrrrr.",
+"rrwrrwrr",
+".rrrrrr.",
+".r.rr.r.",
+],{r:'#ff6b5a',w:'#fff'})];
+const STAR=sprite([
+"..y..",
+"..y..",
+"yyyyy",
+".yyy.",
+".y.y.",
+],{y:'#ffcf3d'});
+const HEART=sprite([
+".rr.rr.",
+"rrrrrrr",
+"rrrrrrr",
+".rrrrr.",
+"..rrr..",
+"...r...",
+],{r:'#ff5d8f'});
+const SHELL=sprite([
+".ppp.",
+"ppppp",
+"pwpwp",
+],{p:'#ffc2d6',w:'#fff'});
+
+/* ---------- state ---------- */
+let fishes=[],jellies=[],foods=[],bubbles=[],hearts=[],plants=[],rocks=[],crab,t=0;
+function sandY(){return H-30;}
+
+function initScenery(){
+  plants=[];
+  const n=Math.floor(W/12);
+  for(let i=0;i<n;i++){
+    plants.push({x:6+i*(W-12)/(n-1)+R(-3,3),h:RI(14,30),c:pick(['#3fbf6f','#2fa862','#58d68d']),
+      ph:R(0,6),front:Math.random()<.4,ph2:R(.6,1.2)});
+  }
+  rocks=[];
+  for(let i=0;i<5;i++)rocks.push({x:RI(4,W-12),w:RI(5,10),h:RI(3,6)});
+  if(!crab)crab={x:W*.3,dir:1,f:0,t:0,pause:0};
+  fishes.forEach(f=>{f.y=Math.min(f.y,sandY()-14);});
+}
+
+function newFish(){
+  const big=Math.random()<.3;
+  const sc=RI(0,SCHEMES.length-1);
+  const dir=Math.random()<.5?1:-1;
+  return {x:dir>0?-10:W+10,y:R(28,sandY()-22),vx:dir*R(.12,.3),dir,sc,big,ty:R(28,sandY()-22),
+    sw:R(0,6),next:R(2,6),eat:0,speed:R(.12,.3)};
+}
+function addFish(){ fishes.push(newFish()); save(); }
+function addJelly(){ jellies.push({x:R(14,W-14),y:R(30,sandY()-30),ph:R(0,6),dx:R(-.05,.05)}); save(); }
+
+function save(){ try{localStorage.setItem('dotaqua',JSON.stringify({f:fishes.length,j:jellies.length}));}catch(e){} updateCount(); }
+function load(){
+  let d=null; try{d=JSON.parse(localStorage.getItem('dotaqua'));}catch(e){}
+  const nf=d?d.f:5, nj=d?d.j:1;
+  for(let i=0;i<nf;i++){const f=newFish();f.x=R(10,W-10);f.dir=f.vx>0?1:-1;fishes.push(f);}
+  for(let i=0;i<nj;i++)addJelly();
+  updateCount();
+}
+function updateCount(){document.getElementById('count').textContent=(fishes.length+jellies.length)+'ひき';}
+
+/* ---------- input ---------- */
+function toLogical(e){
+  const r=cv.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H};
+}
+cv.addEventListener('pointerdown',e=>{
+  const p=toLogical(e);
+  document.getElementById('hint').style.opacity=0;
+  // tap on a fish -> heart + bubble
+  const hit=fishes.find(f=>Math.abs(f.x-p.x)<9&&Math.abs(f.y-p.y)<7);
+  if(hit){hearts.push({x:hit.x,y:hit.y-6,life:50});hit.next=0;hit.vx*=-1;hit.dir*=-1;return;}
+  for(let i=0;i<3;i++)foods.push({x:p.x+R(-4,4),y:Math.max(p.y,10)+R(-3,0),vy:R(.1,.2),life:900});
+  for(let i=0;i<2;i++)bubbles.push({x:p.x+R(-3,3),y:p.y,r:1,vy:R(.2,.4),w:R(0,6)});
+});
+document.getElementById('add').onclick=addFish;
+document.getElementById('jelly').onclick=addJelly;
+document.getElementById('reset').onclick=()=>{fishes=[];jellies=[];foods=[];for(let i=0;i<5;i++)addFish();addJelly();};
+
+/* ---------- update ---------- */
+function update(){
+  t++;
+  // ambient bubbles
+  if(t%40===0)bubbles.push({x:R(4,W-4),y:sandY()-2,r:Math.random()<.3?2:1,vy:R(.15,.35),w:R(0,6)});
+  bubbles.forEach(b=>{b.y-=b.vy;b.x+=Math.sin(t*.06+b.w)*.15;});
+  bubbles=bubbles.filter(b=>b.y>2);
+
+  foods.forEach(f=>{ if(f.y<sandY()+1){f.y+=f.vy;} f.life--; });
+  foods=foods.filter(f=>f.life>0);
+
+  fishes.forEach(f=>{
+    f.sw+=.15;
+    let target=null,best=1e9;
+    for(const fd of foods){const d=Math.hypot(fd.x-f.x,fd.y-f.y);if(d<best){best=d;target=fd;}}
+    if(target&&best<70){
+      const dx=target.x-f.x,dy=target.y-f.y,d=Math.hypot(dx,dy)||1;
+      const sp=f.speed*2.2;
+      f.x+=dx/d*sp; f.y+=dy/d*sp*.9;
+      f.dir=dx>=0?1:-1; f.vx=f.dir*f.speed;
+      if(d<4){foods.splice(foods.indexOf(target),1);f.eat=20;hearts.push({x:f.x,y:f.y-6,life:40});
+        if(Math.random()<.5)bubbles.push({x:f.x+f.dir*5,y:f.y-2,r:1,vy:R(.25,.4),w:R(0,6)});}
+    }else{
+      f.x+=f.vx; f.y+=(f.ty-f.y)*.01+Math.sin(f.sw)*.08;
+      f.next-=1/60; if(f.next<=0){f.ty=R(26,sandY()-20);f.next=R(2,7);}
+      if(f.x>W+14){f.x=W+14;f.vx=-Math.abs(f.vx);f.dir=-1;}
+      if(f.x<-14){f.x=-14;f.vx=Math.abs(f.vx);f.dir=1;}
+    }
+    if(f.eat>0)f.eat--;
+    f.y=Math.max(18,Math.min(sandY()-10,f.y));
+  });
+
+  jellies.forEach(j=>{
+    j.ph+=.05;
+    const pulse=Math.sin(j.ph);
+    j.y-=pulse>0?pulse*.18:pulse*.05; j.x+=j.dx+Math.sin(j.ph*.4)*.05;
+    if(j.y<16)j.y=16; if(j.y>sandY()-18){j.y=sandY()-18;}
+    if(j.x<8||j.x>W-8)j.dx*=-1;
+    if(Math.random()<.002)j.dx=R(-.08,.08);
+    if(j.y<=18&&pulse>0.9)j.y=sandY()-20;
+  });
+
+  hearts.forEach(h=>{h.y-=.25;h.life--;});
+  hearts=hearts.filter(h=>h.life>0);
+
+  // crab
+  const c=crab;
+  if(c.pause>0){c.pause--;}
+  else{
+    c.x+=c.dir*.18; c.t++; c.f=(c.t>>3)&1;
+    if(c.x<6||c.x>W-14||Math.random()<.004){c.dir=c.x<6?1:c.x>W-14?-1:-c.dir; if(Math.random()<.5)c.pause=RI(40,140);}
+  }
+}
+
+/* ---------- draw ---------- */
+const WATER=['#2f8fd8','#2a84cf','#2578c4','#206cb8','#1b60aa','#17559c','#134a8c','#10407c'];
+function drawBG(){
+  const bands=WATER.length, bh=Math.ceil(H/bands);
+  WATER.forEach((c,i)=>{ctx.fillStyle=c;ctx.fillRect(0,i*bh,W,bh);});
+  // dither between bands
+  for(let i=1;i<bands;i++){
+    ctx.fillStyle=WATER[i];
+    for(let x=0;x<W;x+=2)ctx.fillRect(x+(i&1),i*bh-1,1,1);
+  }
+  // light rays
+  ctx.fillStyle='rgba(255,255,255,.07)';
+  for(let i=0;i<4;i++){
+    const bx=12+i*30+Math.sin(t*.01+i)*4;
+    for(let y=0;y<H*.7;y+=1){ctx.fillRect(Math.floor(bx+y*.35),y,5-(y/H*3)|0,1);}
+  }
+  // surface sparkle
+  ctx.fillStyle='rgba(255,255,255,.5)';
+  for(let x=0;x<W;x+=6){const y=1+((Math.sin(t*.04+x)+1)>1.2?1:0);ctx.fillRect(x,y,3,1);}
+  ctx.fillStyle='rgba(255,255,255,.25)';
+  ctx.fillRect(0,0,W,1);
+}
+function drawSand(){
+  const sy=sandY();
+  ctx.fillStyle='#f3d9a0';ctx.fillRect(0,sy,W,H-sy);
+  ctx.fillStyle='#e6c585';
+  for(let x=0;x<W;x+=3)for(let y=sy+2;y<H;y+=4)ctx.fillRect(x+((y>>2)&1)*2,y,1,1);
+  ctx.fillStyle='#ffeabd';
+  for(let x=0;x<W;x++)if((x*7)%5<2)ctx.fillRect(x,sy,1,1);
+  // rocks
+  rocks.forEach((r,i)=>{
+    ctx.fillStyle='#8a93a8';ctx.fillRect(r.x+1,sy-r.h+2,r.w-2,r.h);ctx.fillRect(r.x,sy-r.h+4,r.w,r.h-2);
+    ctx.fillStyle='#aeb6c9';ctx.fillRect(r.x+2,sy-r.h+2,Math.max(2,r.w-5),1);
+  });
+  ctx.drawImage(STAR,W-20,sy+3);
+  ctx.drawImage(SHELL,8,sy+8);
+}
+function drawPlant(p){
+  const base=sandY()+1;
+  for(let i=0;i<p.h;i++){
+    const k=i/p.h;
+    const x=Math.round(p.x+Math.sin(t*.03*p.ph2+p.ph+i*.28)*3.5*k);
+    ctx.fillStyle=p.c;ctx.fillRect(x,base-i,2,1);
+    if(i%7===5){ctx.fillRect(x+2,base-i,2,1);ctx.fillRect(x-2,base-i-1,2,1);}
+  }
+}
+function drawFish(f){
+  const spr=(f.big?fishSprites[f.sc].B:fishSprites[f.sc].s);
+  const w=spr.width,h=spr.height;
+  const bob=Math.round(Math.sin(f.sw)*.6);
+  ctx.save();
+  ctx.translate(Math.round(f.x),Math.round(f.y)+bob);
+  if(f.dir<0)ctx.scale(-1,1);
+  ctx.drawImage(spr,-(w>>1),-(h>>1));
+  if(f.eat>0){ctx.fillStyle='#1a1a3a';ctx.fillRect((w>>1)-1,1,2,1);} // open mouth
+  ctx.restore();
+}
+function drawJelly(j){
+  const spr=Math.sin(j.ph)>0?JELLY_A:JELLY_B;
+  const x=Math.round(j.x),y=Math.round(j.y);
+  ctx.globalAlpha=.9;
+  ctx.drawImage(spr,x-4,y-3);
+  ctx.fillStyle='#ffb8f0';
+  for(let i=0;i<4;i++){
+    for(let k=1;k<=5;k++){
+      const ox=Math.round(Math.sin(t*.08+k*.7+i)*1.2);
+      ctx.globalAlpha=.9-k*.12;
+      ctx.fillRect(x-3+i*2+ox,y+2+k,1,1);
+    }
+  }
+  ctx.globalAlpha=1;
+}
+function drawBubble(b){
+  ctx.fillStyle='rgba(255,255,255,.75)';
+  const x=Math.round(b.x),y=Math.round(b.y);
+  if(b.r>=2){ctx.fillRect(x,y-1,2,1);ctx.fillRect(x-1,y,1,2);ctx.fillRect(x+2,y,1,2);ctx.fillRect(x,y+2,2,1);}
+  else ctx.fillRect(x,y,1,1);
+}
+function draw(){
+  drawBG();
+  plants.filter(p=>!p.front).forEach(drawPlant);
+  drawSand();
+  jellies.forEach(drawJelly);
+  fishes.forEach(drawFish);
+  // crab
+  ctx.save();ctx.translate(Math.round(crab.x),sandY()-3);
+  ctx.drawImage(CRAB[crab.pause>0?0:crab.f],0,0);ctx.restore();
+  plants.filter(p=>p.front).forEach(drawPlant);
+  foods.forEach(f=>{ctx.fillStyle='#ff9f43';ctx.fillRect(Math.round(f.x),Math.round(f.y),2,2);ctx.fillStyle='#ffd08a';ctx.fillRect(Math.round(f.x),Math.round(f.y),1,1);});
+  bubbles.forEach(drawBubble);
+  hearts.forEach(h=>{ctx.globalAlpha=Math.min(1,h.life/20);ctx.drawImage(HEART,Math.round(h.x)-3,Math.round(h.y));ctx.globalAlpha=1;});
+}
+
+/* ---------- loop (fixed 60 updates/sec) ---------- */
+let last=0,acc=0;
+function loop(ts){
+  if(!last)last=ts;
+  acc+=Math.min(100,ts-last);last=ts;
+  while(acc>=1000/60){update();acc-=1000/60;}
+  draw();
+  requestAnimationFrame(loop);
+}
+addEventListener('resize',resize);
+addEventListener('contextmenu',e=>e.preventDefault());
+resize();load();
+setTimeout(()=>{document.getElementById('hint').style.opacity=0;},6000);
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
