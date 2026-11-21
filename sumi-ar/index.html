@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#000000">
-<title>墨流しAR</title>
+<title>墨流し</title>
 <style>
   :root{ --fg:#f4f1ea; --accent:#fff; }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -28,11 +28,12 @@
   .lay .fill{ position:absolute; left:0; right:0; bottom:0; height:0%; background:rgba(255,255,255,.7); transition:height .08s; }
   .lay span{ position:relative; mix-blend-mode:difference; color:#fff; font-weight:600; }
   .lay.sel{ border-color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.35); }
-  #bar{ position:absolute; left:12px; right:84px; bottom:14px; display:flex; gap:10px; align-items:center; }
+  #bar{ position:absolute; left:12px; right:84px; bottom:14px; display:flex; flex-wrap:wrap-reverse; gap:10px; align-items:center; }
   button.pill{ appearance:none; border:1.5px solid rgba(255,255,255,.6); background:rgba(0,0,0,.5); color:var(--fg);
     padding:11px 18px; border-radius:999px; font-size:14px; font-weight:600; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+  button.pill.on{ background:#fff; color:#000; border-color:#fff; }
   button.pill:active{ background:rgba(255,255,255,.3); }
-  #depthWrap{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; padding:6px 12px; border-radius:999px;
+  #depthWrap{ flex:1 1 100%; min-width:0; display:flex; align-items:center; gap:8px; padding:6px 12px; border-radius:999px;
     background:rgba(0,0,0,.5); font-size:11px; }
   #depthWrap input{ flex:1; min-width:0; accent-color:#fff; }
   #intro{ position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
@@ -60,6 +61,7 @@
     <button class="lay sel" data-l="0"><div class="fill"></div><span>奥</span></button>
   </div>
   <div id="bar">
+    <button class="pill" id="arToggle">AR</button>
     <button class="pill" id="clear">消す</button>
     <button class="pill" id="save">保存</button>
     <label id="depthWrap">奥行き<input id="depth" type="range" min="0.6" max="1.6" step="0.02" value="1"></label>
@@ -68,13 +70,13 @@
 
 <div id="intro">
   <div class="ink"></div>
-  <h1>墨流し AR</h1>
-  <p>スマホの背面カメラの向こうで、もう片方の手を動かします。<br>
+  <h1>墨流し</h1>
+  <p>通常モードは、画面を指でなぞって墨を流します。<br>ARモードは、背面カメラの向こうでもう片方の手を動かします。<br>
      親指と人差し指をつまむと墨が落ち、手を動かすと水流が生まれます。<br>
      手を前後に動かすと、墨が浮かぶ3つの層を行き来できます。</p>
   <div class="row">
-    <button class="pill" id="start">はじめる</button>
-    <button class="pill sub" id="startNoCam">カメラなしで試す(画面を指でなぞる)</button>
+    <button class="pill" id="start">ARで始める(背面カメラ)</button>
+    <button class="pill sub" id="startNoCam">通常モードで始める(画面を指でなぞる)</button>
   </div>
 </div>
 
@@ -99,7 +101,7 @@ const PARAM = {
   curl: 4, pIter: 18, simShort: 128,
   centers: [0.13, 0.19, 0.27], sigma: 0.04,   // 手の大きさ(画面の長辺比)と層の対応
 };
-const state = { ptrLayer: 0, depthScale: 1, handOK: false };
+const state = { ptrLayer: 0, depthScale: 1, handOK: false, ar: false };
 
 /* ---------- ステータス表示 ---------- */
 let statusTimer = 0;
@@ -251,7 +253,7 @@ function render(){
    ========================================================= */
 const tilt = { g0: null, b0: null, x: 0, y: 0, tx: 0, ty: 0 };
 function onOrient(e){
-  if(e.gamma == null || e.beta == null) return;
+  if(!state.ar || e.gamma == null || e.beta == null) return;
   if(tilt.g0 == null){ tilt.g0 = e.gamma; tilt.b0 = e.beta; }
   tilt.g0 += (e.gamma - tilt.g0) * 0.004; tilt.b0 += (e.beta - tilt.b0) * 0.004;   // 基準をゆっくり追従
   tilt.tx = Math.max(-1, Math.min(1, (e.gamma - tilt.g0) / 25));
@@ -371,7 +373,7 @@ hud.addEventListener('pointermove', e => {
 let last = performance.now(), lastVT = -1, wantCapture = false, running = false;
 function frame(now){
   const dt = Math.min((now - last) / 1000, 1 / 20); last = now;
-  if(landmarker && video.readyState >= 2 && video.currentTime !== lastVT){
+  if(state.ar && landmarker && video.readyState >= 2 && video.currentTime !== lastVT){
     lastVT = video.currentTime;
     try{
       const r = landmarker.detectForVideo(video, now);
@@ -422,28 +424,46 @@ $('#save').addEventListener('click', () => { wantCapture = true; });
 $('#depth').addEventListener('input', e => { state.depthScale = +e.target.value; });
 addEventListener('resize', resize);
 
-async function boot(useCamera){
+function stopCamera(){
+  const st = video.srcObject; if(st) st.getTracks().forEach(t => t.stop());
+  video.srcObject = null; lastVT = -1;
+}
+function syncMode(){            // 見た目をモードに合わせる
+  $('#arToggle').classList.toggle('on', state.ar);
+  video.style.display = state.ar ? 'block' : 'none';
+  $('#depthWrap').classList.toggle('hidden', !state.ar);
+  if(!state.ar){ lostHand(); tilt.tx = tilt.ty = 0; tilt.g0 = null; }
+}
+let motionOn = false, arBusy = false;
+async function setAR(on){
+  if(arBusy) return; arBusy = true;
+  try{
+    if(!on){ stopCamera(); state.ar = false; syncMode(); say('通常モード:画面を指でなぞって墨を落とします'); return; }
+    state.ar = true; syncMode(); say('カメラと傾きセンサーを準備中…', true);
+    const motion = motionOn ? Promise.resolve(true) : enableMotion();   // iOSは、許可を求める呼び出しがタップ操作の中で必要
+    try{ await startCamera(); }
+    catch(e){ state.ar = false; syncMode(); say('カメラを使えませんでした(設定でカメラを許可してください)。通常モードに戻しました'); return; }
+    motionOn = await motion;
+    if(!landmarker){
+      say('手の認識を読み込み中…', true);
+      try{ await loadHands(); }
+      catch(e){ console.error(e); say('手の認識を読み込めませんでした。カメラ映像の上で、画面を指でなぞって遊べます'); return; }
+    }
+    say('背面カメラの向こうで手をかざして、親指と人差し指をつまんでみてください');
+  } finally { arBusy = false; }
+}
+async function boot(useAR){
   if(!gl){ alert('このブラウザはWebGL2に対応していません'); return; }
   const ext = gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float');
   if(!ext){ alert('この端末では流体の計算に必要な機能(浮動小数点描画)が使えません'); return; }
   for(const k in FS) progs[k] = mkProg(FS[k]);
-  resize();
+  resize(); syncMode();
   $('#intro').classList.add('hidden'); $('#ui').classList.remove('hidden');
   if(!running){ running = true; requestAnimationFrame(frame); }
-
-  if(!useCamera){ say('画面を指でなぞると墨が落ちます。右のボタンで層を選べます', false); return; }
-  say('カメラと傾きセンサーを準備中…', true);
-  const motion = enableMotion();            // iOSは、許可を求める呼び出しがタップ操作の中で必要
-  try{ await startCamera(); }
-  catch(e){
-    say('カメラを使えませんでした。画面を指でなぞって遊べます(設定でカメラを許可してください)');
-    return;
-  }
-  if(!await motion) console.info('傾きセンサーなし:視差は無効');
-  say('手の認識を読み込み中…', true);
-  try{ await loadHands(); say('背面カメラの向こうで手をかざして、親指と人差し指をつまんでみてください'); }
-  catch(e){ console.error(e); say('手の認識を読み込めませんでした。画面を指でなぞって遊べます'); }
+  if(useAR) await setAR(true);
+  else say('画面を指でなぞると墨が落ちます。右のボタンで層を選べます。左下のARでカメラの世界に切り替え');
 }
+$('#arToggle').addEventListener('click', () => setAR(!state.ar));
 $('#start').addEventListener('click', () => boot(true));
 $('#startNoCam').addEventListener('click', () => boot(false));
 if(location.hash === '#demo') boot(false);   // 動作確認用
