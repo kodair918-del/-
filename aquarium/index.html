@@ -11,7 +11,7 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
   html,body{margin:0;height:100%;background:#0d2c55;overflow:hidden;overscroll-behavior:none;
     font-family:'DotGothic16',ui-monospace,monospace;color:var(--ui)}
-  canvas{position:fixed;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none}
+  #c{position:fixed;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none}
   .bar{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 10px) 14px 0;
     display:flex;justify-content:space-between;align-items:center;pointer-events:none}
   .title{font-size:15px;text-shadow:2px 2px 0 #0d2c55}
@@ -23,6 +23,22 @@
   button:active{transform:translateY(3px);box-shadow:none}
   .hint{position:fixed;left:0;right:0;top:46%;text-align:center;font-size:14px;text-shadow:2px 2px 0 #0d2c55;
     pointer-events:none;transition:opacity 1.2s}
+  .dock button{flex:1;padding:10px 4px;font-size:13px}
+  .modal{position:fixed;inset:0;background:rgba(5,15,40,.8);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+  .modal.on{display:flex}
+  .panel{width:100%;max-width:360px;max-height:100%;overflow:auto;background:#10325f;border:3px solid #fff;padding:14px;
+    box-shadow:0 4px 0 #061a38;font-size:14px;line-height:1.6}
+  .panel h2{margin:0 0 8px;font-size:16px}
+  .panel button{width:100%;margin:6px 0}
+  .panel .sec{display:none}.panel .sec.on{display:block}
+  #qr{display:block;margin:8px auto;width:260px;height:260px;image-rendering:pixelated;background:#fff;border:6px solid #fff}
+  video{width:100%;aspect-ratio:1;object-fit:cover;background:#000;border:2px solid #fff}
+  textarea{width:100%;height:56px;font:11px monospace;background:#061a38;color:#bde;border:2px solid #4a78b8;user-select:text;-webkit-user-select:text}
+  details{margin-top:6px;font-size:12px}
+  .small{font-size:12px;opacity:.85}
+  .toast{position:fixed;left:50%;top:60px;transform:translateX(-50%);background:var(--ui-bg);border:2px solid #fff;padding:6px 12px;
+    font-size:14px;z-index:20;opacity:0;transition:opacity .4s;pointer-events:none}
+  .toast.on{opacity:1}
 </style>
 </head>
 <body>
@@ -32,8 +48,45 @@
 <div class="dock">
   <button id="add">＋ さかな</button>
   <button id="jelly">＋ クラゲ</button>
+  <button id="link">🔗 つなぐ</button>
   <button id="reset">リセット</button>
 </div>
+<div class="toast" id="toast"></div>
+<div class="modal" id="modal"><div class="panel">
+  <div class="sec" id="m-menu">
+    <h2>🔗 すいそうをつなぐ</h2>
+    <p class="small">ふたりのスマホを近づけて、おたがいのQRコードを読み合うとつながります。魚が画面のはしから、となりのスマホへ泳いで行きます。</p>
+    <button id="m-host">① 左がわになる（QRを見せる）</button>
+    <button id="m-guest">② 右がわになる（QRを読む）</button>
+    <button id="m-unlink">つなぎをやめる</button>
+    <button class="m-close">とじる</button>
+  </div>
+  <div class="sec" id="m-show">
+    <h2 id="m-title"></h2>
+    <canvas id="qr" width="260" height="260"></canvas>
+    <p class="small" id="m-note"></p>
+    <button id="m-next">つぎへ：相手のQRを読む</button>
+    <details><summary>QRが読めないとき</summary>
+      <p class="small">この文字を相手に送ってください（AirDropやLINEでOK）</p>
+      <textarea id="m-code" readonly></textarea>
+      <button id="m-copy">コピー</button>
+    </details>
+    <button class="m-close">やめる</button>
+  </div>
+  <div class="sec" id="m-scan">
+    <h2 id="m-scan-title"></h2>
+    <video id="vid" playsinline muted></video>
+    <p class="small" id="m-scan-note">相手のQRコードを枠に入れてください</p>
+    <details><summary>QRが読めないとき</summary>
+      <p class="small">相手から届いた文字をここに貼り付けてください</p>
+      <textarea id="m-paste"></textarea>
+      <button id="m-paste-ok">決定</button>
+    </details>
+    <button class="m-close">やめる</button>
+  </div>
+</div></div>
+<script src="lib/qrcode.js"></script>
+<script src="lib/jsQR.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -140,6 +193,7 @@ const SHELL=sprite([
 ],{p:'#ffc2d6',w:'#fff'});
 
 /* ---------- state ---------- */
+const link={pc:null,dc:null,role:null};
 let fishes=[],jellies=[],foods=[],bubbles=[],hearts=[],plants=[],rocks=[],crab,t=0;
 function sandY(){return H-30;}
 
@@ -174,7 +228,7 @@ function load(){
   for(let i=0;i<nj;i++)addJelly();
   updateCount();
 }
-function updateCount(){document.getElementById('count').textContent=(fishes.length+jellies.length)+'ひき';}
+function updateCount(){const lk=link.dc&&link.dc.readyState==='open';document.getElementById('count').textContent=(lk?'🔗 ':'')+(fishes.length+jellies.length)+'ひき';}
 
 /* ---------- input ---------- */
 function toLogical(e){
@@ -219,12 +273,20 @@ function update(){
     }else{
       f.x+=f.vx; f.y+=(f.ty-f.y)*.01+Math.sin(f.sw)*.08;
       f.next-=1/60; if(f.next<=0){f.ty=R(26,sandY()-20);f.next=R(2,7);}
-      if(f.x>W+14){f.x=W+14;f.vx=-Math.abs(f.vx);f.dir=-1;}
-      if(f.x<-14){f.x=-14;f.vx=Math.abs(f.vx);f.dir=1;}
+      const lk=link.dc&&link.dc.readyState==='open';
+      if(f.x>W+14){
+        if(lk&&link.role==='host'&&f.vx>0){sendFish(f);f.gone=true;}
+        else{f.x=W+14;f.vx=-Math.abs(f.vx);f.dir=-1;}
+      }
+      if(f.x<-14){
+        if(lk&&link.role==='guest'&&f.vx<0){sendFish(f);f.gone=true;}
+        else{f.x=-14;f.vx=Math.abs(f.vx);f.dir=1;}
+      }
     }
     if(f.eat>0)f.eat--;
     f.y=Math.max(18,Math.min(sandY()-10,f.y));
   });
+  if(fishes.some(f=>f.gone)){fishes=fishes.filter(f=>!f.gone);updateCount();}
 
   jellies.forEach(j=>{
     j.ph+=.05;
@@ -350,6 +412,138 @@ function loop(ts){
   draw();
   requestAnimationFrame(loop);
 }
+/* ---------- linking (WebRTC, no server) ---------- */
+const $=id=>document.getElementById(id);
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2500);}
+function sendFish(f){
+  try{link.dc.send(JSON.stringify({t:'fish',sc:f.sc,big:f.big,speed:f.speed,r:f.y/sandY()}));}catch(e){}
+}
+function recvFish(m){
+  const host=link.role==='host';
+  const dir=host?-1:1;
+  const y=Math.max(20,Math.min(sandY()-14,m.r*sandY()));
+  fishes.push({x:host?W+12:-12,y,vx:dir*m.speed,dir,sc:m.sc,big:m.big,ty:y,sw:R(0,6),next:R(2,5),eat:0,speed:m.speed});
+  updateCount();
+}
+function setupDC(dc){
+  link.dc=dc;
+  dc.onopen=()=>{closeModal();updateCount();toast('つながった！🐟');};
+  dc.onclose=()=>{if(link.dc===dc){link.dc=null;updateCount();toast('つなぎが切れました');}};
+  dc.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.t==='fish')recvFish(m);}catch(_){}};
+}
+const b64=u8=>{let s='';u8.forEach(b=>s+=String.fromCharCode(b));return btoa(s);};
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function pipe(stream,bytes){
+  const w=stream.writable.getWriter();w.write(bytes);w.close();
+  return new Uint8Array(await new Response(stream.readable).arrayBuffer());
+}
+async function pack(d){
+  const raw=new TextEncoder().encode(JSON.stringify({type:d.type,sdp:d.sdp}));
+  if(window.CompressionStream)return 'z'+b64(await pipe(new CompressionStream('deflate-raw'),raw));
+  return 'p'+b64(raw);
+}
+async function unpack(str){
+  str=str.replace(/\s+/g,'');
+  let bytes=unb64(str.slice(1));
+  if(str[0]==='z')bytes=await pipe(new DecompressionStream('deflate-raw'),bytes);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+function newPC(){
+  closePC();
+  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  pc.onconnectionstatechange=()=>{if(['failed','closed'].includes(pc.connectionState)&&link.pc===pc&&!(link.dc&&link.dc.readyState==='open'))toast('つなげませんでした。もう一度ためしてね');};
+  link.pc=pc;return pc;
+}
+function closePC(){
+  if(link.dc){const d=link.dc;link.dc=null;try{d.close();}catch(e){}}
+  if(link.pc){try{link.pc.close();}catch(e){}link.pc=null;}
+  link.role=null;updateCount();
+}
+function waitIce(pc){
+  return new Promise(res=>{
+    if(pc.iceGatheringState==='complete')return res();
+    const done=()=>{pc.removeEventListener('icegatheringstatechange',chk);res();};
+    const chk=()=>{if(pc.iceGatheringState==='complete')done();};
+    pc.addEventListener('icegatheringstatechange',chk);
+    setTimeout(done,3500);
+  });
+}
+function drawQR(text){
+  const qr=qrcode(0,'L');qr.addData(text,'Byte');qr.make();
+  const n=qr.getModuleCount(),c=$('qr'),g=c.getContext('2d');
+  c.width=c.height=n+8;g.fillStyle='#fff';g.fillRect(0,0,n+8,n+8);g.fillStyle='#000';
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(qr.isDark(y,x))g.fillRect(x+4,y+4,1,1);
+}
+function section(id){['m-menu','m-show','m-scan'].forEach(k=>$(k).classList.toggle('on',k===id));}
+function openModal(){$('modal').classList.add('on');section('m-menu');}
+function closeModal(){$('modal').classList.remove('on');stopScan();}
+let scanStream=null,scanning=false;
+function stopScan(){scanning=false;if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}$('vid').srcObject=null;}
+async function startScan(cb){
+  $('m-paste').value='';
+  let handled=false;
+  const handle=code=>{if(handled)return;handled=true;stopScan();cb(code);};
+  $('m-paste-ok').onclick=()=>{const v=$('m-paste').value.trim();if(v)handle(v);};
+  try{
+    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const v=$('vid');v.srcObject=scanStream;await v.play();
+    scanning=true;
+    const cvs=document.createElement('canvas'),g=cvs.getContext('2d',{willReadFrequently:true});
+    const tick=()=>{
+      if(!scanning)return;
+      if(v.videoWidth){
+        cvs.width=v.videoWidth;cvs.height=v.videoHeight;g.drawImage(v,0,0);
+        const r=jsQR(g.getImageData(0,0,cvs.width,cvs.height).data,cvs.width,cvs.height);
+        if(r&&r.data)return handle(r.data);
+      }
+      setTimeout(tick,120);
+    };
+    tick();
+  }catch(e){$('m-scan-note').textContent='カメラが使えません。下の「QRが読めないとき」から文字を貼り付けてね';}
+}
+function showCode(code,title,note,next){
+  $('m-title').textContent=title;$('m-note').textContent=note;$('m-code').value=code;
+  drawQR(code);
+  $('m-next').style.display=next?'block':'none';$('m-next').onclick=next||null;
+  section('m-show');
+}
+async function fail(e){console.error(e);toast('うまく読み取れませんでした');section('m-menu');closePC();}
+async function startHost(){
+  try{
+    const pc=newPC();link.role='host';setupDC(pc.createDataChannel('aq'));
+    await pc.setLocalDescription(await pc.createOffer());await waitIce(pc);
+    const code=await pack(pc.localDescription);
+    showCode(code,'① 相手にこのQRを読んでもらう','相手が「右がわになる」でこのQRを読み取ったら、下のボタンを押してね',()=>{
+      $('m-scan-title').textContent='② 相手のQRを読む';
+      section('m-scan');
+      startScan(async c=>{try{await pc.setRemoteDescription(await unpack(c));$('m-scan-note').textContent='つなぎ中…';section('m-show');$('m-next').style.display='none';$('m-note').textContent='つなぎ中… しばらく待ってね';}catch(e){fail(e);}});
+    });
+  }catch(e){fail(e);}
+}
+async function startGuest(){
+  link.role='guest';
+  $('m-scan-title').textContent='① 左がわのQRを読む';
+  $('m-scan-note').textContent='左がわの人が出しているQRを枠に入れてください';
+  section('m-scan');
+  startScan(async c=>{
+    try{
+      const pc=newPC();link.role='guest';pc.ondatachannel=e=>setupDC(e.channel);
+      await pc.setRemoteDescription(await unpack(c));
+      await pc.setLocalDescription(await pc.createAnswer());await waitIce(pc);
+      showCode(await pack(pc.localDescription),'② 相手にこのQRを読んでもらう','左がわの人が読み取ると、自動でつながります',null);
+    }catch(e){fail(e);}
+  });
+}
+$('link').onclick=openModal;
+$('m-host').onclick=startHost;
+$('m-guest').onclick=startGuest;
+$('m-unlink').onclick=()=>{closePC();closeModal();toast('つなぎをやめました');};
+document.querySelectorAll('.m-close').forEach(b=>b.onclick=()=>{
+  if(!(link.dc&&link.dc.readyState==='open'))closePC();
+  closeModal();
+});
+$('m-copy').onclick=async()=>{try{await navigator.clipboard.writeText($('m-code').value);toast('コピーしました');}catch(e){$('m-code').select();}};
+
 addEventListener('resize',resize);
 addEventListener('contextmenu',e=>e.preventDefault());
 resize();load();
